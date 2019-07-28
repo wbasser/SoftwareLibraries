@@ -32,8 +32,16 @@
 #include "SenBME280/SenBME280_cfg.h"
 
 // library includes -----------------------------------------------------------
+#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
+///define the number of events and execution rate for this task
+#define SENBME280_NUM_EVENTS              ( 2 )
+#define SENBME280_EXEC_RATE               ( TASK_TIME_MSECS( 70 ))
+
+/// define the sample rate/filter length
+#define SENBME280_SAMP_RATE_MSECS         ( 100 )
+#define SENBME280_FILTER_LENGTH           ( 4 ) 
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the measure type
@@ -51,7 +59,7 @@ typedef enum _SENBME280MEASTYPE
 
 // global function prototypes --------------------------------------------------
 extern  void    SenBME280_Initialize( void );
-extern  void    SenBME280_ProcessScan( void );
+extern  BOOL    SenBME280_ProcessScan( TASKARG xArg );
 extern  S32     SenBME280_GetRawData( SENBME280MEASTYPE eMeasType );
 extern  FLOAT   SenBME280_Compensate( SENBME280MEASTYPE eMeasType, S32 lValue );
 extern  BOOL    SenBME280_GetMeasurement( SENBME280MEASTYPE eMeasType, PFLOAT pfValue );

@@ -36,16 +36,17 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the helper macro for filling a keyboard handler configuation
-#define BTNMNGR_CFG_ENTRY( debnc, repdly, reprate, sh_time, lh_time, stuck_time ) \
+#define BTNMNGR_CFG_ENTRY( debnc, repdly, reprate, sh_time, mh_time, lh_time, stuck_time ) \
     .wDebounceTimeMsecs = debnc, \
     .wRepeatDelayMsecs = repdly, \
     .wRepeatRateMsecs = reprate, \
     .wShortHoldTimeMsecs = sh_time, \
+    .wMediumHoldTimeMsecs = mh_time, \
     .wLongHoldTimeMsecs = lh_time, \
     .wStuckTimeMsecs = stuck_time \
 
 /// define the helper macro for creating button manager entry events
-#define BTNMNGR_DEFCB_ENTRY( keyenum, rel_enb, prs_enb, rep_enb, shh_enb, lng_enb, tgl_enb, callback ) \
+#define BTNMNGR_DEFCB_ENTRY( keyenum, rel_enb, prs_enb, rep_enb, shh_enb, mdh_enb, lng_enb, tgl_enb, getstatus, callback ) \
   {\
     .eRptMethod = BTNMNGR_RPTMETHOD_CB, \
     .nKeyEnum = keyenum, \
@@ -55,13 +56,15 @@
       .bPressEnable = prs_enb, \
       .bRepeatEnable = rep_enb, \
       .bShortHoldEnable = shh_enb, \
+      .bMediumHoldEnable = mdh_enb, \
       .bLongHoldEnable = lng_enb, \
       .bToggleEnable = tgl_enb, \
     }, \
+    .pvGetStatus = getstatus, \
     .pvCallback = callback \
   }
 
-#define BTNMNGR_DEFEVENT_ENTRY( keyenum, rel_enb, prs_enb, rep_enb, shh_enb, lng_enb, tgl_enb, task ) \
+#define BTNMNGR_DEFEVENT_ENTRY( keyenum, rel_enb, prs_enb, rep_enb, shh_enb, mdh_enb, lng_enb, tgl_enb, getstatus, task ) \
   {\
     .eRptMethod = BTNMNGR_RPTMETHOD_EVENT, \
     .nKeyEnum = keyenum, \
@@ -71,9 +74,11 @@
       .bPressEnable = prs_enb, \
       .bRepeatEnable = rep_enb, \
       .bShortHoldEnable = shh_enb, \
+      .bMediumHoldEnable = mdh_enb, \
       .bLongHoldEnable = lng_enb, \
       .bToggleEnable = tgl_enb, \
     }, \
+    .pvGetStatus = getstatus, \
     .eTaskEnum = task \
   }
 
@@ -91,7 +96,10 @@ typedef enum _BTNMNGRRPTMETHOD
 
 // structures -----------------------------------------------------------------
 /// define the callback function event
-typedef void ( *PVBTNMNGRFUNC )( U8, U8 );
+typedef void ( *PVBTNMNGRCBFUNC  )( U8, U8 );
+
+/// define the get button status 
+typedef BOOL ( *PVBTNMNGRGETSTS )( U8 );
 
 /// define the key global settings
 typedef struct _BTNMNGRCFG
@@ -100,6 +108,7 @@ typedef struct _BTNMNGRCFG
   U16   wRepeatDelayMsecs;        ///< repeat delay
   U16   wRepeatRateMsecs;         ///< repeat rate
   U16   wShortHoldTimeMsecs;      ///< short hold time
+  U16   wMediumHoldTimeMsecs;     ///< medium hold time
   U16   wLongHoldTimeMsecs;       ///< long hold time
   U16   wStuckTimeMsecs;          ///< stuck key time
 } BTNMNGRCFG, *PBTNMNGRCFG; 
@@ -117,10 +126,12 @@ typedef struct _BTNMNGRDEF
     BOOL  bPressEnable      : 1;  ///< enable press events
     BOOL  bRepeatEnable     : 1;  ///< enable repeat events
     BOOL  bShortHoldEnable  : 1;  ///< enable short hold events
+    BOOL  bMediumHoldEnable : 1;  ///< medium hold events
     BOOL  bLongHoldEnable   : 1;  ///< enable long hold events
     BOOL  bToggleEnable     : 1;  ///< enable toggle operations
   } tEventFlags;
-  PVBTNMNGRFUNC     pvCallback;   ///< callback function
+  PVBTNMNGRGETSTS      pvGetStatus;   ///< get status function
+  PVBTNMNGRCBFUNC      pvCallback;    ///< callback function
 } BTNMNGRDEF, *PBTNMNGRDEF;
 #define BTNMNGRDEF_SIZE   sizeof( BTNMNGRDEF )
 

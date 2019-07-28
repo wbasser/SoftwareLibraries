@@ -30,9 +30,13 @@
 #include "SystemTick/SystemTick.h"
 
 // local parameter declarations -----------------------------------------------
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 static  U64               hSystemTime;
 static  U32               uTickRateUsec;
 static  U32               uDelayTime;
+#else
+static  U32               wTickRateMsec;
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 static  PVSYSTEMTICKFUNC  pvTickFunc;
 
 // local function prototypes
@@ -47,22 +51,27 @@ static  PVSYSTEMTICKFUNC  pvTickFunc;
  *****************************************************************************/
 void SystemTick_Initialize( U32 uTickRateHz, PVSYSTEMTICKFUNC pvCallback )
 {
-  // clear the system time
-  hSystemTime = 0;
-
   // store the callback
   pvTickFunc = pvCallback;
   
   // initialize the system tick counter
-	SysTick->CTRL = 0;
-	SysTick->LOAD = Clock_GetFreq( ) / uTickRateHz;
-	SysTick->VAL  = 0;
-	SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+  SysTick->CTRL = 0;
+  SysTick->LOAD = Clock_GetFreq( ) / uTickRateHz;
+  SysTick->VAL  = 0;
+  SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  // clear the system time
+  hSystemTime = 0;
 
   // compute the tick rate in microseconds
   uTickRateUsec = 1000000ul / uTickRateHz;
+#else
+  wTickRateMsec = 1000 / uTickRateHz;
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 }
 
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 /******************************************************************************
  * @function SystemTick_GetTickRateUsec
  *
@@ -149,6 +158,7 @@ BOOL SystemTick_IsDelayExpired( void )
   // return the state of delay time
   return(( uDelayTime == 0 ) ? TRUE : FALSE );
 }
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 
 /******************************************************************************
  * @function IrqHandler
@@ -161,11 +171,16 @@ BOOL SystemTick_IsDelayExpired( void )
  *****************************************************************************/
 void SysTick_Handler( void )
 {
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   // adjust the system time
   hSystemTime += uTickRateUsec;
 
   // call the init function
   pvTickFunc( );
+#else
+  pvTickFunc( wTickRateMsec );
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
+
 }
  
 /**@} EOF SystemTick.c */

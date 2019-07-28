@@ -99,7 +99,7 @@ static  const CODE C8 szFilEep[ ]   = { "FEEP" };
 static  const CODE C8 szRspRep[ ]   = { "RREP, 0x%04X, 0x%02X\n\r" };
 
 /// initialize the command table
-const CODE ASCCMDENTRY atEepromDbgHandlerTable[ ] =
+const CODE ASCCMDENTRY g_atEepromDbgHandlerTable[ ] =
 {
   ASCCMD_ENTRY( szWrtEep, 4, 2, ASCFLAG_COMPARE_EQ, EEPROMHANDLER_DIAGMODE_ENUM, CmdWrtEep ),
   ASCCMD_ENTRY( szRedEep, 4, 1, ASCFLAG_COMPARE_EQ, EEPROMHANDLER_DIAGMODE_ENUM, CmdRedEep ),
@@ -129,7 +129,9 @@ void EepromHandler_Initialize( void )
   #endif // EEPROMHANDLER_ENABLE_EMULATION
   
   // call the local initialization
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   EepromHandler_LclInitialize( );
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 }
 
 #if ( EEPROMHANDLER_ENABLE_BACKGROUND_WRITES == 1 )
@@ -330,13 +332,21 @@ EEPROMERR EepromHandler_RdBlock( U16 wAddress, U16 wLength, PU8 pnData )
   {
     #if (( EEPROMHANDLER_ENABLE_EMULATION == 0 ) && ( EEPROMHANDLER_ENABLE_BACKGROUND_WRITES == 0 ))
     // get the current time
+    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
     uTime = EEPROMHANDLER_GET_SYSTEMTIME( ) + WAIT_FOR_BUSY_DONE_TIME;
+    #else
+    uTime = 0x8000000;
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 
     // wait till done
-    while(( bCheckForBusyRequired = CheckForBusy( )) == TRUE )
+    while(( bCheckForBusyRequired = EepromHandler_CheckDeviceBusy( )) == TRUE )
     {
       // check for timeout
+     #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
       if ( EEPROMHANDLER_GET_SYSTEMTIME( ) >= uTime )
+      #else
+      if ( --uTime == 0 )
+      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
       {
         // timeout occured - flag error
         eError = EEPROM_ERR_DEVBUSY;
@@ -547,12 +557,18 @@ static EEPROMERR WriteBlock( U16 wAddress, U8 nBlkLength, PU8 pnData )
   U32       uTime;
 
   // get the current time
-	uTime = EEPROMHANDLER_GET_SYSTEMTIME( ) + WAIT_FOR_BUSY_DONE_TIME;
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  EepromHandler_LclInitialize( );
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+  UTime = EEPROMHANDLER_GET_SYSTEMTIME( ) + WAIT_FOR_BUSY_DONE_TIME;
 
   // wait till done
   while(( bCheckForBusyRequired = CheckForBusy( )) == TRUE )
   {
     // check for timeout
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  EepromHandler_LclInitialize( );
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
     if ( EEPROMHANDLER_GET_SYSTEMTIME( ) >= uTime )
     {
       // timeout occured - flag error
@@ -579,6 +595,8 @@ static EEPROMERR WriteBlock( U16 wAddress, U8 nBlkLength, PU8 pnData )
     tXfrCtl.uTimeout = WRBLOCK_MAX_TIMEOUT + COMPUTE_BLOCK_TIME( nBlkLength + EEPROMHANDLER_ADR_SIZE );
 
     // perform write
+    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
     eError = ( EEPROMERR )I2c_Write( EEPROMHANDLER_I2C_ENUM, &tXfrCtl );
 
     // set the check for busy
@@ -612,6 +630,9 @@ static BOOL CheckForBusy( void )
     // check for device presence
     tChkBusy.nDevAddr = EEPROMHANDLER_DEV_ADDR;
     tChkBusy.bReadMode = EEPROMHANDLER_I2C_POLL_MODE;
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  EepromHandler_LclInitialize( );
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
     if ( I2c_Ioctl( EEPROMHANDLER_I2C_ENUM, I2C_ACTION_POLL_DEVICE, ( PVOID )&tChkBusy ) == I2C_ERR_NONE )
     {
       // clear busy

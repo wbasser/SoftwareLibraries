@@ -58,6 +58,7 @@ typedef struct  _TICKTASKCTL
 {
   U32		uDelayTime;			  ///< current delay time
   U32		uDelayCount;		  ///< delay count
+  BOOL  bEnabled;         ///< task enabled
 } TICKTASKCTL, *PTICKTASKCTL;
 #define TICKTASKCTL_SIZE  sizeof( TICKTASKCTL );
 #endif  // TASK_TICK_ENABLE
@@ -109,7 +110,7 @@ void TaskManager_Initialize( void )
   {
     // get a pointer to the task control/definition
     ptSchdCtl = &atSchdCtls[ nIdx ];
-    ptSchdDef = ( PTASKSCHDDEF )&atTaskSchdDefs[ nIdx ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ nIdx ];
     
     // set the initial values
     ptSchdCtl->uDelayTime   = PGM_RDDWRD( ptSchdDef->uDelayTime ) / uExecutionRate;
@@ -154,6 +155,7 @@ void TaskManager_Initialize( void )
     // set the initial values
     ptTickCtl->uDelayTime	= PGM_RDDWRD( ptTickDef->uDelayTime ) / uExecutionRate;
     ptTickCtl->uDelayCount	= ptTickCtl->uDelayTime;
+    ptTickCtl->bEnabled     = PGM_RDBYTE( ptTickDef->bEnabled );
   }
   #endif  // TASK_TICK_ENABLE
 }
@@ -169,13 +171,12 @@ void TaskManager_Initialize( void )
  *****************************************************************************/
 void TaskManager_IdleProcess( void )
 {
-  U8			      nIdx;
+  U8            nIdx;
   PVEXECFUNC    pvExec;
-  PTASKARG		  pxEvents;
+  PTASKARG	pxEvents;
   PSCHDTASKCTL	ptSchdCtl;
   PTASKSCHDDEF	ptSchdDef;
-  TASKTYPE		  eType;
-  TASKARG		    xArg;
+  TASKARG	xArg;
   BOOL          bPriEvent;
   
   #if ( TASK_DISABLE_TICK_PROCESSING == 1 )
@@ -192,24 +193,15 @@ void TaskManager_IdleProcess( void )
   {
     // get the pointers
     ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ nIdx ];
-    ptSchdDef = ( PTASKSCHDDEF )&atTaskSchdDefs[ nIdx ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ nIdx ];
 
-    // get the task type
-    eType = PGM_RDBYTE( ptSchdDef->eType );
-    
     // determine if this task is enabled
     if ( ptSchdCtl->bEnabled )
     {
       // get the task execution function
       pvExec = ( PVOID )PGM_RDWORD( ptSchdDef->pvExec );
       
-      // if every loop task, execute
-      if ( eType == TASK_TYPE_EXECUTE_EVERYLOOP )
-      {
-        // execute with no argument
-        pvExec( 0 );
-      }
-      else if (( ptSchdCtl->xEvnCount != 0 ) || ( ptSchdCtl->nPriEvnCount != 0 ))
+      if (( ptSchdCtl->xEvnCount != 0 ) || ( ptSchdCtl->nPriEvnCount != 0 ))
       {
         // determine if we have any priority events
         if ( ptSchdCtl->nPriEvnCount != 0 )
@@ -283,18 +275,22 @@ void TaskManager_TickProcess( void )
   for ( nIdx = 0; nIdx < TASK_TICK_MAX; nIdx++ )
   {
     // get the pointers
-    ptTickCtl = ( PTICKTASKCTL )&atTickCtls[ nIdx ];
-    ptTickDef = ( PTASKTICKDEF )&atTaskTickDefs[ nIdx ];
+    ptTickCtl = ( PTICKTASKCTL )&g_atTickCtls[ nIdx ];
+    ptTickDef = ( PTASKTICKDEF )&g_atTaskTickDefs[ nIdx ];
 
-    // decrement the delay
-    if ( --ptTickCtl->uDelayCount == 0 )
+    // check for enabled
+    if ( ptTickCtl->bEnabled )
     {
-      // execute the task
-      pvExec = ( PVEXECFUNC )PGM_RDWORD( ptTickDef->pvExec );
-      pvExec( TASK_TIMEOUT_EVENT );
+      // decrement the delay
+      if ( --ptTickCtl->uDelayCount == 0 )
+      {
+        // execute the task
+        pvExec = ( PVEXECFUNC )PGM_RDWORD( ptTickDef->pvExec );
+        pvExec( TASK_TIMEOUT_EVENT );
 
-      // reset the time
-      ptTickCtl->uDelayCount = ptTickCtl->uDelayTime;
+        // reset the time
+        ptTickCtl->uDelayCount = ptTickCtl->uDelayTime;
+      }
     }
   }
   #endif  // TASK_TICK_ENABLE
@@ -337,6 +333,37 @@ BOOL TaskManager_EnableDisable( TASKSCHDENUMS eTask, BOOL bState )
   return( bStatus );
 }
 
+#if ( TASK_TICK_ENABLE == 1 )
+/******************************************************************************
+ * @function TaskManager_TickEnableDisable
+ *
+ * @brief enables/disables a tick task to run
+ *
+ * This function sets the enable flag in the control structure
+ *
+ * @param[in]   eTask   task enumeration
+ * @param[in]   bState  state of the task
+ *
+ * @return      TRUE if okay, FALSE if illegal task enumeration
+ *
+ *****************************************************************************/
+BOOL TaskManager_TickEnableDisable( TASKTICKENUMS eTask, BOOL bState )
+{
+  BOOL bStatus = FALSE;
+  
+  // valid task
+  if ( eTask < TASK_TICK_MAX )
+  {
+    // set the enable flag/indicate good status
+    atTickCtls[ eTask ].bEnabled = bState;
+    bStatus = TRUE;
+  }
+  
+  // return the status
+  return( bStatus );
+}
+#endif  // TASK_TICK_ENABLE
+
 /******************************************************************************
  * @function TaskManager_PostEvent
  *
@@ -364,11 +391,11 @@ BOOL TaskManager_PostEvent( TASKSCHDENUMS eTask, TASKARG xArg )
   {
     // get a pointer to the event control
     ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ eTask ];
-    ptSchdDef = ( PTASKSCHDDEF )&atTaskSchdDefs[ eTask ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ eTask ];
     
     // test for a valid entry
     eType = PGM_RDBYTE( ptSchdDef->eType );
-    if (( eType != TASK_TYPE_EXECUTE_EVERYLOOP ) && ( eType != TASK_TYPE_TIMED_ONESHOT ) && ( ptSchdCtl->bEnabled == TRUE ))
+    if (( eType != TASK_TYPE_TIMED_ONESHOT ) && ( ptSchdCtl->bEnabled == TRUE ))
     {
       // disable interrupts
       Interrupt_Disable( );
@@ -428,11 +455,11 @@ BOOL TaskManager_PostPriorityEvent( TASKSCHDENUMS eTask, TASKARG xArg )
   {
     // get a pointer to the event control
     ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ eTask ];
-    ptSchdDef = ( PTASKSCHDDEF )&atTaskSchdDefs[ eTask ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ eTask ];
     
     // test for a valid entry
     eType = PGM_RDBYTE( ptSchdDef->eType );
-    if (( eType != TASK_TYPE_EXECUTE_EVERYLOOP ) && ( eType != TASK_TYPE_TIMED_ONESHOT ) && ( ptSchdCtl->bEnabled == TRUE ))
+    if (( eType != TASK_TYPE_TIMED_ONESHOT ) && ( ptSchdCtl->bEnabled == TRUE ))
     {
       // disable interrupts
       Interrupt_Disable( );
@@ -442,6 +469,106 @@ BOOL TaskManager_PostPriorityEvent( TASKSCHDENUMS eTask, TASKARG xArg )
       
       // re-enable interrupts
       Interrupt_Enable( );
+    }
+  }
+  
+  // return the status
+  return( bStatus );
+}
+
+/******************************************************************************
+ * @function TaskManager_PostEventIrq
+ *
+ * @brief post an event to a task
+ *
+ * This function will post an event to a task if there is room
+ *
+ * @param[in]   eTask   task enumeration
+ * @param[in]   xArg    argument to post to task
+ *
+ * @return  TRUE if okay, false if illegal task enumeration or no room
+ *
+ *****************************************************************************/
+BOOL TaskManager_PostEventIrq( TASKSCHDENUMS eTask, TASKARG xArg )
+{
+  BOOL          bStatus = FALSE;
+  PTASKARG		  pxEvents;
+  PSCHDTASKCTL	ptSchdCtl;
+  PTASKSCHDDEF	ptSchdDef;
+  TASKTYPE		  eType;
+  QUESIZEARG    xNumEvents;
+  
+  // valid task
+  if ( eTask < TASK_SCHD_MAX )
+  {
+    // get a pointer to the event control
+    ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ eTask ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ eTask ];
+    
+    // test for a valid entry
+    eType = PGM_RDBYTE( ptSchdDef->eType );
+    if (( eType != TASK_TYPE_TIMED_ONESHOT ) && ( ptSchdCtl->bEnabled == TRUE ))
+    {
+      // get the number of events
+      xNumEvents = PGM_RDBYTE( ptSchdDef->xNumEvents );
+      
+      // is there room
+      if ( ptSchdCtl->xEvnCount < xNumEvents )
+      {
+        // get the event pointer
+        pxEvents = ( PTASKARG )PGM_RDWORD( ptSchdDef->pxEvents );
+
+        // stuff it/increment count/adjust write index
+        *( pxEvents + ptSchdCtl->xWrIdx++ ) = xArg;
+        ptSchdCtl->xEvnCount++;
+        ptSchdCtl->xWrIdx %= xNumEvents;
+        
+        // increment event count
+        wNrmEventCount++;
+        
+        // set good status
+        bStatus = TRUE;
+      }
+    }
+  }
+  
+  // return the status
+  return( bStatus );
+}
+
+/******************************************************************************
+ * @function TaskManager_PostPriorityEventIrq
+ *
+ * @brief post an event to a task
+ *
+ * This function will post an event to a task if there is room
+ *
+ * @param[in]   eTask   task enumeration
+ * @param[in]   xArg    argument to post to task
+ *
+ * @return  TRUE if okay, false if illegal task enumeration or no room
+ *
+ *****************************************************************************/
+BOOL TaskManager_PostPriorityEventIrq( TASKSCHDENUMS eTask, TASKARG xArg )
+{
+  BOOL          bStatus = FALSE;
+  PSCHDTASKCTL	ptSchdCtl;
+  PTASKSCHDDEF	ptSchdDef;
+  TASKTYPE		  eType;
+  
+  // valid task
+  if ( eTask < TASK_SCHD_MAX )
+  {
+    // get a pointer to the event control
+    ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ eTask ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ eTask ];
+    
+    // test for a valid entry
+    eType = PGM_RDBYTE( ptSchdDef->eType );
+    if (( eType != TASK_TYPE_TIMED_ONESHOT ) && ( ptSchdCtl->bEnabled == TRUE ))
+    {
+      // put a priority event
+      bStatus = PutPriorityEvent( ptSchdCtl, xArg );
     }
   }
   
@@ -639,7 +766,7 @@ static BOOL PutPriorityEvent( PSCHDTASKCTL ptCtl, TASKARG xArg )
     bStatus = TRUE;
   }
   
-  // return the statsu
+  // return the status
   return( bStatus );
 }
 
@@ -668,7 +795,7 @@ static void ProcessTick( void )
   {
     // get the pointers
     ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ nIdx ];
-    ptSchdDef = ( PTASKSCHDDEF )&atTaskSchdDefs[ nIdx ];
+    ptSchdDef = ( PTASKSCHDDEF )&g_atTaskSchdDefs[ nIdx ];
     
     // determine if there is a pending task
     if (( ptSchdCtl->bDelayInProgress ) && ( ptSchdCtl->bEnabled ))

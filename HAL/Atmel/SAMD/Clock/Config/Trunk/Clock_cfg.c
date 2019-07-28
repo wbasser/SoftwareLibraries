@@ -45,13 +45,13 @@
 // local function prototypes --------------------------------------------------
 
 // constant parameter initializations -----------------------------------------
-const CODE CLOCKOSCDEF  atClockOscDefs[ ] =
+const CODE CLOCKOSCDEF  g_atClockOscDefs[ ] =
 {
   // create entries using the below macros
   // CLOCKOSCDEFXOSC( ondemand, standby, exttype, extfreq, startup, autogain )
   // CLOCKOSCDEF32KEXT( ondemand, standby, out1kenb, out32kenb, exttype, extfreq, startup, autoamp )
   // CLOCKOSCDEF32KINT( ondemand, standby, out1kenb, out32kenb, id, outenab, outoffenb, impdtycyc, divselect, divisor ) 
-  // CLOCKOSCDEF8MHZ( ondemand, standby, outdiv )
+  // CLOCKOSCDEF8MHZ( ondemand, standby, outdiv, id, outenab, outoffenb, impdtycyc, divselect, divisor )
   // CLOCKOSCDEFDFLLOPEN( mult, coarse, fine, coarsestep, finestep, ondemand, usbrecover, quicklock, tracklock, lockonwakeup, chillcycle )
   // CLOCKOSCDEFDFLLCLOSED( ondemand, usbrecover, quicklock, tracklock, lockonwakeup, chillcycle, refid, refsrc, refoutenab, refoutoffenb, refimpdtycyc, refdivselect, refdivisor, outid, outoutenab, outoutoffenb, outimpdtycyc, outdivselect, outdivisor ) 
 
@@ -60,7 +60,7 @@ const CODE CLOCKOSCDEF  atClockOscDefs[ ] =
 };
 
 
-const CODE CLOCKGENDEF  atClockGenDefs[ ] =
+const CODE CLOCKGENDEF  g_atClockGenDefs[ ] =
 {
   // fill in this structure using the below macro
   // CLOCKGENDEF( clkgenid, clksrc, divselect, divisor, standby, outenb, outoffenb, dutycyle )
@@ -68,16 +68,17 @@ const CODE CLOCKGENDEF  atClockGenDefs[ ] =
   // do not remove his entry
   CLOCKGENDEF_EOT( )
 };
-const CODE CLOCKMUXDEF  atClockMuxDefs[ ] =
+
+const CODE CLOCKMUXDEF  g_atClockMuxDefs[ ] =
 {
   // fill in this structure using the below macro
   // CLOCKDEFMUX( id, clkgenid, writelock )
-  
+
   // do not remove this entry
   CLOCKDEFMUX_EOT( )
 };
 
-const CODE CLOCKMAINDEF tClockMainDef =
+const CODE CLOCKMAINDEF g_tClockMainDef =
 {
   // fill in this structure using the below macro
   // CLOCKMAINDEF( cpu, apba, apba, flash )

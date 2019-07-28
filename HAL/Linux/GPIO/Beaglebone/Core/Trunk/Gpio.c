@@ -22,31 +22,42 @@
  *****************************************************************************/
 
 // system includes ------------------------------------------------------------
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcnt.h>
-#include <errno.h>
-
-// library includes -----------------------------------------------------------
 
 // local includes -------------------------------------------------------------
 #include "GPIO/Gpio.h"
 
+// library includes -----------------------------------------------------------
+
 // Macros and Defines ---------------------------------------------------------
+/// define the signature for GPIO enumerations
+#define ENUM_SIGNATURE_VALUE                     ( 0xC33C )
+
+/// define the macro for creating the port/pin enumeration
+#define ENUM_PORT_PIN_GEN( port, pin, invert )   (( ENUM_SIGNATURE_VALUE << 16 ) |( port << 8 ) | ( pin << 1 ) | bInvert)
+
+/// define the macros for extracting the port and pin
+#define ENUM_TEST_SIG( enum )                   (( enum >> 16 ) == ENUM_SIGNATURE_VALUE )
+#define ENUM_GET_PORT( enum )                   ( enum >> 8  & 0x0FF )
+#define ENUM_GET_PIN( enum )                    (( enum >> 1 ) & 0x01F )
+#define ENUM_GET_INVERT( enum )                 ( enum & 0x01 )
+
 /// define the GpIO base registers
-#define GPIO0_BASE_REG            ( 0x44E07000 )
-#define GPIO1_BASE_REG            ( 0x4804C000 )
-#define GPIO2_BASE_REG            ( 0x481AC000 )
-#define GPIO3_BASE_REG            ( 0x481AE000 )
+#define GPIO0_BASE_REG                          ( 0x44E07000 )
+#define GPIO1_BASE_REG                          ( 0x4804C000 )
+#define GPIO2_BASE_REG                          ( 0x481AC000 )
+#define GPIO3_BASE_REG                          ( 0x481AE000 )
 
 /// define the GPIO register length
-#define GPIO_REG_LENGTH           ( 0x1000 )
+#define GPIO_REG_LENGTH                         ( 0x1000 )
 
 /// define the GPIO register offsets
-#define GPIO_OUTENB_OFFSET        ( 0x0134 )
-#define GPIO_SETOUT_OFFSET        ( 0x0194 )
-#define GPIO_CLROUT_OFFSET        ( 0x0190 )
-#define GPIO_DATAIN_OFFSET        ( 0x0138 )
+#define GPIO_OUTENB_OFFSET                      ( 0x0134 )
+#define GPIO_SETOUT_OFFSET                      ( 0x0194 )
+#define GPIO_CLROUT_OFFSET                      ( 0x0190 )
+#define GPIO_DATAIN_OFFSET                      ( 0x0138 )
+
+/// define the maximum GPIO pin value
+#define GPIO_PIN_MAX                            ( 32 )
 
 // enumerations ---------------------------------------------------------------
 
@@ -61,7 +72,7 @@ static  S32   iMemFileHandle;
 // local function prototypes --------------------------------------------------
 
 // constant declarations ------------------------------------------------------
-static U32  auGpioRegionAddr[ GPIO_PORT_MAX ] =
+static U32 const  auGpioRegionAddr[ GPIO_PORT_MAX ] =
 {
   GPIO0, GPIO1, GPIO2, GPIO3 
 };
@@ -76,8 +87,6 @@ static U32  auGpioRegionAddr[ GPIO_PORT_MAX ] =
  *****************************************************************************/
 void Gpio_Initialize( void )
 {
-  PGPIOPINDEF   ptDef;
-  GPIOPINENUM   ePin;
   GPIOPORT      eRegIdx;
   
   // open a memory file
@@ -88,29 +97,6 @@ void Gpio_Initialize( void )
   {
     // map the register
     puMappedGpioRegs[ eRegIdx ] = mmap( NULL, GPIO_REG_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, iMemFileHandle, auGpioRegionAddr );
-  }
-
-  // for each pin def in the list
-  for( ePin = 0; ePin < GPIO_PIN_ENUM_MAX; ePin++ )
-  {
-    // get a pointer to the definition structure
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ ePin ];
-    
-    // set the direction
-    switch( ptDef->eMode )
-    {
-      case GPIO_MODE_INPUT :
-        *( puMappedGpioRegs + GPIO_OUTENB_OFFSET ) &= ~( BIT( ptDef->nPin ));
-        break;
-        
-      case GPIO_MODE_OUTPUT :
-        *( puMappedGpioRegs + GPIO_OUTENB_OFFSET ) |= BIT( ptDef->nPin );
-        Gpio_Set( ePin, ptDef->bInitialState );
-        break;
-        
-      default :
-        break;
-    }
   }
 }
 
@@ -133,59 +119,107 @@ void Gpio_Close( void )
 }
 
 /******************************************************************************
+ * @function Gpio_Configure
+ *
+ * @brief configure a GPIO pin
+ *
+ * This function will configue a GPIO pin
+ *
+ * @param[in]   ePort       port number
+ * @param[in]   nPin        pin number
+ * @param[in]   eMode       mode
+ * @param[in]   bInvert     invert flag
+ *
+ * @return      GPIO enum   GPIO enumeration for reference
+ *
+ *****************************************************************************/
+GPIOENUM Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bInvert, BOOL bIntial )
+{
+  GPIOENUM  uEnum = 0;
+  BOOL      bState;
+  
+  // test for valid parameters
+  if (( ePort < GPIO_PORT_MAX ) && ( nPin < GPIO_PIN_MAX ) && ( eMode < GPIO_MODE_MAX )) 
+  (
+    // set the direction
+    switch( eMode )
+    {
+      case GPIO_MODE_INPUT :
+        // disable the output enable
+        *( puMappedGpioRegs[ ePort ] + GPIO_OUTENB_OFFSET ) &= ~( BIT( nPin ));
+        break;
+        
+      case GPIO_MODE_OUTPUT :
+        // enable the output enable
+        *( puMappedGpioRegs[ ePort ] + GPIO_OUTENB_OFFSET ) |= BIT( nPin );
+        
+        // set the initial state
+        if ( bInitial ^ bInvert )
+        {
+          // set the bit
+'         *( puMappedGpioRegs[ ePort ] + GPIO_SETOUT_OFFSET ) = BIT( ptDef->nPin );
+        }
+        else
+        {
+          // clear the pin
+          *( puMappedGpioRegs[ ePort ] + GPIO_CLROUT_OFFSET ) = BIT( ptDef->nPin );
+        }
+      }
+
+      default :
+        break;
+    }
+
+    // generate the enum
+    uEnum = ENUM_PORT_PIN_GEN( ePort, nPin, bInvert );
+  }
+  // now return the GPIO enumration
+  return( uEnum );
+}
+
+/******************************************************************************
  * @function Gpio_Set
  *
  * @brief set a GPIO pin 
  *
  * This function will set a GPIO pin to a given state
  *
- * @param[in]   eGpioSel  GPIO pin enumeration
+ * @param[in]   eGpioEnum GPIO pin enumeration
  * @param[in]   bState    desired state of the pin
  *
  * @return      GPIOERR   appropriate error if any
  *
  *****************************************************************************/
-GPIOERR Gpio_Set( GPIOPINENUM eGpioSel, BOOL bState )
+GPIOERR Gpio_Set( GPIOENUM eGpioEnum, BOOL bState )
 {
-  GPIOERR     eError = GPIO_ERR_NONE;
-  PGPIOPINDEF ptDef;
-  GPIOPINENUM ePin;
+  U32     uMask, uPort;
+  GPIOERR eError = GPIO_ERR_NONE;
   
-  // test for valid GPIO select
-  if ( eGpioSel < GPIO_PIN_ENUM_MAX )
+  // test valid pin
+  if ( ENUM_TEST_SIG( eGpioEnum ))
   {
-    // get a pointer to the definition structure
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ ePin ];
-    
-    // check for an output
-    if ( ptDef->eMode == GPIO_MODE_OUTPUT )
+    // compute the mask
+    uMask = BIT( ENUM_GET_PIN( eGpioEnum ));
+    uPort = ENUM_GET_PORT( eGpioEnum );
+
+    // set the appropriate state
+    if ( bState ^ ENUM_GET_INVERT( eGpioEnum ))
     {
-      // determine the state
-      switch( bState ^ ptDef->bInvert )
-      {
-        case OFF :
-          *( puMappedGpioRegs + GPIO_SETOUT_OFFSET ) = BIT( ptDef->nPin );
-          break;
-          
-        case ON :
-          *( puMappedGpioRegs + GPIO_CLROUT_OFFSET ) = BIT( ptDef->nPin );
-          break;
-          
-        default :
-          break;
-      }
+      PORT->Group[ uPort ].OUTSET.reg = uMask;
     }
     else
     {
-      // set the error
-      eError = GPIO_ERR_ILLMODE;
+      PORT->Group[ uPort ].OUTCLR.reg = uMask;
     }
   }
   else
   {
     // set the error
-    eError = GPIO_ERR_ILLGPIO;
+    eError = GPIO_ERR_ILLENUM;
   }
+
+   // return the error
+   return( eError );
 }
 
 /******************************************************************************
@@ -195,34 +229,36 @@ GPIOERR Gpio_Set( GPIOPINENUM eGpioSel, BOOL bState )
  *
  * This function will return a GPIO's pin value
  *
- * @param[in]   eGpioSel  GPIO pin enumeration
- * @param[io]   pbState   pointer to the strorage element to return the state
- *                        of the GPIO pin
+ * @param[in]   eGpioEnum   GPIO pin enumeration
+ * @param[io]   pbState     pointer to store the pin state
  *
  * @return      GPIOERR   appropriate error if any
  *
  *****************************************************************************/
-GPIOERR Gpio_Get( GPIOPINENUM eGpioSel, PBOOL pbState )
+GPIOERR Gpio_Get( GPIOENUM eGpioEnum, PBOOL pbState )
 {
-  GPIOERR     eError = GPIO_ERR_NONE;
-  PGPIOPINDEF ptDef;
-  GPIOPINENUM ePin;
+  U32     uMask, uPort;
+  GPIOERR eError = GPIO_ERR_NONE;
   
-  // test for valid GPIO select
-  if ( eGpioSel < GPIO_PIN_ENUM_MAX )
+  // test valid pin
+  if ( ENUM_TEST_SIG( eGpioEnum ))
   {
-    // get a pointer to the definition structure
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ ePin ];
-    
-    // get the value of the pin
-    *( pbState ) = *( puMappedGpioRegs + GPIO_DATAIN_OFFSET ) & BIT( ptDef->nPin );
-    *( pbState ) ^= ptDef->bInvert;
+    // compute the mask
+    uMask = BIT( ENUM_GET_PIN( eGpioEnum ));
+    uPort = ENUM_GET_PORT( eGpioEnum );
+
+    // get the value
+    *( pbState ) = *( puMappedGpioRegs[ uPort ] + GPIO_DATAIN_OFFSET ) & uMask;
+    *( pbState ) ^= ENUM_GET_INVERT( eGPioEnum );
   }
   else
   {
     // set the error
-    eError = GPIO_ERR_ILLGPIO;
+    eError = GPIO_ERR_ILLENUM;
   }
+
+   // return the error
+   return( eError );
 }
 
 /******************************************************************************
@@ -232,44 +268,39 @@ GPIOERR Gpio_Get( GPIOPINENUM eGpioSel, PBOOL pbState )
  *
  * This function will toggle the state of a GPIO pin
  *
- * @param[in]   eGpioSel  GPIO pin enumeration
+ * @param[in]   eGpioEnum  GPIO pin enumeration
  *
  * @return      GPIOERR   appropriate error if any
  *
  *****************************************************************************/
-GPIOERR Gpio_Toggle( GPIOPINENUM eGpioSel )
+GPIOERR Gpio_Toggle( GPIOENUM eGpioEnum )
 {
-  GPIOERR     eError = GPIO_ERR_NONE;
-  PGPIOPINDEF ptDef;
-  BOOL        bCurState;
+  U32     uMask, uPort;
+  GPIOERR eError = GPIO_ERR_NONE;
   
-  
-  // test for valid GPIO select
-  if ( eGpioSel < GPIO_PIN_ENUM_MAX )
+  // test valid pin
+  if ( ENUM_TEST_SIG( eGpioEnum ))
   {
-    // get a pointer to the definition structure
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ ePin ];
-    
+    // compute the mask
+    uMask = BIT( ENUM_GET_PIN( eGpioEnum ));
+    uPort = ENUM_GET_PORT( eGpioEnum );
+
     // check for an output
-    if ( ptDef->eMode == GPIO_MODE_OUTPUT )
+    if ( ENUM_GET_MODE( eGpioEnum ) == GPIO_MODE_OUTPUT )
     {
       // get the current state/toggle it/set the new output
-      bCurState = *( puMappedGpioRegs + GPIO_DATAIN_OFFSET ) & BIT( ptDef->nPin );
-      bCurState ^= ON;
+      bCurState = *( puMappedGpioRegs[ uPort ] + GPIO_DATAIN_OFFSET ) & nMask;
 
       // determine the state
-      switch( bCurState )
+      if ( bCurState )
       {
-        case OFF :
-          *( puMappedGpioRegs + GPIO_SETOUT_OFFSET ) = BIT( ptDef->nPin );
-          break;
-          
-        case ON :
-          *( puMappedGpioRegs + GPIO_CLROUT_OFFSET ) = BIT( ptDef->nPin );
-          break;
-          
-        default :
-          break;
+        // clear the pin
+        *( puMappedGpioRegs[ uPort ] + GPIO_CLROUT_OFFSET ) = nMask;
+      }
+      else
+      {
+        // set the pin
+        *( puMappedGpioRegs[ uPort ] + GPIO_SETOUT_OFFSET ) = BIT( ptDef->nPin );
       }
     }
     else
@@ -281,56 +312,11 @@ GPIOERR Gpio_Toggle( GPIOPINENUM eGpioSel )
   else
   {
     // set the error
-    eError = GPIO_ERR_ILLGPIO;
-  }
-}
-
-/******************************************************************************
- * @function Gpio_Ioctl
- *
- * @brief GPIO I/O control
- *
- * This function allows the state, interrupt level, interrupt callback and
- * other parameters to be set/retrieved
- *
- * @param[in]   eGpioSel  GPIO pin enumeration
- * @param[in]   eGpioAct  IOCTL action
- * @param[i0]   pvData    pointer to the data to set/retrieve
- *
- * @return      GPIOERR   appropriate error if any
- *
- *****************************************************************************/
-GPIOERR Gpio_Ioctl( GPIOPINENUM eGpioSel, GPIOACT eGpioAct, PVOID pvData )
-{
-  GPIOERR     eError = GPIO_ERR_NONE;
-  // PGPIOPINDEF ptDef;
-  
-  // test for valid GPIO select
-  if ( eGpioSel < GPIO_PIN_ENUM_MAX )
-  {
-    // perform the action
-    switch( eGpioAct )
-    {
-      case GPIO_ACT_SETDIR :
-        break;
-        
-      case GPIO_ACT_SETMODE :
-        break;
-        
-      default :
-        // set the error
-        eError = GPIO_ERR_ILLACT;
-        break;
-    }
-  }
-  else
-  {
-    // set the error
-    eError = GPIO_ERR_ILLGPIO;
+    eError = GPIO_ERR_ILLENUM;
   }
 
-  // return the error
-  return( eError );
+   // return the error
+   return( eError );
 }
 
 /**@} EOF Gpio.c */

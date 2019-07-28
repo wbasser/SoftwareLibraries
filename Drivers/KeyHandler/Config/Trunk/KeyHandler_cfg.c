@@ -46,8 +46,8 @@
 const CODE KEYHANDDEF atKeyHandDefs[ KEYHAND_ENUM_MAX ] =
 {
   // add key definitions below using one of the supplied helper macros
-  // #define KEYHAND_DIRECT( col )
-  // #define KEYHAND_ROWCOL( row, col )
+  // KEYHAND_DIRECT( col )
+  // KEYHAND_ROWCOL( row, col )
 };
 
 /**@} EOF KeyHandler_cfg.c */

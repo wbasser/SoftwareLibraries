@@ -61,6 +61,27 @@ static  void      SetCommonParameters( PADCDEF ptDef, ADC_CTRLB_Type* ptCtlB );
  *****************************************************************************/
 void Adc_Initialize( void )
 {
+  U32             uTemp = 0;
+  
+  // if enabled
+  if ( ADC_ENABLE_1V_BANDGAP == 1 )
+  {
+    // set the bandgap
+    uTemp |= SYSCTRL_VREF_BGOUTEN;
+  }
+  
+  if ( ADC_ENABLE_TEMP_SENSOR == 1 )
+  {
+    // set the temp senor on
+    uTemp |= SYSCTRL_VREF_TSEN;
+  }
+  
+  // now set the additional bits in the register
+  SYSCTRL->VREF.reg |= uTemp;
+
+  // read the non-volatile linearity/biascal values
+  uTemp = ADC_CALIB_BIAS_CAL(( *( PU32 )ADC_FUSES_BIASCAL_ADDR >> ADC_FUSES_BIASCAL_Pos )) | ADC_CALIB_LINEARITY_CAL(( *( PU64 )ADC_FUSES_LINEARITY_0_ADDR >> ADC_FUSES_LINEARITY_0_Pos ));
+  ADC->CALIB.reg = uTemp;
 }
 
 /******************************************************************************
@@ -109,7 +130,7 @@ ADCERRS Adc_ConvertChannel( ADCENUM eAdcChan, PU16 pwResult )
     NVIC_DisableIRQ( ADC_IRQn );
 
     // reset the ADC
-    ADC->CTRLA.bit.SWRST = TRUE;
+    ADC->CTRLA.bit.ENABLE = FALSE;
     while( ADC->STATUS.bit.SYNCBUSY );
 
     // now determine the mode

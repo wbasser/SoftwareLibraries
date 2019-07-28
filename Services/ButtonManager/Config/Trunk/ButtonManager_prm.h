@@ -28,7 +28,7 @@
 // library includes -----------------------------------------------------------
 
 // Macros and Defines ---------------------------------------------------------
-#define BTNMNGR_PROCESS_RATE_MSECS            ( 25 )
+#define BTNMANAGER_PROCESS_RATE_MSECS            ( 25 )
 
 /**@} EOF ButtonManager_prm.h */
 

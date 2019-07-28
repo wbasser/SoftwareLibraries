@@ -32,7 +32,7 @@
 // local includes -------------------------------------------------------------
 
 // library includes -----------------------------------------------------------
-#include "Types/Types.h"
+#include "GPIO/Gpio.h"
 
 // Macros and Defines ---------------------------------------------------------
 #define I2C_AUTORDWR_ENABLED      ( 1 )
@@ -85,8 +85,22 @@ typedef enum _I2CCHAN
 
 // structures -----------------------------------------------------------------
 /// define the task handle
-typedef PVOID   PTI2CHANDLE;
+typedef PVOID   PVI2CHANDLE;
 
+/// define the structure to define a UART channel
+typedef struct _I2CDEF
+{
+  I2CCHAN           eChan;        ///< UART channel
+  BOOL              bRunStandby;  ///< run in standby
+  BOOL              bFastSpeed;   ///< fast speed
+  GPIOPORT          eDevPort;     ///< device port
+  GPIOFUNCMUX       eDevMux;      ///< device mux
+  U8                nSdaPin;      ///< SDA pin
+  U8                nSclPin;      ///< SCL pin
+} I2CDEF, *PI2CDEF;
+#define I2CDEF_SIZE        sizeof( I2CDEF )
+
+/// define the transfer control
 typedef struct _I2CXFRCTL
 {
   U8    nDevAddr;           ///< device address
@@ -107,11 +121,11 @@ typedef struct _I2CCHKBSY
 #define I2CCHKBSY_SIZE        sizeof( I2CCHKBSY )
 
 // global function prototypes --------------------------------------------------
-extern  PTI2CHANDLE I2c_Initialize( I2CCHAN eChan, BOOL bFastSpeed );
-extern  I2CERR      I2c_Write( PTI2CHANDLE ptI2c, PI2CXFRCTL ptXfrCtl );
-extern  I2CERR      I2c_Read( PTI2CHANDLE ptI2c, PI2CXFRCTL ptXfrCtl );
-extern  I2CERR      I2c_Ioctl( PTI2CHANDLE ptI2c, I2CACTION eAction, PVOID pvData );
-extern  I2CERR      I2c_Close( PTI2CHANDLE ptI2c );
+extern  PVI2CHANDLE I2c_Configure( PI2CDEF ptI2cDef );
+extern  I2CERR      I2c_Write( PVI2CHANDLE pvI2cHandle, PI2CXFRCTL ptXfrCtl );
+extern  I2CERR      I2c_Read( PVI2CHANDLE pvI2cHandle, PI2CXFRCTL ptXfrCtl );
+extern  I2CERR      I2c_Ioctl( PVI2CHANDLE pvI2cHandle, I2CACTION eAction, PVOID pvData );
+extern  I2CERR      I2c_Close( PVI2CHANDLE pvI2cHandle );
 
 /**@} EOF I2c.h */
 

@@ -34,7 +34,10 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the command ack
-#define BINCMD_RESPONSE_ACK         ( 0x06 )
+#define BINCMD_RESPONSE_ACK                 ( 0x06 )
+
+/// define the macro to disable special commands
+#define BINCMD_DISABLE_SPECIAL_CMD          ( -1 )
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the return status for the protocol handler
@@ -70,7 +73,7 @@ extern  BINCMDSTS BinaryCommandHandler_SetSequence( BINCMDENUM eProtEnum, U8 nSe
 extern  BINCMDSTS BinaryCommandHandler_SetDstAddr( BINCMDENUM eProtEnum, U8 nDstAddr );
 extern  BINCMDSTS BinaryCommandHandler_SetLclAddr( BINCMDENUM eProtEnum, U8 nLclAddr );
 extern  BINCMDSTS BinaryCommandHandler_GetLclAddr( BINCMDENUM eProtEnum, PU8 pnLclAddr );
-extern  BINCMDSTS BinaryCommandHandler_GetCommand( BINCMDENUM eProtEnum, PU8 pnComman1d );
+extern  BINCMDSTS BinaryCommandHandler_GetCommand( BINCMDENUM eProtEnum, PU8 pnCommand );
 extern  BINCMDSTS BinaryCommandHandler_GetOption( BINCMDENUM eProtEnum, PU8 pnOption );
 extern  BINCMDSTS BinaryCommandHandler_GetSequence( BINCMDENUM eProtEnum, PU8 pnSequence );
 extern  BINCMDSTS BinaryCommandHandler_GetSrcAddr( BINCMDENUM eProtEnum, PU8 pnSrcAddr );

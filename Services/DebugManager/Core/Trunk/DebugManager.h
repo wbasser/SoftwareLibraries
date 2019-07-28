@@ -66,7 +66,7 @@ typedef enum _DEBUGDUMPMODE
 
 // global parameter declarations -----------------------------------------------
 #if ( DEBUGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-extern  const CODE ASCCMDENTRY atDebugManagerCmdHandlerTable[ ];
+extern  const CODE ASCCMDENTRY g_atDebugManagerCmdHandlerTable[ ];
 #endif  // DEBUGMANAGER_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------

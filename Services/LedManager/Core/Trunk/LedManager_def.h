@@ -66,16 +66,29 @@
     .nColIndex    = col \
   }   
   
-/// define the helper macro for creating an animation step
-#define LEDMNGRDEFSTEP( action, led, duration, nextevent, option ) \
+/// define the helper macro for creating an animation step, single led
+#define LEDMNGRDEFSNGSTEP( action, led, duration, nextevent, option ) \
   { \
     .eAction = action, \
     .nLedEnum = led, \
+    .bRgbFlag = FALSE, \
     .wDurationMsecs = duration, \
     .eEvent = nextevent, \
     .nOption = option \
   },
   
+/// define the helper macro for creating an animation step, RGB led
+#define LEDMNGRDEFRGBSTEP( action, led, color, duration, nextevent, option ) \
+{ \
+  .eAction = action, \
+  .nLedEnum = led, \
+  .eRgbColor = color, \
+  .bRgbFlag = TRUE, \
+  .wDurationMsecs = duration, \
+  .eEvent = nextevent, \
+  .nOption = option \
+},
+
 /// define the helper macro for starting an animation sequence
 #define LEDMNGRDEFSTART( name ) \
   static  const CODE  LEDSEQENTRY at ## name ## Defs[ ] = { \
@@ -123,6 +136,7 @@ typedef enum _LEDACTION
   LED_ACTION_ALLBLINKSLOW,      ///< all blink slow
   LED_ACTION_ALLBLINKFAST,      ///< all blink fast
   LED_ACTION_ALLMAX,            ///< all max
+  LED_ACTION_NONE,
 } LEDACTION;
 
 /// enumerate the RGB colors
@@ -178,6 +192,8 @@ typedef struct _LEDSEQENTRY
 {
   LEDACTION     eAction;        ///< LED action
   U8            nLedEnum;       ///< led enumeration
+  LEDRGBCOLOR   eRgbColor;      ///< RGB color
+  BOOL          bRgbFlag;       ///< RGB flag
   U16           wDurationMsecs; ///< duration in msecs
   LEDSEQEVENT   eEvent;         ///< action to execute when this step is done
   U8            nOption;        ///< option used with jump or repeat events or extended events

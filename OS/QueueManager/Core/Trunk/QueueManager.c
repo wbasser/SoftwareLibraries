@@ -40,9 +40,9 @@
 /// define the queue control structure
 typedef struct _QUEUECTL
 {
-  U8		nRdIdx;				///< queue read index
-  U8		nWrIdx;				///< queue write index
-  U8		nCount;				///< count	
+  XQUEUENUMENTRIES  xRdIdx;				///< queue read index
+  XQUEUENUMENTRIES  xWrIdx;				///< queue write index
+  XQUEUENUMENTRIES  xCount;				///< count	
 } QUEUECTL, *PQUEUECTL;
 #define	QUEUECTL_SIZE	sizeof( QUEUECTL )
 
@@ -73,9 +73,9 @@ void QueueManager_Initialize( void )
     ptCtl = &atQueueCtls[ eQueue ];
     
     // reset the indices/count
-    ptCtl->nRdIdx = 0;
-    ptCtl->nWrIdx = 0;
-    ptCtl->nCount = 0;
+    ptCtl->xRdIdx = 0;
+    ptCtl->xWrIdx = 0;
+    ptCtl->xCount = 0;
   }
 }
 
@@ -95,14 +95,15 @@ void QueueManager_Initialize( void )
  *****************************************************************************/
 QUEUESTATUS QueueManager_PutHead( QUEUEENUM eQueue, PU8 pnEntry )
 {
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL		  ptCtl;
-  PQUEUEDEF		  ptDef;
-  QUEUEEVNFLAGS	tEvents;
-  TASKSCHDENUMS	eTaskEnum;
-  U8			      nSize, nNumEntries;
-  PU8           pnQueue;
-  U8            nEvent = 0;
+  QUEUESTATUS       eError = QUEUE_STATUS_NONE;
+  PQUEUECTL		      ptCtl;
+  PQUEUEDEF		      ptDef;
+  QUEUEEVNFLAGS	    tEvents;
+  TASKSCHDENUMS	    eTaskEnum;
+  XQUEUEENTRYSIZE   wSize;
+  XQUEUENUMENTRIES  xNumEntries;
+  PU8               pnQueue;
+  U8                nEvent = 0;
 
 
   // check for a valid queue
@@ -113,13 +114,13 @@ QUEUESTATUS QueueManager_PutHead( QUEUEENUM eQueue, PU8 pnEntry )
     ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
     
     // get the number of events
-    nNumEntries = PGM_RDBYTE( ptDef->nNumEntries );
+    xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
     
     // is there room
-    if ( ptCtl->nCount < nNumEntries )
+    if ( ptCtl->xCount < xNumEntries )
     {
       // get the size/event flags enables/task enum
-      nSize = PGM_RDBYTE( ptDef->nEntrySize );
+      wSize = PGM_RDBYTE( ptDef->xEntrySize );
       tEvents.nByte = ( U8 )PGM_RDBYTE( ptDef->tEventFlags.nByte );
       eTaskEnum = PGM_RDBYTE( ptDef->eTaskEnum );
       
@@ -130,22 +131,22 @@ QUEUESTATUS QueueManager_PutHead( QUEUEENUM eQueue, PU8 pnEntry )
       Interrupt_Disable( );
       
       // adjust the read pointer
-      if ( ptCtl->nRdIdx == 0 )
+      if ( ptCtl->xRdIdx == 0 )
       {
         // reset the index to the end
-        ptCtl->nRdIdx = nSize - 1;
+        ptCtl->xRdIdx = wSize - 1;
       }
       else
       {
         // increment the read index
-        ptCtl->nRdIdx++;
+        ptCtl->xRdIdx++;
       }
       
       // now copy the into the queue
-      memcpy(( pnQueue + ( ptCtl->nRdIdx * nSize )), pnEntry, nSize );
+      memcpy(( pnQueue + ( ptCtl->xRdIdx * wSize )), pnEntry, wSize );
       
       // increment the count
-      ptCtl->nCount++;
+      ptCtl->xCount++;
       
       // re-enable interrupts
       Interrupt_Enable( );
@@ -158,7 +159,7 @@ QUEUESTATUS QueueManager_PutHead( QUEUEENUM eQueue, PU8 pnEntry )
       }
       
       // check for full
-      if (( ptCtl->nCount == nNumEntries ) && ( tEvents.tBits.bFull ))
+      if (( ptCtl->xCount == xNumEntries ) && ( tEvents.tBits.bFull ))
       {
         // or the empty event
         nEvent = QUEUE_EVENT_PUTFULL;
@@ -203,14 +204,15 @@ QUEUESTATUS QueueManager_PutHead( QUEUEENUM eQueue, PU8 pnEntry )
  *****************************************************************************/
 QUEUESTATUS QueueManager_PutTail( QUEUEENUM eQueue, PU8 pnEntry )
 {
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL		  ptCtl;
-  PQUEUEDEF		  ptDef;
-  QUEUEEVNFLAGS	tEvents;
-  TASKSCHDENUMS	eTaskEnum;
-  U8			      nSize, nNumEntries;
-  U8            nEvent = 0;
-  PU8           pnQueue;
+  QUEUESTATUS       eError = QUEUE_STATUS_NONE;
+  PQUEUECTL		      ptCtl;
+  PQUEUEDEF		      ptDef;
+  QUEUEEVNFLAGS	    tEvents;
+  TASKSCHDENUMS	    eTaskEnum;
+  XQUEUEENTRYSIZE   wSize;
+  XQUEUENUMENTRIES  xNumEntries;
+  U8                nEvent = 0;
+  PU8               pnQueue;
   
   // check for a valid queue
   if ( eQueue < QUEUE_ENUM_MAX )
@@ -220,13 +222,13 @@ QUEUESTATUS QueueManager_PutTail( QUEUEENUM eQueue, PU8 pnEntry )
     ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
     
     // get the number of events
-    nNumEntries = PGM_RDBYTE( ptDef->nNumEntries );
+    xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
     
     // is there room
-    if ( ptCtl->nCount < nNumEntries )
+    if ( ptCtl->xCount < xNumEntries )
     {
       // get the size/event flags enables/task enum
-      nSize = PGM_RDBYTE( ptDef->nEntrySize );
+      wSize = PGM_RDBYTE( ptDef->xEntrySize );
       tEvents.nByte = ( U8 )PGM_RDBYTE( ptDef->tEventFlags.nByte );
       eTaskEnum = PGM_RDBYTE( ptDef->eTaskEnum );
       
@@ -237,18 +239,18 @@ QUEUESTATUS QueueManager_PutTail( QUEUEENUM eQueue, PU8 pnEntry )
       Interrupt_Disable( );
       
       // now copy the into the queue
-      memcpy(( pnQueue + ( ptCtl->nWrIdx * nSize )), pnEntry, nSize );
+      memcpy(( pnQueue + ( ptCtl->xWrIdx * wSize )), pnEntry, wSize );
       
       // adjust the write index
-      ptCtl->nWrIdx++;
-      if ( ptCtl->nWrIdx >= nNumEntries )
+      ptCtl->xWrIdx++;
+      if ( ptCtl->xWrIdx >= xNumEntries )
       {
         // reset back to zero
-        ptCtl->nWrIdx = 0;
+        ptCtl->xWrIdx = 0;
       }
       
       // increment the count
-      ptCtl->nCount++;
+      ptCtl->xCount++;
       
       // re-enable interrupts
       Interrupt_Enable( );
@@ -261,7 +263,7 @@ QUEUESTATUS QueueManager_PutTail( QUEUEENUM eQueue, PU8 pnEntry )
       }
       
       // check for full
-      if (( ptCtl->nCount == nNumEntries ) && ( tEvents.tBits.bFull ))
+      if (( ptCtl->xCount == xNumEntries ) && ( tEvents.tBits.bFull ))
       {
         // or the empty event
         nEvent |= QUEUE_EVENT_PUTFULL;
@@ -305,14 +307,15 @@ QUEUESTATUS QueueManager_PutTail( QUEUEENUM eQueue, PU8 pnEntry )
  *****************************************************************************/
 QUEUESTATUS QueueManager_Get( QUEUEENUM eQueue, PU8 pnEntry )
 {
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL		  ptCtl;
-  PQUEUEDEF		  ptDef;
-  QUEUEEVNFLAGS	tEvents;
-  TASKSCHDENUMS	eTaskEnum;
-  U8			      nSize, nNumEntries;
-  U8            nEvent = 0;
-  PU8           pnQueue;
+  QUEUESTATUS       eError = QUEUE_STATUS_NONE;
+  PQUEUECTL		      ptCtl;
+  PQUEUEDEF		      ptDef;
+  QUEUEEVNFLAGS	    tEvents;
+  TASKSCHDENUMS	    eTaskEnum;
+  XQUEUEENTRYSIZE   wSize;
+  XQUEUENUMENTRIES  xNumEntries;
+  U8                nEvent = 0;
+  PU8               pnQueue;
   
   // check for a valid queue
   if ( eQueue < QUEUE_ENUM_MAX )
@@ -322,13 +325,13 @@ QUEUESTATUS QueueManager_Get( QUEUEENUM eQueue, PU8 pnEntry )
     ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
     
     // get the number of events
-    nNumEntries = PGM_RDBYTE( ptDef->nNumEntries );
+    xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
     
     // is there anything in the queue
-    if ( ptCtl->nCount != 0 )
+    if ( ptCtl->xCount != 0 )
     {
       // get the size/event flags enables/task enum
-      nSize = PGM_RDBYTE( ptDef->nEntrySize );
+      wSize = PGM_RDBYTE( ptDef->xEntrySize );
       tEvents.nByte = ( U8 )PGM_RDBYTE( ptDef->tEventFlags.nByte );
       eTaskEnum = PGM_RDBYTE( ptDef->eTaskEnum );
       
@@ -339,18 +342,18 @@ QUEUESTATUS QueueManager_Get( QUEUEENUM eQueue, PU8 pnEntry )
       Interrupt_Disable( );
       
       // now copy the entry to the pointer
-      memcpy( pnEntry, ( pnQueue + ( ptCtl->nRdIdx * nSize )), nSize );
+      memcpy( pnEntry, ( pnQueue + ( ptCtl->xRdIdx * wSize )), wSize );
       
       // adjust the read index
-      ptCtl->nRdIdx++;
-      if ( ptCtl->nRdIdx >= nNumEntries )
+      ptCtl->xRdIdx++;
+      if ( ptCtl->xRdIdx >= xNumEntries )
       {
         // reset back to zero
-        ptCtl->nRdIdx = 0;
+        ptCtl->xRdIdx = 0;
       }
       
       // decrement  the count
-      ptCtl->nCount--;
+      ptCtl->xCount--;
       
       // re-enable interrupts
       Interrupt_Enable( );
@@ -363,7 +366,7 @@ QUEUESTATUS QueueManager_Get( QUEUEENUM eQueue, PU8 pnEntry )
       }
       
       // check for empty
-      if (( ptCtl->nCount == 0 ) && ( tEvents.tBits.bEmpty ))
+      if (( ptCtl->xCount == 0 ) && ( tEvents.tBits.bEmpty ))
       {
         // or the empty event
         nEvent |= QUEUE_EVENT_GETEMPTY;
@@ -408,11 +411,11 @@ QUEUESTATUS QueueManager_Get( QUEUEENUM eQueue, PU8 pnEntry )
  *****************************************************************************/
 QUEUESTATUS QueueManager_Peek( QUEUEENUM eQueue, PU8 pnEntry )
 {
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL		  ptCtl;
-  PQUEUEDEF		  ptDef;
-  U8			      nSize;
-  PU8           pnQueue;
+  QUEUESTATUS     eError = QUEUE_STATUS_NONE;
+  PQUEUECTL		    ptCtl;
+  PQUEUEDEF		    ptDef;
+  XQUEUEENTRYSIZE wSize;
+  PU8             pnQueue;
   
   // check for a valid queue
   if ( eQueue < QUEUE_ENUM_MAX )
@@ -422,10 +425,10 @@ QUEUESTATUS QueueManager_Peek( QUEUEENUM eQueue, PU8 pnEntry )
     ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
     
     // is there anything in the queue
-    if ( ptCtl->nCount != 0 )
+    if ( ptCtl->xCount != 0 )
     {
       // get the size/event flags enables/task enum
-      nSize = PGM_RDBYTE( ptDef->nEntrySize );
+      wSize = PGM_RDBYTE( ptDef->xEntrySize );
       
       // get the pointer to the queue
       pnQueue = ( PU8 )PGM_RDWORD( ptDef->pnQueue );
@@ -434,7 +437,7 @@ QUEUESTATUS QueueManager_Peek( QUEUEENUM eQueue, PU8 pnEntry )
       Interrupt_Disable( );
       
       // now copy the entry to the pointer
-      memcpy( pnEntry, ( pnQueue + ( ptCtl->nRdIdx * nSize )), nSize );
+      memcpy( pnEntry, ( pnQueue + ( ptCtl->xRdIdx * wSize )), wSize );
       
       // re-enable interrupts
       Interrupt_Enable( );
@@ -469,13 +472,13 @@ QUEUESTATUS QueueManager_Peek( QUEUEENUM eQueue, PU8 pnEntry )
  *****************************************************************************/
 QUEUESTATUS QueueManager_Pop( QUEUEENUM eQueue )
 {
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL		  ptCtl;
-  PQUEUEDEF		  ptDef;
-  QUEUEEVNFLAGS	tEvents;
-  TASKSCHDENUMS	eTaskEnum;
-  U8			      nNumEntries;
-  U8            nEvent = 0;
+  QUEUESTATUS       eError = QUEUE_STATUS_NONE;
+  PQUEUECTL		      ptCtl;
+  PQUEUEDEF		      ptDef;
+  QUEUEEVNFLAGS	    tEvents;
+  TASKSCHDENUMS	    eTaskEnum;
+  XQUEUENUMENTRIES  xNumEntries;
+  U8                nEvent = 0;
   
   // check for a valid queue
   if ( eQueue < QUEUE_ENUM_MAX )
@@ -485,10 +488,10 @@ QUEUESTATUS QueueManager_Pop( QUEUEENUM eQueue )
     ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
     
     // get the number of events
-    nNumEntries = PGM_RDBYTE( ptDef->nNumEntries );
+    xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
     
     // is there anything in the queue
-    if ( ptCtl->nCount != 0 )
+    if ( ptCtl->xCount != 0 )
     {
       // get the size/event flags enables/task enum
       tEvents.nByte = ( U8 )PGM_RDBYTE( ptDef->tEventFlags.nByte );
@@ -498,21 +501,21 @@ QUEUESTATUS QueueManager_Pop( QUEUEENUM eQueue )
       Interrupt_Disable( );
       
       // adjust the read index
-      ptCtl->nRdIdx++;
-      if ( ptCtl->nRdIdx >= nNumEntries )
+      ptCtl->xRdIdx++;
+      if ( ptCtl->xRdIdx >= xNumEntries )
       {
         // reset back to zero
-        ptCtl->nRdIdx = 0;
+        ptCtl->xRdIdx = 0;
       }
       
       // decrement  the count
-      ptCtl->nCount--;
+      ptCtl->xCount--;
       
       // re-enable interrupts
       Interrupt_Enable( );
       
       // check for empty
-      if (( ptCtl->nCount == 0 ) && ( tEvents.tBits.bEmpty ))
+      if (( ptCtl->xCount == 0 ) && ( tEvents.tBits.bEmpty ))
       {
         // or the empty event
         nEvent |= QUEUE_EVENT_GETEMPTY;
@@ -568,9 +571,9 @@ QUEUESTATUS QueueManager_Flush( QUEUEENUM eQueue )
     Interrupt_Disable( );
     
     // clear the indices
-    ptCtl->nWrIdx = 0;
-    ptCtl->nRdIdx = 0;
-    ptCtl->nCount = 0;
+    ptCtl->xWrIdx = 0;
+    ptCtl->xRdIdx = 0;
+    ptCtl->xCount = 0;
     
     // re-enable interrupts
     Interrupt_Enable( );
@@ -606,7 +609,7 @@ QUEUESTATUS QueueManager_GetRemaining( QUEUEENUM eQueue, PU8 pnRemaining )
   if ( eQueue < QUEUE_ENUM_MAX )
   {
     // set the remiaining equal to the count
-    *( pnRemaining ) = atQueueCtls[ eQueue ].nCount;
+    *( pnRemaining ) = atQueueCtls[ eQueue ].xCount;
   }
   else
   {
@@ -632,10 +635,10 @@ QUEUESTATUS QueueManager_GetRemaining( QUEUEENUM eQueue, PU8 pnRemaining )
  *****************************************************************************/
 QUEUESTATUS QueueManager_GetStatus( QUEUEENUM eQueue )
 {
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL		  ptCtl;
-  PQUEUEDEF		  ptDef;
-  U8            nNumEntries;
+  QUEUESTATUS       eError = QUEUE_STATUS_NONE;
+  PQUEUECTL		      ptCtl;
+  PQUEUEDEF		      ptDef;
+  XQUEUENUMENTRIES  xNumEntries;
   
   // check for a valid queue
   if ( eQueue < QUEUE_ENUM_MAX )
@@ -645,15 +648,15 @@ QUEUESTATUS QueueManager_GetStatus( QUEUEENUM eQueue )
     ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
     
     // get the number of entries
-    nNumEntries = PGM_RDBYTE( ptDef->nNumEntries );
+    xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
     
     // is the queue empty
-    if ( ptCtl->nCount == 0 )
+    if ( ptCtl->xCount == 0 )
     {
       // set the queue empty status
       eError = QUEUE_STATUS_QUEEMP;
     }
-    else if ( ptCtl->nCount == nNumEntries )
+    else if ( ptCtl->xCount == xNumEntries )
     {
       // set the full error
       eError = QUEUE_STATUS_QUEFUL;

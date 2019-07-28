@@ -760,6 +760,9 @@ ASCCMDSTS AsciiCommandHandler_OutputPrompt( ASCCMDENUM eProtEnum )
   // check for valid protocol
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
+    // get the write function
+    pvCurWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pvWriteFunc );
+
     // get the prompt character
     OutputPrompt( PGM_RDBYTE( atLclCtl[ eProtEnum ].cCurPrompt ));
   }

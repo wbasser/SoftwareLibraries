@@ -29,6 +29,7 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
+#include "QueueManager/QueueManager_cfg.h"
 
 // library includes -----------------------------------------------------------
 #include "Types/Types.h"
@@ -42,8 +43,8 @@
 /// define the macro to create a queue entry
 #define QUEUE_ENTRY( task, entry_size, num_entries, name, empflg, putflg, getflg, fullflg ) \
   { .eTaskEnum = task, \
-    .nEntrySize = entry_size, \
-    .nNumEntries = num_entries, \
+    .xEntrySize = entry_size, \
+    .xNumEntries = num_entries, \
     .pnQueue = ( PU8 )&an ## name ## Queue, \
     .tEventFlags.tBits = \
     { .bEmpty = empflg, \
@@ -52,6 +53,20 @@
       .bFull = fullflg, \
     }, \
   }  
+
+/// define the queue entry type
+#if ( QUEUEMAMAGER_ENABLE_LARGE_ENTRY_SIZE )
+typedef U16   XQUEUEENTRYSIZE;
+#else
+typedef U8    XQUEUEENTRYSIZE;
+#endif
+
+/// define the queue number of entries type
+#if ( QUEUEMANAGER_ENABLE_LARGE_NUMBER_ENTRIES )
+typedef U16   XQUEUENUMENTRIES;
+#else
+typedef U8    XQUEUENUMENTRIES;
+#endif
 
 /// define the queue event shift value
 #if ( TASK_TSKARG_SIZE_BYTES == 1 )
@@ -68,15 +83,15 @@
 
 /// define a macro to generate a QUEUEGET event
 #define QUEUEGET_EVENT( queueenum ) \
-(( QUEUE_EVENT_GET << QUEUE_EVENT_SHIFT ) | queueenum )
+  (( QUEUE_EVENT_GET << QUEUE_EVENT_SHIFT ) | queueenum )
 
 /// define a macro to generate a QUEUEPUT event
 #define QUEUEPUT_EVENT( queueenum ) \
-(( QUEUE_EVENT_PUT << QUEUE_EVENT_SHIFT ) | queueenum )
+  (( QUEUE_EVENT_PUT << QUEUE_EVENT_SHIFT ) | queueenum )
 
 /// define a macro to generate a QUEUEPUTFULL event
 #define QUEUEPUTFULL_EVENT( queueenum ) \
-(( QUEUE_EVENT_PUTFULL << QUEUE_EVENT_SHIFT ) | queueenum )
+  (( QUEUE_EVENT_PUTFULL << QUEUE_EVENT_SHIFT ) | queueenum )
 
 // enumerations ---------------------------------------------------------------
 /// define the queue event flag structure
@@ -105,11 +120,11 @@ typedef enum _QUEUEEVENTS
 /// define the Queue definition structure
 typedef struct 	_QUEUEDEF
 {
-  TASKSCHDENUMS	eTaskEnum;		///< task number for events
-  U8			      nNumEntries;	///< number of entries in queue
-  U8			      nEntrySize;		///< size of each entry
-  QUEUEEVNFLAGS tEventFlags;	///< event flags
-  PU8			      pnQueue;		  ///< pointer to the buffer
+  TASKSCHDENUMS	    eTaskEnum;		///< task number for events
+  XQUEUENUMENTRIES  xNumEntries;	///< number of entries in queue
+  XQUEUEENTRYSIZE   xEntrySize;		///< size of each entry
+  QUEUEEVNFLAGS     tEventFlags;	///< event flags
+  PU8			          pnQueue;		  ///< pointer to the buffer
 } QUEUEDEF, *PQUEUEDEF;
 #define QUEUEDEF_SIZE sizeof( QUEUEDEF )
 

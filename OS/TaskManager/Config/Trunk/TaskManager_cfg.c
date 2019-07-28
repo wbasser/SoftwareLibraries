@@ -38,19 +38,17 @@
 /// declare event buffers here
 // TASKEVENTSTORAGE( bufname, size )
 
-
 /// scheduled task table declaration
-const CODE TASKSCHDDEF  atTaskSchdDefs[ TASK_SCHD_MAX ] =
+const CODE TASKSCHDDEF  g_atTaskSchdDefs[ TASK_SCHD_MAX ] =
 {
   // TASKSCHD( type, taskhandler, numevents, bufname, executionrate, enabled, runoninit )
 };
 
 #if ( TASK_TICK_ENABLE == 1 )
 /// tick task table declaration
-const CODE TASKTICKDEF  atTaskTickDefs[ TASK_TICK_MAX ] = 
+const CODE TASKTICKDEF  g_atTaskTickDefs[ TASK_TICK_MAX ] = 
 {
-  // TASKTICK( taskhandler, executionrate ),
-
+  // TASKTICK( taskhandler, executionrate, enabled ),
 };
 #endif  // TASK_TICK_ENABLE
 

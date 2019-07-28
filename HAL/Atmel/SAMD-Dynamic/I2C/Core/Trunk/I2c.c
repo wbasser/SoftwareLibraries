@@ -30,7 +30,10 @@
 #include "SystemTick/SystemTick.h"
 
 // local includes -------------------------------------------------------------
+#include "Clock/Clock.h"
 #include "I2C/I2c.h"
+#include "Interrupt/Interrupt.h"
+#include "PowerManager/PowerManager.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the baud rate values for slow/fast
@@ -39,6 +42,9 @@
 
 /// define the stop command value 
 #define CMD_SEND_STOP       ( 3 )
+
+/// define the macro to map the control pointer
+#define MAP_HANDLE_TO_POINTER( handle )   (( SercomI2cm* )handle )
 
 // enumerations ---------------------------------------------------------------
 /// enuemrate the bus direction
@@ -58,16 +64,27 @@ typedef enum _PRCWRTACTION
 } PRCWRACTION;
 
 // structures -----------------------------------------------------------------
+/// define the local control structure
+typedef struct _LCLCTLS
+{
+  PI2CXFRCTL  ptXfrCtl;     ///< transfer control ointer
+  U16         wBufIdx;      ///< buffer index
+  I2CERR      eError;       ///< current error
+  BOOL        bRunning;     ///< running state
+  BUSDIR      eBusDir;      ///< bus direction
+  SercomI2cm* ptI2c;        ///< pointer to the SERCOM
+} LCLCTL, *PLCLCTL;
+#define LCLCTL_SIZE           sizeof( LCLCTL )
 
 // local parameter declarations -----------------------------------------------
 
 // local function prototypes --------------------------------------------------
 static  SercomI2cm*   GetSercomChannel( I2CCHAN eChan );
-static  void          IrqCommonHandler( I2CDEVENUM eDev );
-static  PRCWRACTION   ProcessMasterWrite( PLCLCTL ptCtl, SercomI2cm* ptI2c );
-static  BOOL          ProcessMasterRead( PLCLCTL ptCtl, SercomI2cm* ptI2c );
-static  void          ProcessComplete( I2CERR eError, PI2CDEF ptDef, PLCLCTL ptCtl, SercomI2cm* ptI2c );
-static  U32           ComputeBaudRate( I2CCHAN eChan, U32 uBaud );
+static  void          ProcessInterrupts( PLCLCTL ptLclCtl );
+static  PRCWRACTION   ProcessMasterWrite( PLCLCTL ptLclCtl );
+static  BOOL          ProcessMasterRead( PLCLCTL ptLclCtl );
+static  void          ProcessComplete( I2CERR eError, PLCLCTL ptLclCtl );
+static  U32           ComputeBaudRate( U32 uBaud );
 
 /******************************************************************************
  * @function I2c_Initialize
@@ -77,40 +94,51 @@ static  U32           ComputeBaudRate( I2CCHAN eChan, U32 uBaud );
  * This function all devices in the table
  *
  *****************************************************************************/
-PTI2CHANDLE I2c_Initialize( I2CCHAN eChan, BOOL bFastSpeed )
+PVI2CHANDLE I2c_Configure( PI2CDEF ptI2cDef )
 {
-  SercomI2cm*             ptI2c;
   U32                     uTemp;
   SERCOM_I2CM_CTRLA_Type  tCtrlA;
-  
-  // get pointer to the definition structure
-  ptI2c = GetSercomChannel( eChan );
+  PLCLCTL                 ptLclCtl;
 
-  // disable the control and wait for done
-  ptI2c->CTRLA.bit.SWRST = 1;
-  #ifdef __SAM_D21_SUBFAMILY
-  while( ptI2c->SYNCBUSY.bit.SWRST );
-  #endif //  __SAM_D21_SUBFAMILY
-  
-  // now set the baudrate
-  uTemp = ( bFastSpeed ) ? BAUD_RATE_FAST : BAUD_RATE_SLOW;
-  ptI2c->BAUD.reg = ComputeBaudRate( eChan, uTemp );
-  
-  // now set up control B
-  ptI2c->CTRLB.reg = SERCOM_I2CM_CTRLB_SMEN;
+  // malloc space
+  if (( ptLclCtl = malloc( LCLCTL_SIZE )) != NULL )
+  {
+    // configure the GPIO pins
+    Gpio_Configure( ptI2cDef->eDevPort, ptI2cDef->nSdaPin, GPIO_MODE_INPUT, OFF, ptI2cDef->eDevMux, OFF );
+    Gpio_Configure( ptI2cDef->eDevPort, ptI2cDef->nSclPin, GPIO_MODE_INPUT, OFF, ptI2cDef->eDevMux, OFF );
 
-  // now build control A
-  tCtrlA.reg = SERCOM_I2CM_CTRLA_MODE_I2C_MASTER;
-  tCtrlA.reg |= ( ptDef->bRunStandby ) ? SERCOM_I2CM_CTRLA_RUNSTDBY : 0;
-  tCtrlA.reg |= SERCOM_I2CM_CTRLA_ENABLE;
-  tCtrlA.reg |= SERCOM_I2CM_CTRLA_INACTOUT( 1 );
-  tCtrlA.reg |= SERCOM_I2CM_CTRLA_SDAHOLD( 2 );
-  ptI2c->CTRLA = tCtrlA;
+    // get pointer to the definition structure
+    ptLclCtl->ptI2c = GetSercomChannel( ptI2cDef->eChan );
+
+    // disable the control and wait for done
+    ptLclCtl->ptI2c->CTRLA.bit.SWRST = 1;
+    #ifdef __SAM_D21_SUBFAMILY
+    while( ptI2c->SYNCBUSY.bit.SWRST );
+    #endif //  __SAM_D21_SUBFAMILY
   
-  // now wait for done
-  #ifdef __SAM_D21_SUBFAMILY
-  while( ptI2c->SYNCBUSY.bit.SWRST );
-  #endif //  __SAM_D21_SUBFAMILY
+    // now set the baudrate
+    uTemp = ( ptI2cDef->bFastSpeed ) ? BAUD_RATE_FAST : BAUD_RATE_SLOW;
+    ptLclCtl->ptI2c->BAUD.reg = ComputeBaudRate( uTemp );
+  
+    // now set up control B
+    ptLclCtl->ptI2c->CTRLB.reg = SERCOM_I2CM_CTRLB_SMEN;
+
+    // now build control A
+    tCtrlA.reg = SERCOM_I2CM_CTRLA_MODE_I2C_MASTER;
+    tCtrlA.reg |= SERCOM_I2CM_CTRLA_SPEED( ptI2cDef->bFastSpeed );
+    tCtrlA.reg |= SERCOM_I2CM_CTRLA_ENABLE;
+    tCtrlA.reg |= SERCOM_I2CM_CTRLA_INACTOUT( 1 );
+    tCtrlA.reg |= SERCOM_I2CM_CTRLA_SDAHOLD( 2 );
+    ptLclCtl->ptI2c->CTRLA = tCtrlA;
+  
+    // now wait for done
+    #ifdef __SAM_D21_SUBFAMILY
+    while( ptI2c->SYNCBUSY.bit.SWRST );
+    #endif //  __SAM_D21_SUBFAMILY
+    }
+
+  // return the handle
+  return(( PVI2CHANDLE )ptLclCtl );
 }
 
 /******************************************************************************
@@ -120,80 +148,63 @@ PTI2CHANDLE I2c_Initialize( I2CCHAN eChan, BOOL bFastSpeed )
  *
  * This function will write some characters to the I2C buffer if room
  *
- * @param[in]   eDev        Device enumeration
+ * @param[in]   pvI2cHandle handle
  * @param[in]   ptXftCtl    pointer to the transfer control
  *
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Write( PTI2CHANDLE ptI2c, PI2CXFRCTL ptXfrCtl )
+I2CERR I2c_Write( PVI2CHANDLE pvI2cHandle, PI2CXFRCTL ptXfrCtl )
 {
-  I2CERR 	    eError = I2C_ERR_NONE;
+  I2CERR      eError = I2C_ERR_NONE;
   U32         uTime;  
+  PLCLCTL     ptLclCtl;
+
+  // map handle to pointer
+  ptLclCtl = ( PLCLCTL  )pvI2cHandle;
 
   // check for a valid I2C
-  if ( eDev < I2C_DEV_ENUM_MAX )
+  if ( ptLclCtl != NULL )
   {
-    // get pointer to the definition structure
-    ptDef = ( PI2CDEF )&atI2cDefs[ eDev ];
-    ptCtl = &atLclCtls[ eDev ];
-    ptI2c = GetSercomChannel( ptDef->eChan );
-    
     // copy the values to the local controls
-    ptCtl->ptXfrCtl = ptXfrCtl;
-    ptCtl->wBufIdx = 0;
+    ptLclCtl->ptXfrCtl = ptXfrCtl;
+    ptLclCtl->wBufIdx = 0;
 
     // clear any error bits in the status/flag
-    ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
+    ptLclCtl->ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
 
     // set the running flag/direction/state
-    ptCtl->bRunning = TRUE;
-    ptCtl->eBusDir = BUS_DIR_WRITE;
-    ptCtl->eError = I2C_ERR_NONE;
+    ptLclCtl->bRunning = TRUE;
+    ptLclCtl->eBusDir = BUS_DIR_WRITE;
+    ptLclCtl->eError = I2C_ERR_NONE;
 
-    // enable the interrupts
-    ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MASK;
-    ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_ERROR;
-    
     // now write the address with read bit cleared
     #ifdef __SAM_D21_SUBFAMILY
-    while( ptI2c->SYNCBUSY.bit.SWRST );
+    while( ptLclCtl->ptI2c->SYNCBUSY.bit.SWRST );
     #endif //  __SAM_D21_SUBFAMILY
-    ptI2c->ADDR.bit.ADDR = ( ptXfrCtl->nDevAddr << 1 ) | BUS_DIR_WRITE;
+    ptLclCtl->ptI2c->ADDR.bit.ADDR = ( ptXfrCtl->nDevAddr << 1 ) | BUS_DIR_WRITE;
 
-    // check for a blocking device
-    if ( ptDef->pvCallBack == NULL )
+    // wait till done or timeout
+    ptLclCtl->bRunning = TRUE;
+    uTime = 0x80000000;
+    while( ptLclCtl->bRunning )
     {
-			// wait till done or timeout
-			ptCtl->bRunning = TRUE;
-			uTime = SystemTick_GetTimeMsec( ) + ptXfrCtl->uTimeout;
-			while( ptCtl->bRunning )
-			{
-    		// check for timeout
-    		if ( SystemTick_GetTimeMsec( ) >= uTime )
-    		{
-      		// timeout occured - flag error
-      		ptCtl->bRunning = FALSE;
-      		ptCtl->eError = I2C_ERR_TIMEOUT;
-    		}
-			}
+      ProcessInterrupts( ptLclCtl );
 
-      // copy the error
-			eError = ptCtl->eError;
-    
-      // disable the interrupts
-      ptI2c->INTENCLR.reg = SERCOM_I2CM_INTENCLR_MB | SERCOM_I2CM_INTENCLR_ERROR;
+      // check for timeout
+      if ( --uTime == 0 )
+      {
+        // timeout occured - flag error
+        ptLclCtl->bRunning = FALSE;
+        ptLclCtl->eError = I2C_ERR_TIMEOUT;
+      }
     }
-    else
-    {
-      // set the error to busy
-      eError = I2C_ERR_BLKING;
-    }
-  }
-  else
-  {
-    // illegal device
-    eError = I2C_ERR_ILLDEV;
+
+    // copy the error
+    eError = ptLclCtl->eError;
+  
+    // disable the interrupts
+    ptLclCtl->ptI2c->INTENCLR.reg = SERCOM_I2CM_INTENCLR_MB | SERCOM_I2CM_INTENCLR_ERROR;
   }
 
   // return the status
@@ -207,47 +218,43 @@ I2CERR I2c_Write( PTI2CHANDLE ptI2c, PI2CXFRCTL ptXfrCtl )
  *
  * This function will read bytes from the buffer
  *
- * @param[in]   eDev        Device enumeration
+ * @param[in]   pvI2cHandle handle
  * @param[in]   ptXftCtl    pointer to the transfer control
  *
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
+I2CERR I2c_Read( PVI2CHANDLE pvI2cHandle, PI2CXFRCTL ptXfrCtl )
 {
   I2CERR      eError = I2C_ERR_NONE;
-  PI2CDEF     ptDef;
-  PLCLCTL     ptCtl;
   U32         uTime;  
-  SercomI2cm* ptI2c;
+  PLCLCTL     ptLclCtl;
   U8          nAddr;
-  
-  // check for a valid I2C
-  if ( eDev < I2C_DEV_ENUM_MAX )
-  {
-    // get pointers to the control/def structure
-    ptDef = ( PI2CDEF )&atI2cDefs[ eDev ];
-    ptCtl = &atLclCtls[ eDev ];
-    ptI2c = GetSercomChannel( ptDef->eChan );
 
+  // map handle to pointer
+  ptLclCtl = ( PLCLCTL  )pvI2cHandle;
+
+  // check for a valid I2C
+  if ( ptLclCtl != NULL )
+  {
     // copy the values to the local controls
-    ptCtl->ptXfrCtl = ptXfrCtl;
-    ptCtl->wBufIdx = 0;
+    ptLclCtl->ptXfrCtl = ptXfrCtl;
+    ptLclCtl->wBufIdx = 0;
 
     // clear any error bits in the status
-    ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
+    ptLclCtl->ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
 
     // clear the interrupts
-    ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MASK;
+    ptLclCtl->ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MASK;
     
     // clear the ack flag
-    ptI2c->CTRLB.reg &= ~SERCOM_I2CM_CTRLB_ACKACT;
+    ptLclCtl->ptI2c->CTRLB.reg &= ~SERCOM_I2CM_CTRLB_ACKACT;
 
     // set the running flag/direction/state
-    ptCtl->bRunning = TRUE;
+    ptLclCtl->bRunning = TRUE;
 
     // clear the error
-    ptCtl->eError = I2C_ERR_NONE;
+    ptLclCtl->eError = I2C_ERR_NONE;
 
     // compute the bus address
     nAddr = ( ptXfrCtl->nDevAddr << 1 );
@@ -256,49 +263,44 @@ I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
     if ( ptXfrCtl->nAddrLen == 0 )
     {
       // enable all the interrupts/set the bus direction/adjust the address
-      ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR;
-      ptCtl->eBusDir = BUS_DIR_READ;
+      ptLclCtl->ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR;
+      ptLclCtl->eBusDir = BUS_DIR_READ;
       nAddr |= BUS_DIR_READ;
     }
     else
     {
       // enable only the MB and Error interrupts
-      ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_ERROR;
-      ptCtl->eBusDir = BUS_DIR_RDWRITE;
+      ptLclCtl->ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_ERROR;
+      ptLclCtl->eBusDir = BUS_DIR_RDWRITE;
     }
 
     // now write the address with read bit set
     #ifdef __SAM_D21_SUBFAMILY
     while( ptI2c->SYNCBUSY.bit.SWRST );
     #endif //  __SAM_D21_SUBFAMILY
-    ptI2c->ADDR.bit.ADDR = nAddr;
+    ptLclCtl->ptI2c->ADDR.bit.ADDR = nAddr;
 
     // check for a blocking device
-    if ( ptDef->pvCallBack == NULL )
+    ptLclCtl->bRunning = TRUE;
+    uTime = 0x80000000;
+    while( ptLclCtl->bRunning )
     {
-			ptCtl->bRunning = TRUE;
-			uTime = SystemTick_GetTimeMsec( ) + ptXfrCtl->uTimeout;
-			while( ptCtl->bRunning )
-			{
-    		// check for timeout
-    		if ( SystemTick_GetTimeMsec( ) >= uTime )
-    		{
-      		// timeout occured - flag error
-      		ptCtl->bRunning = FALSE;
-      		ptCtl->eError = I2C_ERR_TIMEOUT;
-    		}
-			}
+      // process the interrupts
+      ProcessInterrupts( ptLclCtl );
+
+      // check for timeout
+      if ( --uTime == 0  )
+      {
+        // timeout occured - flag error
+        ptLclCtl->bRunning = FALSE;
+        ptLclCtl->eError = I2C_ERR_TIMEOUT;
+      }
 
       // copy the error
-      eError = ptCtl->eError;
+      eError = ptLclCtl->eError;
       
       // disable the interrupts
-      ptI2c->INTENCLR.reg = SERCOM_I2CM_INTENCLR_MB | SERCOM_I2CM_INTENCLR_SB | SERCOM_I2CM_INTENCLR_ERROR;
-    }
-    else
-    {
-      // set the error to busy
-      eError = I2C_ERR_BLKING;
+      ptLclCtl->ptI2c->INTENCLR.reg = SERCOM_I2CM_INTENCLR_MB | SERCOM_I2CM_INTENCLR_SB | SERCOM_I2CM_INTENCLR_ERROR;
     }
   }
   else
@@ -325,25 +327,23 @@ I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
+I2CERR I2c_Ioctl( PVI2CHANDLE pvI2cHandle, I2CACTION eAction, PVOID pvData )
 {
   I2CERR      eError = I2C_ERR_NONE;
-  PI2CDEF     ptDef;
+  PLCLCTL     ptLclCtl;
   PU32        puData;
-  SercomI2cm* ptI2c;
-  U32         uTime;
   PI2CCHKBSY  ptBusyParams;
+  U32         uTime;
 
-  // set the pointer to avoid compiler errors
-  puData = ( PU32 )pvData;
-  
+  // map handle to pointer
+  ptLclCtl = ( PLCLCTL  )pvI2cHandle;
+
   // check for a valid I2C
-  if ( eDev < I2C_DEV_ENUM_MAX )
+  if ( ptLclCtl != NULL )
   {
-    // get pointers to the control/def structure
-    ptDef = ( PI2CDEF )&atI2cDefs[ eDev ];
-    ptI2c = GetSercomChannel( ptDef->eChan );
-
+    // set the pointer to avoid compiler errors
+    puData = ( PU32 )pvData;
+  
     // process the action
     switch( eAction )
     {
@@ -352,24 +352,24 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
         ptBusyParams = ( PI2CCHKBSY )pvData;
 
         // clear any error bits in the status/clear ACK flag
-        ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
-        ptI2c->CTRLB.reg &= ~SERCOM_I2CM_CTRLB_ACKACT;
+        ptLclCtl->ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
+        ptLclCtl->ptI2c->CTRLB.reg &= ~SERCOM_I2CM_CTRLB_ACKACT;
 
         // now write the address with read bit set
         #ifdef __SAM_D21_SUBFAMILY
         while( ptI2c->SYNCBUSY.bit.SWRST );
         #endif //  __SAM_D21_SUBFAMILY
-        ptI2c->ADDR.bit.ADDR = ( ptBusyParams->nDevAddr << 1 ) | ptBusyParams->bReadMode;
+        ptLclCtl->ptI2c->ADDR.bit.ADDR = ( ptBusyParams->nDevAddr << 1 ) | ptBusyParams->bReadMode;
 
         // get the status - check for flag
-        uTime = SystemTick_GetTimeMsec( ) + 10;
-        while( SystemTick_GetTimeMsec( ) < uTime  )
+        uTime = 0x40000000;
+        while( --uTime != 0 )
         {
           // check for MB flag
-          if ( ptI2c->INTFLAG.bit.MB )
+          if ( ptLclCtl->ptI2c->INTFLAG.bit.MB )
           {
             // clear the flag
-            ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MB;
+            ptLclCtl->ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MB;
 
             // break;
             break;
@@ -377,7 +377,7 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
         }
 
         // return the status based on RXNACK
-        if ( ptI2c->STATUS.reg & SERCOM_I2CM_STATUS_RXNACK )
+        if ( ptLclCtl->ptI2c->STATUS.reg & SERCOM_I2CM_STATUS_RXNACK )
         {
           // set error 
           eError = I2C_ERR_SLVNAK;
@@ -385,12 +385,12 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
 
         // issue stop
         #ifdef __SAM_D21_SUBFAMILY
-        while( ptI2c->SYNCBUSY.reg & SERCOM_I2CM_SYNCBUSY_MASK );
+        while( ptLclCtl->ptI2c->SYNCBUSY.reg & SERCOM_I2CM_SYNCBUSY_MASK );
         #endif //  __SAM_D21_SUBFAMILY
-        ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD( CMD_SEND_STOP );
+        ptLclCtl->ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD( CMD_SEND_STOP );
 
         // clear status bits
-        ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
+        ptLclCtl->ptI2c->STATUS.reg = SERCOM_I2CM_STATUS_MASK;
         break;
         
       case I2C_ACTION_SET_DEVADDR :
@@ -416,225 +416,67 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
 }
 
 /******************************************************************************
- * @function I2c_Close
- *
- * @brief Close the I2C
- *
- * This function will disable any interrupt, unregister the interrupt handler
- *
- * @param[in]   eDev        Device enumeration
- *
- * @return      appropriate error value
- *
- *****************************************************************************/
-I2CERR I2c_Close( I2CDEVENUM eDev )
-{
-  I2CERR       eError = I2C_ERR_NONE;
-  SercomI2cm*  ptI2c;
-  
-  // check for a valid UART
-  if ( eDev < I2C_DEV_ENUM_MAX )
-  {
-    // get the pointer to the USART channel
-    ptI2c = GetSercomChannel( atI2cDefs[ eDev ].eChan );
-
-    // disable the USART
-    while( ptI2c->SYNCBUSY.reg & SERCOM_I2CM_SYNCBUSY_MASK );
-    ptI2c->CTRLA.reg &= ~SERCOM_I2CM_CTRLA_ENABLE;
-
-    // enable the interrupt in the NVIC
-    NVIC_DisableIRQ( SERCOM0_IRQn + atI2cDefs[ eDev ].eChan );
-  }
-  else
-  {
-    // illegal device
-    eError = I2C_ERR_ILLDEV;
-  }
-  
-  // return the error
-  return( eError );
-}
-
-#ifdef SERCOM0
-#if ( I2C_CHAN0_IN_USE == 1)
-/******************************************************************************
- * @function SERCOM0_Handler
- *
- * @brief interrupt SERCOM 0 handler
- *
- * This function handles the interrupts from SERCOM 0
- *
- *****************************************************************************/
-void SERCOM0_Handler( void )
-{
-  // call the common handler
-  IrqCommonHandler( aePhyToDefMap[ I2C_CHAN_0 ] );
-}
-#endif // I2C_CHAN0_IN_USE
-#endif // SERCOM0
-
-#ifdef SERCOM1 
-#if ( I2C_CHAN1_IN_USE == 1)
-/******************************************************************************
- * @function SERCOM1_Handler
- *
- * @brief interrupt SERCOM 1 handler
- *
- * This function handles the interrupts from SERCOM 1
- *
- *****************************************************************************/
-void SERCOM1_Handler( void )
-{
-  // call the common handler
-  IrqCommonHandler( aePhyToDefMap[ I2C_CHAN_1 ] );
-}
-#endif // I2C_CHAN1_IN_USE
-#endif // SERCOM1
-
-#ifdef SERCOM2
-#if ( I2C_CHAN2_IN_USE == 1 )
-/******************************************************************************
- * @function SERCOM2_Handler
- *
- * @brief interrupt SERCOM 2 handler
- *
- * This function handles the interrupts from SERCOM 2
- *
- *****************************************************************************/
-void SERCOM2_Handler( void )
-{
-  // call the common handler
-  IrqCommonHandler( aePhyToDefMap[ I2C_CHAN_2 ] );
-}
-#endif // I2C_CHAN2_IN_USE
-#endif // SERCOM2
-
-#ifdef SERCOM3
-#if ( I2C_CHAN3_IN_USE == 1 )
-/******************************************************************************
- * @function SERCOM3_Handler
- *
- * @brief interrupt SERCOM 3 handler
- *
- * This function handles the interrupts from SERCOM 3
- *
- *****************************************************************************/
-void SERCOM3_Handler( void )
-{
-  // call the common handler
-  IrqCommonHandler( aePhyToDefMap[ I2C_CHAN_3 ] );
-}
-#endif // I2C_CHAN3_IN_USE
-#endif // SERCOM3
-
-#ifdef SERCOM4
-#if ( I2C_CHAN4_IN_USE == 1 )
-/******************************************************************************
- * @function SERCOM4_Handler
- *
- * @brief interrupt SERCOM 4 handler
- *
- * This function handles the interrupts from SERCOM 4
- *
- *****************************************************************************/
-void SERCOM4_Handler( void )
-{
-  // call the common handler
-  IrqCommonHandler( aePhyToDefMap[ I2C_CHAN_4 ] );
-}
-#endif // I2C_CHAN4_IN_USE
-#endif // SERCOM4
-
-#ifdef SERCOM5
-#if ( I2C_CHAN5_IN_USE == 1 )
-/******************************************************************************
- * @function SERCOM5_Handler
- *
- * @brief interrupt SERCOM 5 handler
- *
- * This function handles the interrupts from SERCOM 5
- *
- *****************************************************************************/
-void SERCOM5_Handler( void )
-{
-  // call the common handler
-  IrqCommonHandler( aePhyToDefMap[ I2C_CHAN_5 ] );
-}
-#endif // I2C_CHAN5_IN_USE
-#endif // SERCOM5
-
-/******************************************************************************
- * @function IrqCommandHandler
+ * @function ProcessInterrupts
  *
  * @brief common interrupt handler
  *
  * This function checks for the type of interrupts and processes them
  * appropriately
  *
- * @param[in]   eDev        physical device enumeration
+ * @param[in]   ptLclCtl    pointer to the local control
  *
  *****************************************************************************/
-static void IrqCommonHandler( I2CDEVENUM eDev )
+static void ProcessInterrupts( PLCLCTL ptLclCtl )
 {
-  PI2CDEF       ptDef;
-  PLCLCTL       ptCtl;
-  SercomI2cm*   ptI2c;
   U8            nAddr;
   
-  // get the definition/control structure pointers
-  ptDef = ( PI2CDEF )&atI2cDefs[ eDev ];
-  ptCtl = &atLclCtls[ eDev ];
-
-  // get the pointer to the register
-  ptI2c = GetSercomChannel( ptDef->eChan );
-
   // check for error first
-  if ( ptI2c->INTFLAG.bit.ERROR )
+  if ( ptLclCtl->ptI2c->INTFLAG.bit.ERROR )
   {
     // clear the flag
-    ptI2c->INTFLAG.reg |= SERCOM_I2CM_INTFLAG_ERROR;
+    ptLclCtl->ptI2c->INTFLAG.reg |= SERCOM_I2CM_INTFLAG_ERROR;
     
     // set the error and exit
-    ProcessComplete( I2C_ERR_BUSFAULT, ptDef, ptCtl, ptI2c );
+    ProcessComplete( I2C_ERR_BUSFAULT, ptLclCtl );
   }
 
   // check master on bus
-  if ( ptI2c->INTFLAG.bit.MB )
+  if (ptLclCtl-> ptI2c->INTFLAG.bit.MB )
   {
     // clear the flag
-    ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MB;
+    ptLclCtl->ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MB;
 
     // now determine the action
-    if ( ptI2c->STATUS.bit.ARBLOST )
+    if ( ptLclCtl->ptI2c->STATUS.bit.ARBLOST )
     {
       // error - arbitration lost
-      ProcessComplete( I2C_ERR_ARBLOST, ptDef, ptCtl, ptI2c );
+      ProcessComplete( I2C_ERR_ARBLOST, ptLclCtl );
     }
-    else if ( ptI2c->STATUS.bit.RXNACK )
+    else if ( ptLclCtl->ptI2c->STATUS.bit.RXNACK )
     {
       // error - NAK
-      ProcessComplete( I2C_ERR_SLVNAK, ptDef, ptCtl, ptI2c );
+      ProcessComplete( I2C_ERR_SLVNAK, ptLclCtl );
     }
     else
     {
       // process the bus write
-      switch( ProcessMasterWrite( ptCtl, ptI2c ))
+      switch( ProcessMasterWrite( ptLclCtl ))
       {
         case PRC_WR_ACTION_DONE :
           //  call process complete
-          ProcessComplete( I2C_ERR_NONE, ptDef, ptCtl, ptI2c );
+          ProcessComplete( I2C_ERR_NONE, ptLclCtl );
           break;
 
         case PRC_WR_ACTION_RESTART :
           // allow all interrupts
-          ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR;
+          ptLclCtl->ptI2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR;
 
           // compute the bus address
-          nAddr = ( ptCtl->ptXfrCtl->nDevAddr << 1 ) | BUS_DIR_READ;
+          nAddr = ( ptLclCtl->ptXfrCtl->nDevAddr << 1 ) | BUS_DIR_READ;
 
           // now write the address with read bit set
-          while( ptI2c->SYNCBUSY.reg != 0 );
-          ptI2c->ADDR.bit.ADDR = nAddr;
+          while( ptLclCtl->ptI2c->SYNCBUSY.reg != 0 );
+          ptLclCtl->ptI2c->ADDR.bit.ADDR = nAddr;
           break;
 
         default :
@@ -644,16 +486,16 @@ static void IrqCommonHandler( I2CDEVENUM eDev )
   }
 
   // check slave on bus
-  if ( ptI2c->INTFLAG.bit.SB )
+  if ( ptLclCtl->ptI2c->INTFLAG.bit.SB )
   {
     // clear the flag
-    ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_SB;
+    ptLclCtl->ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_SB;
 
     // check for read
-    if ( ProcessMasterRead( ptCtl, ptI2c ) == TRUE )
+    if ( ProcessMasterRead( ptLclCtl ) == TRUE )
     {
       //  call process complete
-      ProcessComplete( I2C_ERR_NONE, ptDef, ptCtl, ptI2c );
+      ProcessComplete( I2C_ERR_NONE, ptLclCtl );
     }
   }
 }
@@ -665,34 +507,31 @@ static void IrqCommonHandler( I2CDEVENUM eDev )
  *
  * This function determines if data is to be written and processes it
  *
- * @param[in]   eError    error
- * @param[in]   ptDef     pointer to the definition structure
- * @param[in]   ptCtl     pointer to the control structure
- * @param[in]   ptI2c     pointer to the I2C module
+ * @param[in]   ptLclCtl     pointer to the control structure
  *
  * @return      appropriate action
  *
  *****************************************************************************/
-static PRCWRACTION ProcessMasterWrite( PLCLCTL ptCtl, SercomI2cm* ptI2c )
+static PRCWRACTION ProcessMasterWrite( PLCLCTL ptLclCtl )
 {
   U8            nData;
   PRCWRACTION   eAction = PRC_WR_ACTION_CONT;
 
   // is there any address that needs to be sent
-  if ( ptCtl->ptXfrCtl->nAddrLen != 0 )
+  if ( ptLclCtl->ptXfrCtl->nAddrLen != 0 )
   {
     // get the address byte/decrement the length/set send data
-    nData = ptCtl->ptXfrCtl->tAddress.anValue[ ptCtl->ptXfrCtl->nAddrLen - 1 ];
-    ptCtl->ptXfrCtl->nAddrLen--;
+    nData = ptLclCtl->ptXfrCtl->tAddress.anValue[ ptLclCtl->ptXfrCtl->nAddrLen - 1 ];
+    ptLclCtl->ptXfrCtl->nAddrLen--;
   }
-  else if ( ptCtl->ptXfrCtl->wDataLen != 0 )
+  else if ( ptLclCtl->ptXfrCtl->wDataLen != 0 )
   {
     // determine if this a write
-    if ( ptCtl->eBusDir == BUS_DIR_WRITE )
+    if ( ptLclCtl->eBusDir == BUS_DIR_WRITE )
     {
       // get data/set data send
-      nData = *( ptCtl->ptXfrCtl->pnData + ptCtl->wBufIdx++ );
-      ptCtl->ptXfrCtl->wDataLen--;
+      nData = *( ptLclCtl->ptXfrCtl->pnData + ptLclCtl->wBufIdx++ );
+      ptLclCtl->ptXfrCtl->wDataLen--;
     }
     else
     {
@@ -710,8 +549,8 @@ static PRCWRACTION ProcessMasterWrite( PLCLCTL ptCtl, SercomI2cm* ptI2c )
   if ( eAction == PRC_WR_ACTION_CONT )
   {
     // send the data
-    while( ptI2c->SYNCBUSY.reg != 0 );
-    ptI2c->DATA.reg = nData;
+    while( ptLclCtl->ptI2c->SYNCBUSY.reg != 0 );
+    ptLclCtl->ptI2c->DATA.reg = nData;
   }  
 
   // return the action
@@ -725,39 +564,36 @@ static PRCWRACTION ProcessMasterWrite( PLCLCTL ptCtl, SercomI2cm* ptI2c )
  *
  * This function determines if data is to be read and processes it
  *
- * @param[in]   eError    error
- * @param[in]   ptDef     pointer to the definition structure
- * @param[in]   ptCtl     pointer to the control structure
- * @param[in]   ptI2c     pointer to the I2C module
+ * @param[in]   ptLclCtl     pointer to the control structure
  *
  * @return      TRUE if done, FALSE if more data
  *
  *****************************************************************************/
-static BOOL ProcessMasterRead( PLCLCTL ptCtl, SercomI2cm* ptI2c )
+static BOOL ProcessMasterRead( PLCLCTL ptLclCtl )
 {
   BOOL  bStatus = FALSE;
   U8    nData;
 
   // decrement the length
-  ptCtl->ptXfrCtl->wDataLen--;
+  ptLclCtl->ptXfrCtl->wDataLen--;
 
   // determine if we are done
-  if ( ptCtl->ptXfrCtl->wDataLen == 0 )
+  if ( ptLclCtl->ptXfrCtl->wDataLen == 0 )
   {
     // set NACK
-    ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_ACKACT;
+    ptLclCtl->ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_ACKACT;
 
     // send a stop
-    while( ptI2c->SYNCBUSY.reg != 0 );
-    ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD( CMD_SEND_STOP );
+    while( ptLclCtl->ptI2c->SYNCBUSY.reg != 0 );
+    ptLclCtl->ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD( CMD_SEND_STOP );
 
     // set status to true
     bStatus = TRUE;
   }
 
   // read the current byte
-  nData = ptI2c->DATA.reg;
-  *( ptCtl->ptXfrCtl->pnData + ptCtl->wBufIdx++ ) = nData;
+  nData = ptLclCtl->ptI2c->DATA.reg;
+  *( ptLclCtl->ptXfrCtl->pnData + ptLclCtl->wBufIdx++ ) = nData;
 
   // return the state
   return( bStatus );
@@ -772,27 +608,18 @@ static BOOL ProcessMasterRead( PLCLCTL ptCtl, SercomI2cm* ptI2c )
  * appropriately
  *
  * @param[in]   eError    error
- * @param[in]   ptDef     pointer to the definition structure
- * @param[in]   ptCtl     pointer to the control structure
- * @param[in]   ptI2c     pointer to the I2C module
+ * @param[in]   ptLclCtl     pointer to the control structure
  *
  *****************************************************************************/
-static void ProcessComplete( I2CERR eError, PI2CDEF ptDef, PLCLCTL ptCtl, SercomI2cm* ptI2c )
+static void ProcessComplete( I2CERR eError, PLCLCTL ptLclCtl )
 {
   // clear the funning flag/set the state to idle/set the error
-  ptCtl->bRunning = FALSE;
-  ptCtl->eError = eError;
+  ptLclCtl->bRunning = FALSE;
+  ptLclCtl->eError = eError;
 
   // issue stop
-  while( ptI2c->SYNCBUSY.reg & SERCOM_I2CM_SYNCBUSY_MASK );
-  ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD( CMD_SEND_STOP );
-
-  // check to see if the callback is not null
-  if ( ptDef->pvCallBack != NULL )
-  {
-    // call it
-    ptDef->pvCallBack( 0 );
-  }
+  while( ptLclCtl->ptI2c->SYNCBUSY.reg & SERCOM_I2CM_SYNCBUSY_MASK );
+  ptLclCtl->ptI2c->CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD( CMD_SEND_STOP );
 }
 
 /******************************************************************************
@@ -807,15 +634,14 @@ static void ProcessComplete( I2CERR eError, PI2CDEF ptDef, PLCLCTL ptCtl, Sercom
  * @return      computer baud rate
  *
  *****************************************************************************/
-static U32 ComputeBaudRate( I2CCHAN eChan, U32 uBaud )
+static U32 ComputeBaudRate( U32 uBaud )
 {
   U32   uPeripheralClock, uBaudRate;
   
   // get the system clock value
-  uPeripheralClock = Clock_GetMultiplexerFreq( CLOCK_MUXID_SERCOM_0 + eChan );
+  uPeripheralClock = Clock_GetFreq( );
   
   // calculate the baud rate
-  //uBaudRate = divceil( uPeripheralClock, ( 2000*( uBaud ))) - 5;
   uBaudRate = (( uPeripheralClock / uBaud ) / 2 ) - 5;
 
   // return it
@@ -837,39 +663,53 @@ static U32 ComputeBaudRate( I2CCHAN eChan, U32 uBaud )
  *****************************************************************************/
 static SercomI2cm* GetSercomChannel( I2CCHAN eChan )
 {
-  Sercom* ptSercom = NULL;
+  Sercom*     ptSercom = NULL;
+  CLOCKMUXID  eClockId;
+  U32         uPeriphId;
   
   switch( eChan )
   {
     case I2C_CHAN_0 :
       ptSercom = SERCOM0;
+      eClockId = CLOCK_MUXID_SERCOM_0;
+      uPeriphId = PM_APBCMASK_SERCOM0;
       break;
       
     case I2C_CHAN_1 :
       ptSercom = SERCOM1;
+      eClockId = CLOCK_MUXID_SERCOM_1;
+      uPeriphId = PM_APBCMASK_SERCOM1;
       break;
     
     #ifdef SERCOM2
     case I2C_CHAN_2:
       ptSercom = SERCOM2;
+      eClockId = CLOCK_MUXID_SERCOM_2;
+      uPeriphId = PM_APBCMASK_SERCOM2;
       break;
     #endif // SERCOM2
     
     #ifdef SERCOM3
     case I2C_CHAN_3 :
       ptSercom = SERCOM3;
+      eClockId = CLOCK_MUXID_SERCOM_3;
+      uPeriphId = PM_APBCMASK_SERCOM3;
       break;
     #endif // SERCOM3
     
     #ifdef SERCOM4
     case I2C_CHAN_4 :
       ptSercom = SERCOM4;
+      eClockId = CLOCK_MUXID_SERCOM_4;
+      uPeriphId = PM_APBCMASK_SERCOM4;
       break;
     #endif // SERCOM4
     
     #ifdef SERCOM5
     case I2C_CHAN_5 :
       ptSercom = SERCOM5;
+      eClockId = CLOCK_MUXID_SERCOM_5;
+      uPeriphId = PM_APBCMASK_SERCOM5;
       break;
     #endif // SERCOM5
     
@@ -878,6 +718,10 @@ static SercomI2cm* GetSercomChannel( I2CCHAN eChan )
       break;
   }
   
+  // now enable the clock and power mask
+  Clock_PeriphEnable( eClockId, CLOCK_GENID_0 );
+  PowerManager_DisableEnablePeriphC( uPeriphId, ON );
+
   // return the pointer to the channlel
   return( &ptSercom->I2CM );
 }

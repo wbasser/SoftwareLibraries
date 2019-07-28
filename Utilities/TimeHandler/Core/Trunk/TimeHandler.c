@@ -338,6 +338,66 @@ void TimeHandler_AddTime( PDATETIME ptCurTime, PDATETIME ptTimeToAdd )
 }
 
 /******************************************************************************
+ * @function TimeHandler_AdjustTimeForZone
+ *
+ * @brief adjust time for zone
+ *
+ * This function adjusts the time for zone 
+ *
+ * @param[io]   ptDateTime  pointer to the data time structure
+ *
+ *****************************************************************************/
+void TimeHandler_AdjustTimeForZone( PDATETIME ptDateTime )
+{
+  U64       hZoneTime, hCurTime;
+  DATETIME  tZone;
+
+  // set the zone time/convert to huge
+  tZone.nHours = abs( ptDateTime->cZone );
+  hZoneTime = TimeHandler_TimeToHuge( TIME_OS_MICRODOS, &tZone );
+  
+  // adjust for negative
+  if ( ptDateTime->cZone < 0 )
+  {
+    // negate it
+    hZoneTime = ~hZoneTime;
+    hZoneTime++;    
+  }  
+  
+  // convert the current current time to huge/add it/convert back to time
+  hCurTime = TimeHandler_TimeToHuge( TIME_OS_MICRODOS, ptDateTime );
+  hCurTime += hZoneTime;
+  TimeHandler_HugeToTime( TIME_OS_MICRODOS, hCurTime, ptDateTime );
+}
+
+/******************************************************************************
+ * @function TimeHandler_InitializeDateTime
+ *
+ * @brief initiailize date time
+ *
+ * This function initialized the date time structure 
+ *
+ * @param[in]   eOsType     OS type
+ * @param[io]   ptDateTime  pointer to the data time structure
+ *
+ *
+ *****************************************************************************/
+void TimeHandler_InitializeDateTime( TIMEOSTYPE eOsType, PDATETIME ptDateTime )
+{
+  POSPARAMS ptOsParams;
+  
+  // get a pointer to the parameters
+  ptOsParams = ( POSPARAMS )&atOsParams[ eOsType ];
+
+  // set to default
+  memset( ptDateTime, 0, DATETIME_SIZE );
+  
+  // now set to base
+  ptDateTime->wYear = PGM_RDWORD( ptOsParams->wEpochYear );
+  ptDateTime->nDay = PGM_RDBYTE( ptOsParams->nEpochDay );
+}
+
+/******************************************************************************
  * @function TestLeap
  *
  * @brief Test Leap Year

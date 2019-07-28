@@ -21,7 +21,7 @@
  * @{
  *****************************************************************************/
  
-// ensure only one instatiation
+// ensure only one instantiation
 #ifndef _TASKMANAGE_CFG_H
 #define _TASKMANAGE_CFG_H
 
@@ -58,10 +58,10 @@ typedef enum _TASKSTICKENUMS
 #endif // TASK_TICK_ENABLE
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE TASKSCHDDEF  atTaskSchdDefs[ ];
+extern  const CODE TASKSCHDDEF  g_atTaskSchdDefs[ ];
 
 #if ( TASK_TICK_ENABLE == 1 )
-extern  const CODE TASKTICKDEF  atTaskTickDefs[ ];
+extern  const CODE TASKTICKDEF  g_atTaskTickDefs[ ];
 #endif  // TASK_TICK_ENABLE
 
 /**@} EOF TaskManager_cfg.h */

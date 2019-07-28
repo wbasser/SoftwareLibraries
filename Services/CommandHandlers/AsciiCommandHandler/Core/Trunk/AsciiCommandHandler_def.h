@@ -58,7 +58,7 @@
     .cEOLChar = eolchar, \
     .pvWriteFunc = writefunc, \
     .pszDelims = ( PC8 )delims, \
-    .pvCmdTable = ( PASCCMDENTRY )cmdtbl, \
+    .pvCmdTable = cmdtbl, \
   }
 
 /// helper macro to create entries

@@ -29,36 +29,41 @@
 #include "Micro/Micro_def.h"
 
 // library includes -----------------------------------------------------------
-#include "Types/Types.h"
+#include "SystemDefines/SystemDefines_prm.h"
 
-// global function prototypes
-extern  BOOL  Micro_CheckTasksPending( void );
-extern  void  Micro_EnterSleepMode( void );
+// macro declarations ---------------------------------------------------------
+#define MICRO_ENABLE_SYSTIMECMDS                          ( 0 )
 
 // global parameter declarations -----------------------------------------------
-/// declare the initialization -IRQ disabled structure
-extern  const CODE PVMICROINITFUNC    apvInitIrqDsbFunctions[ ];
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  /// declare the initialization -IRQ disabled structure
+  extern  const CODE PVMICROINITFUNC    g_apvInitIrqDsbFunctions[ ];
 
-/// declare the initialization -IRQ enabled structure
-extern  const CODE PVMICROINITFUNC    apvInitIrqEnbFunctions[ ];
+  /// declare the initialization -IRQ enabled structure
+  extern  const CODE PVMICROINITFUNC    g_apvInitIrqEnbFunctions[ ];
 
-/// declare the idle structure
-extern  const CODE PVMICROIDLEFUNC    apvIdleFunctions[ ];
+  /// declare the idle structure
+  extern  const CODE PVMICROIDLEFUNC    g_apvIdleFunctions[ ];
 
-/// declare the shutdown structure
-extern  const CODE PVMICROSHUTDNFUNC  apvShutdownFunctions[ ];
+  /// declare the shutdown structure
+  extern  const CODE PVMICROSHUTDNFUNC  g_apvShutdownFunctions[ ];
+#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
 // global function declarations ---------------------------------------------------
-extern  BOOL  Micro_CheckTasksPending( void );
-extern  void  Micro_EnterSleepMode( void );
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  extern  BOOL  Micro_CheckTasksPending( void );
+  extern  void  Micro_EnterSleepMode( void );
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 extern  void  Micro_LocalInitialize( void );
+extern  void  Micro_LocalIrqInitialize( void );
+extern  void  Micro_LocalIdle(void);
 
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   extern void vApplicationStackOverflowHook( xTaskHandle *pxTask,signed char *pcTaskName);
   extern void vApplicationIdleHook(void);
   extern void vApplicationTickHook(void);
   extern void vApplicationMallocFailedHook(void);
-#endif
+#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
 /**@} EOF Micro_cfg.c */
 

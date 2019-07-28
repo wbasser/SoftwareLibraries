@@ -55,11 +55,11 @@ static  ASCCMDSTS CmdSetDatTim( U8 nCmdEnum );
 static  const CODE C8 szQryDatTim[ ]   = { "QRYDATTIM" };
 static  const CODE C8 szSetDatTim[ ]   = { "SETDATTIM" };
 
-/// define the resonse string
-static  const CODE C8 szRspDatTim[ ]   = { "RDATTIM, %2d/%2d/%4d-%2d:%2d:%2d\n\r" };
+/// define the response string
+static  const CODE C8 szRspDatTim[ ]   = { "RDATTIM, %02d/%02d/%4d-%02d:%02d:%02d\n\r" };
   
 /// initialize the command table
-const CODE ASCCMDENTRY atRtcManagerCmdHandlerTable[ ] =
+const CODE ASCCMDENTRY g_atRtcManagerCmdHandlerTable[ ] =
 {
   ASCCMD_ENTRY( szQryDatTim, 9, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryDatTim ),
   ASCCMD_ENTRY( szSetDatTim, 9, 6, ASCFLAG_COMPARE_NONE, 0, CmdSetDatTim ),
@@ -212,6 +212,8 @@ BOOL RTCManager_ProcessEvent( TASKARG xArg )
  *
  * This function outputs the current date/time
  *
+ * @param[in]   nCmdEnum    command handler enumeration
+ *
  * @return  appropriate status
  *****************************************************************************/
 static ASCCMDSTS CmdQryDatTim( U8 nCmdEnum )
@@ -238,6 +240,8 @@ static ASCCMDSTS CmdQryDatTim( U8 nCmdEnum )
  * @brief set the current date/time
  *
  * This function sets the current date/time
+ *
+ * @param[in]   nCmdEnum    command handler enumeration
  *
  * @return  Aappropriate statue
  *****************************************************************************/

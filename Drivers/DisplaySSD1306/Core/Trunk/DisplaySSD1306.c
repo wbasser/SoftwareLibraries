@@ -26,6 +26,7 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
+#include "DisplaySSD1306/DisplaySSD1306_prm.h"
 #include "DisplaySSD1306/DisplaySSD1306.h"
 
 // library includes -----------------------------------------------------------
@@ -37,45 +38,53 @@
   #define DISPLAY_WIDTH                             ( 128 )
   #define DISPLAY_HEIGHT                            ( 64 )
   #define DISPLAY_END_PAGE                          ( 7 )
-  #define SSD1306_MULTIPLEX_VALUE                   ( 0x3F )
+  #define SSD1306_MULTIPLEX_VALUE                   ( 0x1F )
   #define SSD1306_COMPINS_VALUE                     ( 0x12 )
+  #define SSD1306_DEVICE_ADDRESS                    ( 0x3D )
   #if ( DISPLAYSSD1306_VCC_SELECT == DISPLAYSSD1306_VCC_EXTRNAL )
     #define SSD1306_CONTRAST_VALUE                  ( 0x9F )
+    #define SSD1306_VCC_VALUE                       ( 0x10 )
+    #define SDD1306_PRECHARGE_VALUE                 ( 0x22 )
   #else
     #define SSD1306_CONTRAST_VALUE                  ( 0xCF )
-  #endif
-  #define SSD1306_DEVICE_ADDRESS                    ( 0x3C )
+    #define SSD1306_VCC_VALUE                       ( 0x14 )
+    #define SDD1306_PRECHARE_VALUE                  ( 0xF1 )
+  #endif // DISPLAYSSD1306_VCC_SELECT
 #elif ( DISPLAYSSD1306_TYPE_SELECT == DISPLAYSSD1306_TYPE_128_32 )
-  #define DISPLAY_WIDHT                             ( 128 )
+  #define DISPLAY_WIDTH                             ( 128 )
   #define DISPLAY_HEIGHT                            ( 32 )
-  #define DISPLAY_END_PAGE                          ( 3 );
+  #define DISPLAY_END_PAGE                          ( 3 )
   #define SSD1306_MULTIPLEX_VALUE                   ( 0x3F )
-  #define SDD1306_COMPINS_VALUE                     ( 0x02 )
-  #define SCC1306_CONTRAST_VALUE                    ( 0x8F )
+  #define SSD1306_COMPINS_VALUE                     ( 0x02 )
   #define SSD1306_DEVICE_ADDRESS                    ( 0x3C )
+  #if ( DISPLAYSSD1306_VCC_SELECT == DISPLAYSSD1306_VCC_EXTRNAL )
+    #define SSD1306_CONTRAST_VALUE                  ( 0x8F )
+    #define SSD1306_VCC_VALUE                       ( 0x10 )
+    #define SSD1306_PRECHARGE_VALUE                 ( 0x22 )
+  #else
+    #define SSD1306_CONTRAST_VALUE                  ( 0xCF )
+    #define SSD1306_VCC_VALUE                       ( 0x14 )
+    #define SSD1306_PRECHARE_VALUE                  ( 0xF1 )
+  #endif // DISPLAYSSD1306_VCC_SELECT
 #elif ( DISPLAYSSD1306_TYPE_SELECT == DISPLAYSSD1306_TYPE_96_16 )
-  #define DISPLAY_WIDHT                             ( 96 )
+  #define DISPLAY_WIDTH                             ( 96 )
   #define DISPLAY_HEIGHT                            ( 16 )
-  #define DISPLAY_END_PAGE                          ( 1 );
+  #define DISPLAY_END_PAGE                          ( 1 )
   #define SSD1306_MULTIPLEX_VALUE                   ( 0x0F )
   #define SSD1306_COMPINS_VALUE                     ( 0x02 )
+  #define SSD1306_DEVICE_ADDRESS                    ( 0x3C )
   #if ( DISPLAYSSD1306_VCC_SELECT == DISPLAYSSD1306_VCC_EXTRNAL )
     #define SSD1306_CONTRAST_VALUE                  ( 0x10 )
+    #define SSD1306_VCC_VALUE                       ( 0x10 )
+    #define SSD1306_PRECHARGE_VALUE                 ( 0x22 )
   #else
     #define SSD1306_CONTRAST_VALUE                  ( 0xAF )
-  #endif
-  #define SSD1306_DEVICE_ADDRESS                    ( 0x3C )
+    #define SSD1306_VCC_VALUE                       ( 0x14 )
+    #define SSD1306_PRECHARE_VALUE                  ( 0xF1 )
+  #endif // DISPLAYSSD1306_VCC_SELECT
 #else
 ` #error "DISPLAYSSD1306_TYPE_SELECT incorrectly set" 
-#endif
-
-#if ( DISPLAYSSD1306_VCC_SELECT == DISPLAYSSD1306_VCC_EXTRNAL )
-  #define SSD1306_VCC_VALUE                         ( 0x10 )
-  #define SSD1306_PRECHARGE_VALUE                   ( 0x22 )
-#else
-  #define SSD1306_VCC_VALUE                         ( 0x14 )
-  #define SSD1306_PRECHARGE_VALUE                   ( 0xF1 )
-#endif
+#endif // DISPLAYSSD1306_TYPE_SELECT
 
 /// define the command
 #define SSD1306_SETCONTRAST                       ( 0x81 )
@@ -115,7 +124,7 @@
 #define SSD1306_CLKDIV_RATIO                      ( 0x80 )
 
 /// define the buffer size
-#define BUFFER_SIZE                               ( ( DISPLAY_HEIGHT * DISPLAY_WIDTH ) / 8  )
+#define BUFFER_SIZE                               (( DISPLAY_HEIGHT * DISPLAY_WIDTH ) / 8 )
 
 // enumerations ---------------------------------------------------------------
 
@@ -126,8 +135,8 @@
 // local parameter declarations -----------------------------------------------
 static  U8  anBuffer[ BUFFER_SIZE ];
 #if ( DISPLAYSSD1306_INTERFACE_SELECT == DISPLAYSSD1306_INTERFACE_I2C )
-static  U8  nI2cCommand;
-#endif
+  static  U8  nI2cCommand;
+#endif //DISPLAYSSD1306_INTERFACE_SELECT
 
 // local function prototypes --------------------------------------------------
 static  void  WriteCommand( U8 nValue );
@@ -156,7 +165,7 @@ static  const U8    anInitializationSequence[ ] =
   SSD1306_SETCONTRAST,
   SSD1306_CONTRAST_VALUE,
   SSD1306_SETPRECHARGE,
-  SSD1306_PRECHARGE_VALUE,
+  SDD1306_PRECHARGE_VALUE,
   SSD1306_SETVCOMDETECT,
   0x40,
   SSD1306_DISPLAYALLON_RESUME,
@@ -176,10 +185,12 @@ void DisplaySSD1306_Initialize( void )
 {
   U8  nIdx;
   
-  // drive reset low/delay 2 MS/drive reset high
-  Gpio_Set( DISPLAYSSD1306_RST_PIN_ENUM, ON );
-  SystemTick_DelayMsec( 2 );
-  Gpio_Set( DISPLAYSSD1306_RST_PIN_ENUM, OFF );
+  #if ( DISPLAYSD1306_RST_ENABLE == 1 )
+    // drive reset low/delay 2 MS/drive reset high
+    Gpio_Set( DISPLAYSSD1306_RST_PIN_ENUM, ON );
+    SystemTickDelayMsec( 2 );
+    Gpio_Set( DISPLAYSSD1306_RST_PIN_ENUM, OFF );
+  #endif // DISPLAYSD1306_RST_ENABLE
   
   // for each byte in the initialization sequence
   for ( nIdx = 0; nIdx < sizeof( anInitializationSequence ); nIdx++ )
@@ -276,6 +287,50 @@ void DisplaySSD1306_SetPixel( U8 nX, U8 nY, DISPLAYPIXACT eAction )
 }
 
 /******************************************************************************
+ * @function DisplaySSD1306_SetColData
+ *
+ * @brief sets a columns data
+ *
+ * This function will write the column data at a given page, column
+ *
+ * @param[in]   nPage     page
+ * @param[in]   nCol      column
+ * @param[in]   nData     data
+ * @param[in]   eAction   pixel action, clear, set, toggle
+ *
+ *****************************************************************************/
+void DisplaySSD1306_SetColData( U8 nPage, U8 nCol, U8 nData, DISPLAYPIXACT eAction )
+{
+  U16 wOffset;
+
+  // test for valid page/column
+  if (( nPage < DISPLAY_END_PAGE ) && ( nCol < DISPLAY_WIDTH )) 
+  {
+    // compute buffer index
+    wOffset = ( nPage * DISPLAY_WIDTH ) + nCol;
+    
+    // determine the action
+    switch( eAction )
+    {
+      case DISPLAY_PIXACT_CLR :
+        anBuffer[ wOffset ] &= ~( nData );
+        break;
+        
+      case DISPLAY_PIXACT_SET :
+        anBuffer[ wOffset ] |= nData;
+        break;
+        
+      case DISPLAY_PIXACT_TGL :
+        anBuffer[ wOffset ] ^= nData;
+        break;
+        
+      default :
+        break;
+    }
+  }
+}
+
+/******************************************************************************
  * @function DisplaySSD1306_WriteBuffer
  *
  * @brief outputs the buffer to the dislay
@@ -312,12 +367,15 @@ void DisplaySSD1306_WriteBuffer( void )
     // fill the transfer control
     I2CXFRCTL tXfrCtl =
     {
-      .nDevAddr         = SSD1306_DEVICE_ADDRESS,
-      .nAddrLen         = 1,
-      .tAddress.uValue  = 0x40ul,
-      .pnData           = &anBuffer[ wIdx ],
-      .wDataLen         = 16,
-      .uTimeout         = 5
+      .nDevAddr   = SSD1306_DEVICE_ADDRESS,
+      .nAddrLen   = 1,
+      .tAddress   = 
+      {
+        .anValue[ LE_U16_LSB_IDX ] = 0x40ul,
+      },
+      .pnData     = &anBuffer[ wIdx ],
+      .wDataLen   = 16,
+      .uTimeout    = 5
     };
 
     // write it
@@ -435,7 +493,7 @@ static  void  WriteCommand( U8 nValue )
  * @param[in]   nValue      value to write
  *
  *****************************************************************************/
-static  void  WriteData( U8 nValue )
+static void WriteData( U8 nValue )
 {
   #if ( DISPLAYSSD1306_INTERFACE_SELECT == DISPLAYSSD1306_INTERFACE_SPI )
   // drive command/data select low
@@ -472,12 +530,15 @@ static void WriteValue( U8 nValue )
   // fill the transfer control
   I2CXFRCTL tXfrCtl =
   {
-    .nDevAddr         = SSD1306_DEVICE_ADDRESS,
-    .nAddrLen         = 1,
-    .tAddress.uValue  = nI2cCommand,
-    .pnData           = &nValue,
-    .wDataLen         = 1,
-    .uTimeout         = 5
+    .nDevAddr   = SSD1306_DEVICE_ADDRESS,
+    .nAddrLen   = 1,
+      .tAddress   = 
+      {
+        .anValue[ LE_U16_LSB_IDX ] = 0x40ul,
+      },
+    .pnData     = &nValue,
+    .wDataLen   = 1,
+    .uTimeout   = 5
   };
 
   // write it

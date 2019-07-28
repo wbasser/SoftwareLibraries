@@ -21,27 +21,26 @@
 
 // system includes ------------------------------------------------------------
 
-// library includes -----------------------------------------------------------
-#include "CRC16/CRC16.h"
-#ifndef __ATMEL_AVR__
-#include "EepromHandler/EepromHandler.h"
-#endif // __ATMEL_AVR__
-
 // local includes -------------------------------------------------------------
 #include "ConfigManager/ConfigManager.h"
-#include "ConfigManager/ConfigManager_prm.h"
+
+// library includes -----------------------------------------------------------
+#include "CRC16/CRC16.h"
+#include "EepromHandler/EepromHandler.h"
 #if ( CONFIGMANAGER_ENABLE_LOGEVENTS == 1 )
 #include "LogHandler/LogHandler.h"
 #endif
+#include "ManufInfo/ManufInfo.h"
 
 // Macros and Defines ---------------------------------------------------------
-#ifndef __ATMEL_AVR__
 /// define the address of the CRC
-#define CFGBLK_CRC_ADDR         ( EEPROMHANDLER_CFGBLOCK_BASE_ADDR )
+#define CFGBLK_CHCK_ADDR         ( EEPROMHANDLER_CFGBLOCK_BASE_ADDR )
+
+/// define the address of the version block
+#define CFGBLK_VERS_ADDR         ( CFGBLK_CHCK_ADDR + sizeof( U16 ))
 
 /// define the address of the config block
-#define CFGBLK_DATA_ADDR        ( CFGBLK_CRC_ADDR + sizeof( U16 ))
-#endif
+#define CFGBLK_DATA_ADDR        ( CFGBLK_VERS_ADDR + sizeof( U16 ))
 
 // enumerations ---------------------------------------------------------------
 
@@ -52,8 +51,23 @@
 // local parameter declarations -----------------------------------------------
 
 // local function prototypes --------------------------------------------------
+/// command handlers
+#if ( CONFIGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+static  ASCCMDSTS CmdRstCfg( U8 nCmdEnum );
 
 // constant parameter initializations -----------------------------------------
+/// declare the command strings
+static  const CODE C8 szRstCfg[ ]   = { "RSTCFG" };
+
+/// initialize the command table
+const CODE ASCCMDENTRY g_atConfigManagerCmdHandlerTable[ ] =
+{
+  ASCCMD_ENTRY( szRstCfg, 4, 1, ASCFLAG_COMPARE_NONE, CONFIGMANAGER_RESET_SYSTEM_MODE, CmdRstCfg ),
+
+  // the entry below must be here
+  ASCCMD_ENDTBL( )
+};
+#endif  // CONFIGMANAGER_ENABLE_DEBUG_COMMANDS
 
 /******************************************************************************
  * @function ConfigManager_Initialize
@@ -66,67 +80,54 @@
  *****************************************************************************/
 void ConfigManager_Initialize( void )
 {
-  U16               wCalcCrc, wActCrc, wSize;
+  U16               wCalcCrc, wActCrc, wSize, wActVersion;
   CONFIGTYPE        eCfgBlkIdx;
   PCONFIGMGRBLKDEF  ptDef;
   PVGETPOINTER      pvGetPointerActual;
   PU8               pnActual;
-  #ifdef __ATMEL_AVR__
-  PU16              puEepromAddress;
-  #else
   U16               wBase;
-  #endif //__ATMEL_AVR__
+  U16UN             tExpVersion;
   
   // perform any local initialization
   ConfigManager_LocalInitialize( );
 
-  // get the stored CRC
-  #ifdef __ATMEL_AVR__ 
-  wActCrc = EEP_RDWORD( wConfigCheck );
-  #else
-  EepromHandler_RdWord( CFGBLK_CRC_ADDR, &wActCrc );
-  #endif //__ATMEL_AVR__
+  // get the expectant version
+  tExpVersion.anValue[ LE_U16_MSB_IDX ] = ManufInfo_GetSfwMajor( );
+  tExpVersion.anValue[ LE_U16_LSB_IDX ] = ManufInfo_GetSfwMinor( );
 
+  // get the stored CRC/version
+  EepromHandler_RdWord( CFGBLK_CHCK_ADDR, &wActCrc );
+  EepromHandler_RdWord( CFGBLK_VERS_ADDR, &wActVersion );
+  
   // get the actual CRC
   wCalcCrc = ConfigManager_ComputeBlockCrc( CONFIG_SOURCE_EEPROM );
 
   // are they the same
-  if ( wActCrc != wCalcCrc )
+  if (( wActCrc != wCalcCrc ) || ( wActVersion != tExpVersion.wValue ))
   {
     // reset to defaults
     ConfigManager_ResetDefaults( );
   }
-  else
-  {
-    // now copy the EEPROM to the local storage
-    #ifndef __ATMEL_AVR__
-    wBase = EEPROMHANDLER_CFGBLOCK_BASE_ADDR + sizeof( U16 );
-    #endif //__ATMEL_AVR__
+
+  // now copy the EEPROM to the local storage
+  wBase = CFGBLK_DATA_ADDR;
     
-    // for each block copy the data to EEPROM
-    for ( eCfgBlkIdx = 0; eCfgBlkIdx < CONFIG_TYPE_MAX; eCfgBlkIdx++ )
-    {
-      // get the definition
-      ptDef = ( PCONFIGMGRBLKDEF )&atConfigDefs[ eCfgBlkIdx ];
+  // for each block copy the data to EEPROM
+  for ( eCfgBlkIdx = 0; eCfgBlkIdx < CONFIG_TYPE_MAX; eCfgBlkIdx++ )
+  {
+    // get the definition
+    ptDef = ( PCONFIGMGRBLKDEF )&atConfigDefs[ eCfgBlkIdx ];
       
-      // now get a pointer to the actual/size
-      pvGetPointerActual = ( PVOID )PGM_RDWORD( ptDef->pvGetActual );
-      pnActual = ( PU8 )pvGetPointerActual( );
-      wSize = PGM_RDWORD( ptDef->wSize );
+    // now get a pointer to the actual/size
+    pvGetPointerActual = ( PVOID )PGM_RDWORD( ptDef->pvGetActual );
+    pnActual = ( PU8 )pvGetPointerActual( );
+    wSize = PGM_RDWORD( ptDef->wSize );
       
-      // now read the data from the EEPROM
-      #ifdef __ATMEL_AVR__ 
-      puEepromAddress = ( PU16 )PGM_RDWORD( ptDef->pwEepromAddr );
-      EEP_RDBLOCK_PTR( pnActual, puEepromAddress, wSize );
-      #else
-      EepromHandler_RdBlock( wBase, wSize, pnActual );
-      #endif //__ATMEL_AVR__
+    // now read the data from the EEPROM
+    EepromHandler_RdBlock( wBase, wSize, pnActual );
       
-      #ifndef __ATMEL_AVR__
-      // adjust the size
-      wBase += wSize;
-      #endif //__ATMEL_AVR__
-    }
+    // adjust the size
+    wBase += wSize;
   }
 
   // post the config done event
@@ -153,17 +154,19 @@ BOOL ConfigManager_ResetDefaults( void )
   PVGETPOINTER      pvGetPointer;
   PU8               pnActual, pnDefault;
   BOOL              bStatus = FALSE;
-  #ifdef __ATMEL_AVR__
-  PU16              puEepromAddress;
-  #else
   U16               wBase;
-  #endif //__ATMEL_AVR__
+  U16UN             tVersion;
+
+  // get the expectant version
+  tVersion.anValue[ LE_U16_MSB_IDX ] = ManufInfo_GetSfwMajor( );
+  tVersion.anValue[ LE_U16_LSB_IDX ] = ManufInfo_GetSfwMinor( );
+  
+  // write it
+  EepromHandler_WrWord( CFGBLK_VERS_ADDR, tVersion.wValue );
 
   // set the base address for the config blocks  
-  #ifndef __ATMEL_AVR__
   wBase = CFGBLK_DATA_ADDR;
-  #endif //__ATMEL_AVR__
-  
+
   // for each block copy the data to EEPROM
   for ( eCfgBlkIdx = 0; eCfgBlkIdx < CONFIG_TYPE_MAX; eCfgBlkIdx++ )
   {
@@ -181,22 +184,15 @@ BOOL ConfigManager_ResetDefaults( void )
     MEMCPY_P( pnActual, pnDefault, wSize );
 
     // now write the data to the EEPROM
-    #ifdef __ATMEL_AVR__ 
-    puEepromAddress = ( PU16 )PGM_RDWORD( ptDef->pwEepromAddr );
-    EEP_WRBLOCK_PTR( pnActual, puEepromAddress, wSize );
-    #else
     if ( EepromHandler_WrBlock( wBase, wSize, pnActual ) != EEPROM_ERR_NONE )
     {
       // set the error flag/exit loop
       bStatus = TRUE;
       break;
     }
-    #endif //__ATMEL_AVR__
     
-    #ifndef __ATMEL_AVR__
     // adjust the size
     wBase += wSize;
-    #endif //__ATMEL_AVR__
   }
   
   // if no error
@@ -230,11 +226,7 @@ U16 ConfigManager_GetSignature( void )
   U16         wActCrc;
   
   // get the stored CRC
-  #ifdef __ATMEL_AVR__ 
-  wActCrc = EEP_RDWORD( wConfigCheck );
-  #else
-  EepromHandler_RdWord( CFGBLK_CRC_ADDR, &wActCrc );
-  #endif //__ATMEL_AVR__
+  EepromHandler_RdWord( CFGBLK_CHCK_ADDR, &wActCrc );
 
   // return the actual CRC
   return( wActCrc );
@@ -258,11 +250,7 @@ U16 ConfigManager_UpdateCRC( CONFIGSOURCE eSource )
 
   // calculate the CRC block
   wCalcCrc = ConfigManager_ComputeBlockCrc( eSource );
-  #ifdef __ATMEL_AVR__ 
-  EEP_WRWORD( wConfigCheck, wCalcCrc );
-  #else
-  EepromHandler_WrWord( CFGBLK_CRC_ADDR, wCalcCrc );
-  #endif //__ATMEL_AVR__
+  EepromHandler_WrWord( CFGBLK_CHCK_ADDR, wCalcCrc );
 
   // return the CRC
   return( wCalcCrc );
@@ -287,19 +275,13 @@ U16 ConfigManager_ComputeBlockCrc( CONFIGSOURCE eSource )
   PCONFIGMGRBLKDEF  ptDef;
   PVGETPOINTER      pvGetPointer;
   PU8               pnActData = NULL;
-  #ifdef __ATMEL_AVR__
-  PU16              puEepromAddress;
-  #else
   U16               wBase;
-  #endif //__ATMEL_AVR__
 
   // get the initial value
   wCrc = CRC16_GetInitialValue( );
   
   // set the base address for the config blocks
-  #ifndef __ATMEL_AVR__
   wBase = CFGBLK_DATA_ADDR;
-  #endif //__ATMEL_AVR__
   
   // for each config block
   for( eCfgBlkIdx = 0; eCfgBlkIdx < CONFIG_TYPE_MAX; eCfgBlkIdx++ )
@@ -319,12 +301,7 @@ U16 ConfigManager_ComputeBlockCrc( CONFIGSOURCE eSource )
         pnActData = malloc( wSize );
 
         // read a byte from EEPROM
-        #ifdef __ATMEL_AVR__ 
-        puEepromAddress = ( PU16 )PGM_RDWORD( ptDef->pwEepromAddr );
-        EEP_RDBLOCK_PTR( pnActData, puEepromAddress, wSize );
-        #else
         EepromHandler_RdBlock( wBase, wSize, pnActData );
-        #endif //__ATMEL_AVR__
         break;
         
       case CONFIG_SOURCE_RAM :
@@ -350,10 +327,8 @@ U16 ConfigManager_ComputeBlockCrc( CONFIGSOURCE eSource )
       free( pnActData );
     }
     
-    #ifndef __ATMEL_AVR__
     // adjust the size
     wBase += wSize;
-    #endif //__ATMEL_AVR__
   }
   
   // return the CRC
@@ -377,12 +352,8 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
   PVGETPOINTER      pvGetPointer;
   U16               wSize;
   BOOL              bWriteOk = FALSE;
-  #ifdef __ATMEL_AVR__
-  PU16              puEepromAddress;
-  #else
   U16               wBase;
   CONFIGTYPE        eCfgType;
-  #endif //__ATMEL_AVR__
 
   // get the block
   ptDef = ( PCONFIGMGRBLKDEF )&atConfigDefs[ eConfigType ];
@@ -395,7 +366,6 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
   wSize = PGM_RDWORD( ptDef->wSize );
 
   // calculate the address
-  #ifndef __ATMEL_AVR__
   wBase = CFGBLK_DATA_ADDR;
   for ( eCfgType = 0; eCfgType < eConfigType; eCfgType++ )
   {
@@ -405,20 +375,13 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
     // add the size
     wBase += PGM_RDWORD( ptDef->wSize );
   }
-  #endif //__ATMEL_AVR__
 
   // now write the EEPROM
-  #ifdef __ATMEL_AVR__ 
-  puEepromAddress = ( PU16 )PGM_RDWORD( ptDef->pwEepromAddr );
-  EEP_WRBLOCK_PTR( pnActData, puEepromAddress, wSize );
-  bWriteOk = TRUE;
-  #else
   if ( EepromHandler_WrBlock( wBase, wSize, pnActData ) == EEPROM_ERR_NONE )
   {
     // set the write OK
     bWriteOk = TRUE;
   }
-  #endif //__ATMEL_AVR__
     
   // update the CRC
   if ( bWriteOk )
@@ -432,5 +395,43 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
   LogHandler_AddEntry( LOG_TYPE_CFGUPD, xArg, 0 );
   #endif
 }
+
+#if ( CONFIGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+/******************************************************************************
+ * @function CmdRstCfg
+ *
+ * @brief reset to defaults
+ *
+ * This function will reset the parameters to their default state
+ *
+ * @param[in]   nCmdEnum      command handler enumeration
+ *
+ * @return      appropriate eerror
+ *
+ *****************************************************************************/
+static ASCCMDSTS CmdRstCfg( U8 nCmdEnum )
+{
+  ASCCMDSTS eStatus = ASCCMD_STS_NONE;
+  PC8       pszPassWord;
+
+  // get the password
+  AsciiCommandHandler_GetArg( nCmdEnum, 0, &pszPassWord );
+
+  // now compare to password
+  if ( STRCMP_P( CONFIGMANAGER_RESET_DEFAULTS_PASSWORD, pszPassWord ) == 0 )
+  {
+    // reset the parameters
+    ConfigManager_ResetDefaults( );
+  }
+  else
+  {
+    // send the error
+    eStatus = ASCCMD_STS_ILLPASSWORD;
+  }
+
+  // return the status
+  return( eStatus );
+}
+#endif  // CONFIGMANAGER_ENABLE_DEBUG_COMMANDS
 
 /**@} EOF ConfigManager.c */

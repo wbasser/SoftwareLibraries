@@ -31,11 +31,9 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "RTCManager/RTCManager_prm.h"
-#include "RTCmanager/RTCmanager_cfg.h"
+#include "RTCManager/RTCManager_cfg.h"
 
 // library includes -----------------------------------------------------------
-#include "Types/Types.h"
 #include "TaskManager/TaskManager.h"
 #if ( RTCMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
 #include "AsciiCommandHandler/AsciiCommandHandler.h"
@@ -52,7 +50,7 @@
 
 // global parameter declarations -----------------------------------------------
 #if ( RTCMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-extern  const CODE ASCCMDENTRY atRtcManagerCmdHandlerTable[ ];
+extern  const CODE ASCCMDENTRY g_atRtcManagerCmdHandlerTable[ ];
 #endif  // RTCMANAGER_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------

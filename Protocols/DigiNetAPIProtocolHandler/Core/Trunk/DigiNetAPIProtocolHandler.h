@@ -30,19 +30,34 @@
 // local includes -------------------------------------------------------------
 
 // library includes -----------------------------------------------------------
+#include "Types/Types.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the frame types
-#define FRAME_TYPE_ATCOMMAND                      ( 0x08 )
-#define FRAME_TYPE_XMTSMS                         ( 0x1F )
-#define FRAME_TYPE_XMTIP                          ( 0x20 )
-#define FRAME_TYPE_ATRESPONSE                     ( 0x88 )
-#define FRAME_TYPE_XMTSTATUS                      ( 0x89 )
-#define FRAME_TYPE_MDMSTATUS                      ( 0x8A )
-#define FRAME_TYPE_RCVSMS                         ( 0x9F )
-#define FRAME_TYPE_RCVIP                          ( 0xB0 )
+#define DIGIFRAME_TYPE_ATCOMMAND                      ( 0x08 )
+#define DIGIFRAME_TYPE_XMTSMS                         ( 0x1F )
+#define DIGIFRAME_TYPE_XMTIP                          ( 0x20 )
+#define DIGIFRAME_TYPE_ATRESPONSE                     ( 0x88 )
+#define DIGIFRAME_TYPE_XMTSTATUS                      ( 0x89 )
+#define DIGIFRAME_TYPE_MDMSTATUS                      ( 0x8A )
+#define DIGIFRAME_TYPE_RCVSMS                         ( 0x9F )
+#define DIGIFRAME_TYPE_RCVIP                          ( 0xB0 )
 
 // enumerations ---------------------------------------------------------------
+/// enumerate the frame types
+typedef enum _DIGIFRAMETYPEENUM
+{
+  DIGIFRAME_TYPE_ENUM_ATCOMMAND = 0,
+  DIGIFRAME_TYPE_ENUM_XMTSMS,
+  DIGIFRAME_TYPE_ENUM_XMTIP,
+  DIGIFRAME_TYPE_ENUM_ATRESPONSE,
+  DIGIFRAME_TYPE_ENUM_XMTSTATUS,
+  DIGIFRAME_TYPE_ENUM_MDMSTATUS,
+  DIGIFRAME_TYPE_ENUM_RCVSMS,
+  DIGIFRAME_TYPE_ENUM_RCVIP,
+  DIGIFRAME_TYPE_ENUM_MAX
+} DIGIFRAMETYPEENUM;
+
 /// enumerate the commands
 typedef enum _DIGICMS
 {
@@ -51,7 +66,7 @@ typedef enum _DIGICMS
   DIGI_CMD_RE,              ///< reset to defaults
   DIGI_CMD_WR,              ///< write the new value to NV storage
   DIGI_CMD_PH,              ///< read the phone number
-  DIGI_CMD_S#,              ///< read the ICCID of the sim
+  DIGI_CMD_SN,              ///< read the ICCID of the sim
   DIGI_CMD_IM,              ///< read the IMIE
   DIGI_CMD_MN,              ///< reads the network operator
   DIGI_CMD_MV,              ///< reads the modem firmware version
@@ -69,7 +84,7 @@ typedef enum _DIGICMS
   DIGI_CMD_SH,              ///< reads the upper digits of the IMEI
   DIGI_CMD_SL,              ///< reads the lower digits of the IMEI
   DIGI_CMD_DL,              ///< reads/sets the destination address
-  DIGI_CMD_P#,              ///< reads/sets the destination phone number
+  DIGI_CMD_PN,              ///< reads/sets the destination phone number
   DIGI_CMD_N1,              ///< reads the primary DNS server address
   DIGI_CMD_N2,              ///< reads the secondary DNS server address
   DIGI_CMD_DE,              ///< reads/sets the destination port number
@@ -104,7 +119,7 @@ typedef enum _DIGIPROTOCOLTYPE
 {
   DIGIPROTOCOL_TYPE_UDP = 0,
   DIGIPROTOCOL_TYPE_TCP,
-  DIGIPROTOCOL_TYPE_SSLTCP = 4;
+  DIGIPROTOCOL_TYPE_SSLTCP = 4,
 } DIGIPROTOCOLTYPE;
 
 /// enumerate the AT response status
@@ -136,29 +151,29 @@ typedef enum _DIGITXSTATUS
   DIGITX_STATUS_SLOCKETCLOSED,
   DIGITX_STATUS_UNKNSERVER,
   DIGITX_STATUS_UNKNERROR,
-} TDIGIXSTATUS;
+} DIGITXSTATUS;
 
 /// enumerate the modem status
-typedef enum _DIGIMDMSTATUS
+typedef enum _DIGIMDSTATUS
 {
-  DIGIMDM_STATUS_RESET        = 0,
-  DIGIMDM_STATUS_WDTRST,
-  DIGIMDM_STATUS_CELLREG,
-  DIGIMDM_STATUS_UNREGCELL,
-  DIGIMDM_STATUS_RMTMNGRCON   = 0x0E,
-  DIGIMDM_STATUS_RMTMNGRDIS,
-} DIGIMDMSTATUS;
+  DIGIMD_STATUS_RESET        = 0,
+  DIGIMD_STATUS_WDTRST,
+  DIGIMD_STATUS_CELLREG,
+  DIGIMD_STATUS_UNREGCELL,
+  DIGIMD_STATUS_RMTMNGRCON   = 0x0E,
+  DIGIMD_STATUS_RMTMNGRDIS,
+} DIGIMDSTATUS;
 
 /// enumerate the frame decode status
 typedef enum _DIGIFRMDECSTS
 {
   DIGI_FRMDEC_STS_NONE        = 0,
-  DIGI_FRMDEF_STS_INPROG,
-  DIGI_FRMDEF_STS_ATRESPONSE  = FRAME_TYPE_ATRESPONSE,
-  DIGI_FRMDEF_STS_XMTSTATUS   = FRAME_TYPE_XMTSTATUS,
-  DIGI_FRMDEF_STS_MDMSTATUS   = FRAME_TYPE_MDMSTATUS,
-  DIGI_FRMDEF_STS_RCVSMS      = FRAME_TYPE_RCVSMS,
-  DIGI_FRMDEF_STS_RCVIP       = FRAME_TYPE_RCVIP
+  DIGI_FRMDEC_STS_INPROG,
+  DIGI_FRMDEC_STS_ATRESPONSE  = DIGIFRAME_TYPE_ATRESPONSE,
+  DIGI_FRMDEC_STS_XMTSTATUS   = DIGIFRAME_TYPE_XMTSTATUS,
+  DIGI_FRMDEC_STS_MDMSTATUS   = DIGIFRAME_TYPE_MDMSTATUS,
+  DIGI_FRMDEC_STS_RCVSMS      = DIGIFRAME_TYPE_RCVSMS,
+  DIGI_FRMDEC_STS_RCVIP       = DIGIFRAME_TYPE_RCVIP
 } DIGIFRMDECSTS;
 
 // structures -----------------------------------------------------------------
@@ -213,7 +228,7 @@ typedef struct _DIGIXMTSTATUS
 /// define the modem status
 typedef struct _DIGIMDMSTATUS
 {
-  DIGIMDMSTATUS eStatus;            ///< status
+  DIGIMDSTATUS  eStatus;            ///< status
 } DIGIMDMSTATUS, *PDIGIMDMSTATUS;
 #define DIGIMDMSTATUS_SIZE                    sizeof( DIGIMDMSTATUS )
 
@@ -223,6 +238,13 @@ typedef struct _DIGIRCVSMS
   C8    acPhone[ 20 ];      ///< phone number
 } DIGIRCVSMS, *PDIGIRCVSMS;
 #define DIGIRCVSMS_SIZE                       sizeof( DIGIRCVSMS )
+
+/// define the receive IP 
+typedef struct _DIGIRCVIP
+{
+  U8  anData[ 1500u ];
+} DIGIRCVIP, *PDIGIRCVIP;
+#define DIGIRCVIP_SIZE                        sizeof( DIGIRCVIP )
 
 /// define the frame data union
 typedef union _DIGIAPIFRAMEDAT
@@ -236,6 +258,7 @@ typedef union _DIGIAPIFRAMEDAT
     DIGIXMTSTATUS   tXmtStatus;
     DIGIMDMSTATUS   tMdmStatus;
     DIGIRCVSMS      tRcvSms;
+    DIGIRCVIP       tRcvIp;
   } tTypes;
   U8  anBuffer[ 1 ];
 } DIGIAPIFRAMEDAT, *PDIGIAPIFRAMEDAT;
@@ -245,8 +268,8 @@ typedef union _DIGIAPIFRAMEDAT
 
 // global function prototypes --------------------------------------------------
 extern  void          DigiNetAPIProtocolHandler_Initialize( void );
-extern  U16           DigiNetAPIProtocolHandler_SendCommand( FRAMETYPEENUM eFrameType, PU8 pnFrameData, U16 wFrameLength, PU8 pnXmtBuffer );
-extern  DIGIFRMDECSTS DigiNetAPIProtocolHandler_ProcessRcvChar( PDIGIAPIFRMEDAT ptFrameData, U8 nChar );
+extern  U16           DigiNetAPIProtocolHandler_SendCommand( DIGIFRAMETYPEENUM eFrameType, PU8 pnFrameData, U16 wFrameLength, PU8 pnXmtBuffer );
+extern  DIGIFRMDECSTS DigiNetAPIProtocolHandler_ProcessRcvChar( PDIGIAPIFRAMEDAT ptFrameData, U8 nChar );
 
 /**@} EOF DigiNetAPIProtocolHandler.h */
 

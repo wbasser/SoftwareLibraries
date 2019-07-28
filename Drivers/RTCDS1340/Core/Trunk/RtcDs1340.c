@@ -27,8 +27,8 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "RTCDS1340/RtcDs1340.h"
 #include "RTCDS1340/RtcDs1340_prm.h"
+#include "RTCDS1340/RtcDs1340.h"
 
 // library includes -----------------------------------------------------------
 #include "I2C/I2c.h"
@@ -91,8 +91,8 @@ typedef struct _D1340SREGS
   {
     struct
     {
-      U8    nMinOnes      : 4;      ///< minutess 
-      U8    nMinTens      : 3;      ///< minutess - tens
+      U8    nMinOnes      : 4;      ///< minutes 
+      U8    nMinTens      : 3;      ///< minutes - tens
       U8    nReserved     : 1;      ///< reserved
     } tFields;
     U8  nByte;
@@ -108,7 +108,24 @@ typedef struct _D1340SREGS
     } tFields;
     U8  nByte;
   } tHours;
-  U8      nDay;
+  union
+  {
+    struct  
+    {
+      U8  nDay            : 3;      ///< days
+      U8  nReserved       : 5;      ///< reserve
+    } tFields;
+    U8 nByte;
+  } tDay;
+  union
+  {
+    struct  
+    {
+      U8  nDateOnes       : 4;      ///< date
+      U8  nDateTens       : 2;      ///< date - tens   
+    } tFields;
+    U8 nByte;
+  } tDate;  
   union
   {
     struct
@@ -136,7 +153,7 @@ typedef struct _D1340SREGS
       U8    nCalib        : 5;      ///< calibration
       U8    bCalibNeg     : 1;      ///< negative calibration
       U8    bFreqTestEnb  : 1;      ///< enable the frequency test
-      U8    bOutInbDsb    : 1;      ///< disable the inverstion on the Output pin
+      U8    bOutInbDsb    : 1;      ///< disable the inversion on the Output pin
     } tFields;
     U8  nByte;
   } tCtl;
@@ -245,8 +262,9 @@ RTCDS1340ERR  RtcDs1340_SetDateTime( PDATETIME ptDateTime )
   tRegs.tMins.nByte = HexToBcd( ptDateTime->nMinutes );
   tRegs.tHours.nByte = HexToBcd( ptDateTime->nHours );
   tRegs.tMonth.nByte = HexToBcd( ptDateTime->nMonth );
-  tRegs.nDay = ptDateTime->nDay;
-  tRegs.tYear.nByte = HexToBcd( ptDateTime->wYear );
+  tRegs.tDate.nByte = HexToBcd( ptDateTime->nDay );
+  tRegs.tDay.nByte = ptDateTime->nDayOfWeek;
+  tRegs.tYear.nByte = HexToBcd(( U8 )( ptDateTime->wYear - RTCDS1340_CENTURY_VALUE ));
   
   // set up the control block
   tCtl.nDevAddr         = DS1340_SLV_ADDR;
@@ -259,7 +277,7 @@ RTCDS1340ERR  RtcDs1340_SetDateTime( PDATETIME ptDateTime )
   // now write it
   eError = ( I2c_Write( RTCDS1340_I2C_DEV_ENUM, &tCtl ) == I2C_ERR_NONE ) ? RTCDS1340_ERR_NONE : RTCDS1340_ERR_XFR;
   
-  // retrurn the error
+  // return the error
   return( eError );
 }
 
@@ -297,9 +315,10 @@ RTCDS1340ERR RtcDs1340_GetDateTime( PDATETIME ptDateTime )
     BcdToHex( tRegs.tMins.tFields.nMinTens, tRegs.tMins.tFields.nMinOnes, &ptDateTime->nMinutes );
     BcdToHex( tRegs.tHours.tFields.nHorTens, tRegs.tHours.tFields.nHorOnes, &ptDateTime->nHours );
     BcdToHex( tRegs.tMonth.tFields.nMonTens, tRegs.tMonth.tFields.nMonOnes,  &ptDateTime->nMonth );
-    ptDateTime->nDay = tRegs.nDay;
+    ptDateTime->nDayOfWeek = tRegs.tDay.tFields.nDay;
+    BcdToHex( tRegs.tDate.tFields.nDateTens, tRegs.tDate.tFields.nDateOnes, &ptDateTime->nDay );
     BcdToHex( tRegs.tYear.tFields.nYerTens, tRegs.tYear.tFields.nYerOnes,  &nTemp );
-    ptDateTime->wYear = nTemp;
+    ptDateTime->wYear = nTemp + RTCDS1340_CENTURY_VALUE;
   }
   else
   {
@@ -307,7 +326,7 @@ RTCDS1340ERR RtcDs1340_GetDateTime( PDATETIME ptDateTime )
     eError = RTCDS1340_ERR_XFR;
   }
 
-  // retrurn the error
+  // return the error
   return( eError );
 }
 

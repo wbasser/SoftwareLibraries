@@ -122,10 +122,77 @@ void Clock_Initialize( CLOCKSRC eClkSrc, U8 nFlashWaitStates, CLOCKMAINDIV eCpuD
  * @return     the frequency of the main clock
  *
  *****************************************************************************/
-U32 Clock_GetFreq( )
+U32 Clock_GetSysFreq( void )
 {
   // GetSystemClockSource
   return( uSystemClockFreq );
+}
+
+/******************************************************************************
+ * @function Clock_GetFreq
+ *
+ * @brief get the current clock frequency
+ *
+ * This function will return the current clock frequency
+ *
+ * @parma[in]     eGenId            generator ID
+ *
+ * @return     the frequency of the main clock
+ *
+ *****************************************************************************/
+U32 Clock_GetGenClock( CLOCKGENID eGenId )
+{
+  U32               uClockFreq;
+  GCLK_GENDIV_Type  tGenDiv;
+  GCLK_GENCTRL_TYPE tGenCtrl;
+  
+  // get the divider
+  GCLK->GENDIV.bit.ID = GCLK_GENDIV_ID( eGenId );
+  tGenDiv.reg = GCLK->GENDIV.reg;
+  
+  // get the control
+  GCLK->GENCTRL.bit.ID = GCLK_GENCTRL_ID( eGenId );
+  tGenCtrl.reg = GLCK->GENCTRL.reg;
+  
+  // get the source
+  switch( tGenDiv.bit.SRC )
+  {
+    case CLOCK_SRC_XOSC :
+      break;
+
+    case CLOCK_SRC_GCLKIN :
+      uClockFreq = uSystemClockFreq;
+      break;
+
+    case CLOCK_SRC_GCLKGEN1 :
+      break;
+
+    case CLOCK_SRC_OSCULP32K :
+      break;
+
+    case CLOCK_SRC_OSC32K :
+      break;
+
+    case CLOCK_SRC_XOSC32K :
+      break;
+
+    case CLOCK_SRC_OSC8M :
+      uClockFreq = 8000000l;
+      break;
+
+    case CLOCK_SRC_DFLL48M :
+      uClockFreq = 48000000l;
+      break;
+
+    case CLOCK_SRC_DPLL96M :
+      break;
+  }
+  
+  // now apply the divider
+  uClockFreq /= tGenDiv.bit.DIV;
+  
+  // return the clock frequency
+  return( uClockFreq );
 }
 
 /******************************************************************************

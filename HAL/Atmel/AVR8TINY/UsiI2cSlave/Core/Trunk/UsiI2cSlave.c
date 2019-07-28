@@ -73,7 +73,7 @@ void UsiI2cSlave_Initialize( void )
 	USI_STS_REG = USI_SIF_MSK | USI_OIF_MSK | USI_SPF_MSK | USI_DCL_MSK;
 
   // set the device address to default
-  nDevAddr = USI_SLV_ADDR;
+  nDevAddr = USI_DEFAULT_ADDR;
 
   // get the callback
   pvCallback = ( PVUSIINTCALLBACK )PGM_RDWORD( pvUsiCallBack );
@@ -149,7 +149,7 @@ ISR( USI_OVF_VEC )
 	  case SLV_CHK_ADR :
 		  // get the data
 		  nTemp = USI_DAT_REG;
-		  if ((( nTemp >> 1 ) == USI_SLV_ADDR ) || ( nTemp == 0 ))
+		  if ((( nTemp >> 1 ) == USI_DEFAULT_ADDR ) || ( nTemp == 0 ))
 		  {
 			  // test the direction
 			  if ( nTemp & 0x01 )

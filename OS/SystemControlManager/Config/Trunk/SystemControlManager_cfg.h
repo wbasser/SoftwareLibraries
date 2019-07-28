@@ -26,14 +26,19 @@
 #define _SYSTEMCONTROLMANAGER_CFG_H
 
 // local includes -------------------------------------------------------------
-#include "SystemControlManager\SystemControlManager_prm.h"
 #include "SystemControlManager/SystemControlManager_def.h"
 
 // global parameter declarations ----------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-extern  QueueHandle_t xSystemControlManagerQueue;
+extern  QueueHandle_t g_xSystemControlManagerQueue;
 #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 #include "StateExecutionEngine/StateExecutionEngine.h"
+
+// macro and defines ------------------------------------------------------------
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+/// define the process event  size
+#define SYSCTRLMNGR_TASK_NUM_EVENTS               ( 4 )
+#endif // SYSTEMDEFINE_OS_SELECTION
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the local modes
@@ -51,12 +56,19 @@ typedef enum _SYSCTRLMGRLCLMODE
 } SYSCTRLMGRLCLMODE;
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE SYSCTRLMNGRDEF   atSysCtrlMngrDefs[ ];
-extern  const CODE SYSCTRLMGRENTCHK atSysCtrlMngrEntChkFuncs[ ];
+extern  const CODE SYSCTRLMNGRSCHDDEF g_atSysCtrlMngrSchdDefs[ ];
+#if ( TASK_TICK_ENABLE == 1 )
+extern  const CODE SYSCTRLMNGRTICKDEF g_atSysCtrlMngrTickDefs[ ];
+#endif // TASK_TICK_ENABLE
+extern  const CODE SYSCTRLMGRENTCHK   g_atSysCtrlMngrEntChkFuncs[ ];
 
 // global function prototypes --------------------------------------------------
 extern  void  SystemControlManager_LocalInitialize( void );
-extern  U8    SystemControlManager_GetNumberDefs( void );
+extern  U8    SystemControlManager_GetNumberSchdDefs( void );
+#if ( TASK_TICK_ENABLE == 1 )
+extern  U8    SystemControlManager_GetNumberTickDefs( void );
+#endif // TASK_TICK_ENABLE
+
 /**@} EOF SystemControlManager_cfg.h */
 
 #endif  // _SYSTEMCONTROLMANAGER_CFG_H

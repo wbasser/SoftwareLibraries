@@ -69,6 +69,7 @@ typedef enum  _CLOCKMUXID
   CLOCK_MUXID_SERCOM_0,         /// SERCOM 0 
   CLOCK_MUXID_SERCOM_1,         /// SERCOM 1 
   CLOCK_MUXID_SERCOM_2,         /// SERCOM 2 
+  CLOCK_MUXID_SERCOM_3,         /// SERCOM 3
   CLOCK_MUXID_TCC0,             /// TCC 0
   CLOCK_MUXID_TC1TC2,           /// TC 1 and T2
   CLOCK_MUXID_ADC,              /// ADC
@@ -99,7 +100,7 @@ typedef enum _CLOCKDIVSEL
 /// enumerate the clock source masks
 typedef enum  _CLOCKSRC
 {
-  CLOCK_SRC_XOSC = 0,              ///< external oscilator
+  CLOCK_SRC_XOSC = 0,             ///< external oscilator
   CLOCK_SRC_GCLKIN,               ///< generator input pad
   CLOCK_SRC_GCLKGEN1,             ///< generic clock generator 1 output
   CLOCK_SRC_OSCULP32K,            ///< low power 32Khz oscillator
@@ -117,7 +118,8 @@ typedef enum  _CLOCKSRC
 
 // global function prototypes --------------------------------------------------
 extern  void  Clock_Initialize( CLOCKSRC eClkSrc, U8 nFlashStates, CLOCKMAINDIV eCpuDiv, CLOCKMAINDIV eApbADiv, CLOCKMAINDIV eApbBDiv );
-extern  U32   Clock_GetFreq( void );
+extern  U32   Clock_GetSysFreq( void );
+extern  U32   Clock_GetGenClock( CLOCKGENID eGenId );
 extern  void  Clock_PeriphEnable( CLOCKMUXID eMuxId, CLOCKGENID eGenId ); 
 extern  void  Clock_SetGenClock( CLOCKGENID eGenId, CLOCKSRC eClockSrc, U16 wDivisor, CLOCKDIVSEL eDivSel );
 

@@ -67,6 +67,10 @@
 /// define the animation rate in milliseconds 
 #define LEDMANAGER_ANIMATE_RATE_MSECS           ( 25 )
 
+/// define the macro for enabling the debug commands
+#define LEDMANAGER_ENABLE_DEBUG_COMMANDS        ( 1 )
+
+
 /**@} EOF LedManager_prm.h */
 
 #endif  // _LEDMANAGER_PRM_H

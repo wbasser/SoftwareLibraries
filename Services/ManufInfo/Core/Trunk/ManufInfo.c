@@ -69,6 +69,14 @@ static  const CODE U8  nSfwVerMinor =
   MANUFINFO_SFW_MIN
 };
 
+/// initialize the software version test
+#if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+static  const CODE U8  nSfwVerTest =
+{
+  MANUFINFO_SFW_TST
+};
+#endif // MANUFINFO_REV_SFW_TST_ENABLE
+
 /// initialize the title
 static  const CODE C8  szTitle[ MANUFINFO_TITLE_LEN ] = 
 {
@@ -100,11 +108,13 @@ static  const CODE C8  szPartNum2[ MANUFINFO_PRTNUM2_LEN ] =
 // constant parameter initializations -----------------------------------------
 /// declare the command strings
 static  const CODE C8 szQryVer[ ]   = { "QVER" };
+static  const CODE C8 szQryVerX[ ]  = { "QRYVER" };
 
 /// initialize the command table
-const CODE ASCCMDENTRY atManufInfoCmdHandlerTable[ ] =
+const CODE ASCCMDENTRY g_atManufInfoCmdHandlerTable[ ] =
 {
-  ASCCMD_ENTRY( szQryVer, 4, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
+  ASCCMD_ENTRY( szQryVer,  4, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
+  ASCCMD_ENTRY( szQryVerX, 6, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
 
   // the entry below must be here
   ASCCMD_ENDTBL( )
@@ -113,7 +123,12 @@ const CODE ASCCMDENTRY atManufInfoCmdHandlerTable[ ] =
 /// define the response strings
 static  const CODE C8 szRspVr1[ ]   = { "RVER, " };
 static  const CODE C8 szRspVr2[ ]   = { ", HDW:%02X_%02X, " };
+#if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+static  const CODE C8 szRspVr3[ ]   = { "SFW:%02X_%02X_%02X\n\r" };
+#else
 static  const CODE C8 szRspVr3[ ]   = { "SFW:%02X_%02X\n\r" };
+#endif // MANUFINFO_REV_SFW_TST_ENABLE
+
 static  const CODE C8 szNewLine[ ]  = { "\n\r" };
 #endif // MANUFINFO_ENABLE_DEBUGCOMMANDS
 
@@ -148,6 +163,24 @@ U8 ManufInfo_GetSfwMinor( void )
   // return the value
   return( PGM_RDBYTE( nSfwVerMinor ));
 }
+
+#if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+/******************************************************************************
+ * @function ManufInfo_GetSfwTest
+ *
+ * @brief get the version test
+ *
+ * This function returns the test portion of the version
+ *
+ * @return      test revision
+ *
+ *****************************************************************************/
+U8 ManufInfo_GetSfwTest( void )
+{
+  // return the value
+  return( PGM_RDBYTE( nSfwVerTest ));
+}
+#endif // MANUFINFO_REV_SFW_TST_ENABLE
 
 /******************************************************************************
  * @function ManufInfo_GetHdwMajor
@@ -269,7 +302,11 @@ static ASCCMDSTS CmdQryVer( U8 nCmdEnum )
   AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szRspVr1 );
   AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szTitle );
   wBufferIndex = SPRINTF_P( pcBuffer, ( char const * )szRspVr2, nHdwVerMajor, nHdwVerMinor );
+  #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+  SPRINTF_P( ( pcBuffer + wBufferIndex ), ( char const * )szRspVr3, nSfwVerMajor, nSfwVerMinor, nSfwVerTest );
+  #else
   SPRINTF_P( ( pcBuffer + wBufferIndex ), ( char const * )szRspVr3, nSfwVerMajor, nSfwVerMinor );
+  #endif // MANUFINFO_REV_SFW_TST_ENABLE
   AsciiCommandHandler_OutputBuffer( nCmdEnum );
   AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szPartNum2 );
   AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szNewLine );

@@ -38,15 +38,16 @@
     .pvExec = ( PVEXECFUNC )taskhandler, \
     .xNumEvents = numevents, \
     .pxEvents = ( PTASKARG )&at ## bufname ## Events, \
-    .uDelayTime = ( U32 )executionrate, \
+    .uDelayTime = executionrate, \
     .bEnabled = enabled, \
     .bRunOnInit = runoninit \
   }
                 
 /// define the tick task creation macro
-#define	TASKTICK( taskhandler, executionrate ) \
+#define	TASKTICK( taskhandler, executionrate, enabled ) \
   { .pvExec = ( PVEXECFUNC )taskhandler, \
-    .uDelayTime = executionrate \
+    .uDelayTime = executionrate, \
+    .bEnabled = enabled, \
   }
 
 /// define the task event queue 
@@ -55,9 +56,9 @@
   
 /// define the time macros
 #define TASK_TIME_USECS( a )  ( a )
-#define TASK_TIME_MSECS( a )  ( a * 1000 ## l)
-#define TASK_TIME_SECS( a )   ( a * 1000 * 1000 ## ul)
-#define TASK_TIME_MINS( a )   ( a * 1000l * 1000l * 60 ## ul)
+#define TASK_TIME_MSECS( a )  ( a * 1000 )
+#define TASK_TIME_SECS( a )   ( a * 1000 * 1000 )
+#define TASK_TIME_MINS( a )   ( a * 1000 * 1000 * 60 )
 
 /// determine the event argument size
 #if ( TASK_TSKARG_SIZE_BYTES == 1 )
@@ -100,20 +101,19 @@ typedef enum	_TASKTYPE
 	TASK_TYPE_EVENT = 0,
 	TASK_TYPE_TIMED_ONESHOT,
 	TASK_TYPE_TIMED_CONTINUOUS,
-	TASK_TYPE_EXECUTE_EVERYLOOP
 } TASKTYPE;
 
 // structures -----------------------------------------------------------------
 /// define the scheduled task definition structure
 typedef struct 	_TASKSCHDDEF
 {
-	TASKTYPE	  eType;      ///< task type
+	TASKTYPE	  eType;        ///< task type
 	PVEXECFUNC  pvExec;	      ///< pointer to the task handler
 	QUESIZEARG	xNumEvents;	  ///< number of events
-	PTASKARG	  pxEvents;	  ///< pointer to the event buffer
-	U32		      uDelayTime; ///< delay time in microseconds
-  BOOL        bEnabled;       ///< task enabled
-  BOOL        bRunOnInit;     ///< run on initialization
+	PTASKARG	  pxEvents;	    ///< pointer to the event buffer
+	U32		      uDelayTime;   ///< delay time in microseconds
+  BOOL        bEnabled;     ///< task enabled
+  BOOL        bRunOnInit;   ///< run on initialization
 } TASKSCHDDEF, *PTASKSCHDDEF;
 #define	TASKSCHDDEF_SIZE	sizeof( TASKSCHDDEF )
 
@@ -122,6 +122,7 @@ typedef struct	_TSKTICKDEF
 {
 	PVEXECFUNC  pvExec;	      ///< pointer to the task handler
 	U32		      uDelayTime;		///< delay time in microseconds
+  BOOL        bEnabled;     ///< task enabled
 } TASKTICKDEF, *PTASKTICKDEF;
 #define	TASKTICKDEF_SIZE	sizeof( TASKTICKDEF )
 

@@ -24,16 +24,15 @@
 // local includes -------------------------------------------------------------
 #include "AsciiCommandHandler/AsciiCommandHandler.h"
 
-// library includes -----------------------------------------------------------
+// library includes ----------------------------------------------------------
 
 // local parameter declarations -----------------------------------------------
 /// declare the buffers here using the below macro
-//ASCCMD_BUFFER( name, bufsize, numargs )
+// ASCCMD_BUFFER( name, bufsize, numargs )
 
 // local constant parameter initializations -----------------------------------------
-/// declare the delimiters
 
-// constant parameter initializations -----------------------------------------
+// global constant parameter initializations -----------------------------------------
 const CODE  ASCCMDDEF   atAscCmdDefs[ ASCCMD_ENUM_MAX ] =
 {
   // add entries to this table using the below macro

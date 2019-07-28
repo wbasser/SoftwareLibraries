@@ -27,6 +27,11 @@
 // library includes -----------------------------------------------------------
 #include "GPIO/Gpio.h"
 
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+// OS includes
+#include "FreeRtos.h"
+#endif // SYSTEMDEFINE_OS_SELECTION
+
 // Macros and Defines ---------------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
 #define LED_ANIMATE_TASK_PRIORITY             ( tskIDLE_PRIORITY + 4 )
@@ -43,7 +48,7 @@ static  void  ScanTask( PVOID pvParameters );
 
 // constant parameter initializations -----------------------------------------
 /// declare the led definitions
-const CODE LEDDEF  atLedDefs[ LEDMANAGER_ENUM_MAX ] = 
+const CODE LEDDEF  g_atLedDefs[ LEDMANAGER_ENUM_MAX ] = 
 {
   // populate using one or both of the helper macros
   // LEDDEF_DIRECT( pin )
@@ -52,45 +57,37 @@ const CODE LEDDEF  atLedDefs[ LEDMANAGER_ENUM_MAX ] =
 };
 
 #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-const CODE LEDRGBDEF  atLedRgbDefs[ LEDMANAGER_RGBENUM_MAX ] =
+const CODE LEDRGBDEF  g_atLedRgbDefs[ LEDMANAGER_RGBENUM_MAX ] =
 {
   // popuate usinig the macro below
   // LEDMNGRRGBDEF( red, grn, blu )
-
 };
 #endif  // LEDMANAGER_RGB_LEDS_ENABLED
 
 /// fill the matrix row columns 
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
-const CODE GPIOPINENUM aeLedMatrixRows[ LEDMANAGER_MATRIX_MAX_NUM_ROWS ] =
+const CODE GPIOPINENUM g_aeLedMatrixRows[ LEDMANAGER_MATRIX_MAX_NUM_ROWS ] =
 {
 };
 
-const CODE GPIOPINENUM aeLedMatrixCols[ LEDMANAGER_MATRIX_MAX_NUM_COLS ] =
+const CODE GPIOPINENUM g_aeLedMatrixCols[ LEDMANAGER_MATRIX_MAX_NUM_COLS ] =
 {
 };
 #endif  // MATRIX DEFS
 
 /// define each sequence here
 /// LEDMNGRDEFSTART( name )
-/// LEDMNGRDEFSTEP( action, led, duration, nextevent, option )
-/// LEDMNGRDEFSTOP
+/// LEDMNGRDEFSNGSENTRY,
+/// LEDMNGRDEFSNGSTEP( action, led, duration, nextevent, option )
+/// LEDMNGRDEFRGBSTEP( action, led, color, duration, nextevent, option )
 
 
 /// declare the animation definitions
-const CODE PLEDSEQENTRY apLedAnimationsDef[ LEDMNGR_ANIMATION_MAX ] =
+const CODE PLEDSEQENTRY g_apLedAnimationsDef[ LEDMNGR_ANIMATION_MAX ] =
 {
   /// fill animations here using the below helper
-  /// LEDMNGRANIMATIONDEF( name )
+  /// LEDMNGRANIMATIONDEF( name )]]
 };
-
-#if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-const CODE LEDRGBDEF  atLedsRgbDef[ LEDMNGR_RGB_ENUM_MAX ] =
-{
-  // define each RGB led using the below macro
-  // LEDMNGRRGBDEF( red, grn, blu )
-};
-#endif // LEDMANAGER_RGB_LEDS_ENABLED
 
 /******************************************************************************
  * @function LedManager_LocalInitialize
@@ -193,7 +190,6 @@ BOOL LedManager_AnimationTask( TASKARG xArg )
   // return true
   return( TRUE );
 }
-#endif  // SYSTEMDEFINE_OS_SELECTION
 
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
 /******************************************************************************
@@ -217,5 +213,6 @@ BOOL LedManager_ScanTask( TASKARG xArg )
   return( TRUE );
 }
 #endif  // MATRIX DEFS
+#endif  // SYSTEMDEFINE_OS_SELECTION
 
 /**@} EOF LedManager_cfg.c */

@@ -28,12 +28,14 @@
 #define _EEPROMHANDLER_H
 
 // system includes ------------------------------------------------------------
+#include "Types/Types.h"
 
 // local includes -------------------------------------------------------------
+//#if  (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
 #include "EepromHandler/Eepromhandler_cfg.h"
+//#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 
 // library includes -----------------------------------------------------------
-#include "Types/Types.h"
 #if ( EEPROMHANDLER_ENABLE_EMULATION == 0 )
 #include "I2C/I2c.h"
 #endif // EEPROMHANDLER_ENABLE_EMULATION
@@ -66,7 +68,7 @@ typedef enum _EEPROMERR
 
 // global parameter declarations -----------------------------------------------
 #if ( EEPROMHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-extern  const CODE ASCCMDENTRY atEepromDbgHandlerTable[ ];
+extern  const CODE ASCCMDENTRY g_atEepromDbgHandlerTable[ ];
 #endif // EEPROMHANDLER_ENABLE_DEBUGCOMMANDS
 
 // global function prototypes --------------------------------------------------

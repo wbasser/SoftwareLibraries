@@ -29,7 +29,8 @@
 /// define the operating system types
 #define SYSTEMDEFINE_OS_TASKMANAGER               ( 0 )
 #define SYSTEMDEFINE_OS_FREERTOS                  ( 1 )
-#define SYSTEMDEFINE_OS_LINUX                     ( 2 )
+#define SYSTEMDEFINE_OS_TASKSCHEDULER             ( 3 )
+#define SYSTEMDEFINE_OS_MINIMAL                   ( 4 )
 
 /// define the selected operating system here using one of the above macros
 #define SYSTEMDEFINE_OS_SELECTION                 ( SYSTEMDEFINE_OS_TASKMANAGER )

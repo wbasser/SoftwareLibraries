@@ -28,7 +28,17 @@
 #define _MICRO_H
 
 // local includes -------------------------------------------------------------
-#include "Micro_def.h"
+#include "Micro_cfg.h"
+
+// library includes
+#if ( MICRO_ENABLE_SYSTIMECMDS == 1 )
+#include "AsciiCommandHandler/AsciiCommandHandler.h"
+#endif // MICRO_ENABLE_SYSTIMECMDS
+
+// global paramter declarations  ------------------------------------------------
+#if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
+extern  const CODE ASCCMDENTRY g_atMicroCmdHandlerTable[ ];
+#endif // MICRO_ENABLE_SYSTIMECMDS
 
 // global function prototypes --------------------------------------------------
 extern  void  Micro_Shutdown( void );

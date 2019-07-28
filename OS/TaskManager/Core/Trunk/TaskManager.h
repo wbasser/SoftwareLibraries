@@ -31,16 +31,21 @@
 // Macros and Defines ---------------------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern 	void	TaskManager_Initialize( void );
-extern	void 	TaskManager_IdleProcess( void );
-extern	void	TaskManager_TickProcess( void );
+extern 	void  TaskManager_Initialize( void );
+extern	void  TaskManager_IdleProcess( void );
+extern	void  TaskManager_TickProcess( void );
 extern  BOOL  TaskManager_EnableDisable( TASKSCHDENUMS eTask, BOOL bState );
-extern	BOOL	TaskManager_PostEvent( TASKSCHDENUMS eTask, TASKARG xArg );
+extern	BOOL  TaskManager_PostEvent( TASKSCHDENUMS eTask, TASKARG xArg );
 extern  BOOL  TaskManager_PostPriorityEvent( TASKSCHDENUMS eTask, TASKARG xArg );
-extern	BOOL	TaskManager_FlushEvents( TASKSCHDENUMS eTask );
-extern	BOOL	TaskManager_StartTimer( TASKSCHDENUMS eTask, U32 uTime );
-extern	BOOL	TaskManager_StopTimer( TASKSCHDENUMS eTask );
+extern	BOOL  TaskManager_PostEventIrq( TASKSCHDENUMS eTask, TASKARG xArg );
+extern  BOOL  TaskManager_PostPriorityEventIrq( TASKSCHDENUMS eTask, TASKARG xArg );
+extern	BOOL  TaskManager_FlushEvents( TASKSCHDENUMS eTask );
+extern	BOOL  TaskManager_StartTimer( TASKSCHDENUMS eTask, U32 uTime );
+extern	BOOL  TaskManager_StopTimer( TASKSCHDENUMS eTask );
 extern  BOOL  TaskManager_CheckTasksPending( void );
+#if ( TASK_TICK_ENABLE == 1 )
+extern  BOOL  TaskManager_TickEnableDisable( TASKTICKENUMS eTask, BOOL bState );
+#endif  // TASK_TICK_ENABLE
 
 /**@} EOF TaskManager.h */
 

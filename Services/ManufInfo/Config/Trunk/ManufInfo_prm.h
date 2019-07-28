@@ -27,6 +27,12 @@
 #define _MANUFINFO_PRM_H
 
 // Macros and Defines ---------------------------------------------------------
+/// define the macro to enable debug commands
+#define MANUFINFO_ENABLE_DEBUGCOMMANDS  ( 0 )
+
+/// define the macro to enable software revision test
+#define MANUFINFO_REV_SFW_TST_ENABLE 		( 1 )
+
 /// define the lengths for the serial number/part numbers
 #define MANUFINFO_TITLE_LEN             ( 16 )
 #define MANUFINFO_SERNUM_LEN            ( 8 )
@@ -40,15 +46,15 @@
 /// define the major/minor/test version numbers
 #define MANUFINFO_SFW_MAJ               ( 0x00 )
 #define MANUFINFO_SFW_MIN               ( 0x00 )
+#if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+#define MANUFINFO_SFW_TST               ( 0x01 )
+#endif // MANUFINFO_REV_SFW_TST_ENABLE
 
 /// define the sernum
 #define MANUFINFO_TITLE                 ( "" )
 #define MANUFINFO_SERNUM                ( "" )
 #define MANUFINFO_PRTNUM1               ( "" )
 #define MANUFINFO_PRTNUM2               ( "" )
-
-/// define the macro to enable debug commands
-#define MANUFINFO_ENABLE_DEBUGCOMMANDS  ( 0 )
 
 /**@} EOF ManufInfo_prm.h */
 

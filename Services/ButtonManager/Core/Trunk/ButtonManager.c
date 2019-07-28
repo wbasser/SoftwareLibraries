@@ -61,7 +61,13 @@ typedef struct
   U16       wDelayCounts;   ///< delay counts
   U16       wHoldCounts;    ///< hold count
   BOOL      bOffOn;         ///< button on/off
-} BTNCTL, *ptBtnCtl;
+  struct
+  {
+    BOOL    bShort   : 1;  ///< short hold detected
+    BOOL    bMedium  : 1;  ///< medium hold detected
+    BOOL    bLong    : 1;  ///< long hold detected
+  } tHoldDets;
+} BTNCTL, *PBTNCTL;
 #define BTNCTL_SIZE   sizeof( BTNCTL )
 
 // global parameter declarations ----------------------------------------------
@@ -93,6 +99,7 @@ void ButtonManager_Initialize( void )
   tConfig.wRepeatDelayMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
   tConfig.wRepeatRateMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
   tConfig.wShortHoldTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
+  tConfig.wMediumHoldTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
   tConfig.wLongHoldTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
   tConfig.wStuckTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
   
@@ -115,18 +122,36 @@ void ButtonManager_ResetAllStates( void )
 }
 
 /******************************************************************************
+ * @function ButtonManager_ForceButton
+ *
+ * @brief force a button event
+ *
+ * This function will force a button event
+ *
+ * @param[in]   eBtnEnum      button enumerator
+ * @param[in]   eBtnEvent     button event
+ *  
+ *****************************************************************************/
+void ButtonManager_ForceButton( BTNMNGRENUM eBtnEnum, BTNMNGREVENTS eBtnEvent )
+{ 
+  BTNMNGRDEF    tBtnDef;
+
+  // copy the def
+  MEMCPY_P( &tBtnDef, &atBtnMgrDefs[ eBtnEnum ], BTNMNGRDEF_SIZE );
+
+  // post the button
+  PostEvent( eBtnEnum, eBtnEvent, &tBtnDef );
+}
+
+/******************************************************************************
  * @function ButtonManager_Process
  *
  * @brief button manager process
  *
  * This function processes all defined buttons and determines there current statees
  *
- * @param[in]   xArg    task argument
- *  
- * @return      always return true
- *
  *****************************************************************************/
-BOOL ButtonManager_Process( TASKARG xArg )
+void ButtonManager_Process( void )
 {
   BTNMNGRENUM   eBtn;
   BTNCTL*       ptBtnCtl;
@@ -143,7 +168,16 @@ BOOL ButtonManager_Process( TASKARG xArg )
     MEMCPY_P( &tBtnDef, &atBtnMgrDefs[ eBtn ], BTNMNGRDEF_SIZE );
 
     // get the current state
-    bKeyState = ButtonManager_GetKeyStatus( tBtnDef.nKeyEnum );
+    if ( tBtnDef.pvGetStatus != NULL )
+    {
+      // get the status
+      bKeyState = tBtnDef.pvGetStatus( tBtnDef.nKeyEnum );
+    }
+    else
+    {
+      // set the key state to false
+      bKeyState = FALSE;
+    }
     
     // deterime which state this button is in
     switch( ptBtnCtl->eState )
@@ -167,6 +201,13 @@ BOOL ButtonManager_Process( TASKARG xArg )
           // set the delay to repeat delay/set state to pressed/generate an event
           ptBtnCtl->wDelayCounts = tConfig.wRepeatDelayMsecs;
           ptBtnCtl->eState = BTN_STATE_PRESSED;
+          
+          // clear the hold events
+          ptBtnCtl->tHoldDets.bShort = OFF;
+          ptBtnCtl->tHoldDets.bMedium = OFF;
+          ptBtnCtl->tHoldDets.bLong = OFF;
+          
+          // check for tobble
           if ( tBtnDef.tEventFlags.bToggleEnable )
           {
             // toggle the button off/on state/post the toggle event
@@ -202,15 +243,31 @@ BOOL ButtonManager_Process( TASKARG xArg )
           ptBtnCtl->wHoldCounts++;
 
           // check for short hold
-          if ( ptBtnCtl->wHoldCounts >= tConfig.wShortHoldTimeMsecs )
+          if (( ptBtnCtl->wHoldCounts >= tConfig.wShortHoldTimeMsecs ) & ( !ptBtnCtl->tHoldDets.bShort ))
           {
+            // mark it
+            ptBtnCtl->tHoldDets.bShort = ON;
+            
             // generate an event
             PostEvent( eBtn, BTNMNGR_EVENT_SHORTHOLD, &tBtnDef );
           }
           
-          // check for long hold
-          if ( ptBtnCtl->wHoldCounts >= tConfig.wLongHoldTimeMsecs )
+          // check for medimum hold
+          if (( ptBtnCtl->wHoldCounts >= tConfig.wMediumHoldTimeMsecs ) & ( !ptBtnCtl->tHoldDets.bMedium ))
           {
+            // mark it
+            ptBtnCtl->tHoldDets.bMedium = ON;
+            
+            // generate an event
+            PostEvent( eBtn, BTNMNGR_EVENT_MEDIUMHOLD, &tBtnDef );
+          }
+          
+          // check for long hold
+          if (( ptBtnCtl->wHoldCounts >= tConfig.wLongHoldTimeMsecs ) && ( !ptBtnCtl->tHoldDets.bLong ))
+          {
+            // mark it
+            ptBtnCtl->tHoldDets.bLong = ON;
+            
             // generate an event
             PostEvent( eBtn, BTNMNGR_EVENT_LONGHOLD, &tBtnDef );
           }
@@ -239,7 +296,7 @@ BOOL ButtonManager_Process( TASKARG xArg )
       // key is stuck
       case BTN_STATE_STUCK :
         // check for key released
-        if ( bKeyState )
+        if ( !bKeyState )
         {
           // generate a release event
           PostEvent( eBtn, BTNMNGR_EVENT_RELEASED, &tBtnDef );
@@ -255,9 +312,6 @@ BOOL ButtonManager_Process( TASKARG xArg )
         break;
     }
   }
-
-  // return true
-  return( TRUE );
 }
 
 /******************************************************************************
@@ -277,13 +331,14 @@ static void PostEvent( BTNMNGRENUM eKey, BTNMNGREVENTS eEvent, PBTNMNGRDEF ptDef
   U16UN tEvent;
   
   // determine if there the event is enabled
-  if (( ptDef->tEventFlags.bReleaseEnable   && ( eEvent == BTNMNGR_EVENT_RELEASED ))  ||
-      ( ptDef->tEventFlags.bPressEnable     && ( eEvent == BTNMNGR_EVENT_PRESSED ))   ||
-      ( ptDef->tEventFlags.bRepeatEnable    && ( eEvent == BTNMNGR_EVENT_REPEAT ))    ||
-      ( ptDef->tEventFlags.bShortHoldEnable && ( eEvent == BTNMNGR_EVENT_SHORTHOLD )) ||
-      ( ptDef->tEventFlags.bToggleEnable    && ( eEvent == BTNMNGR_EVENT_BTNON ))     ||
-      ( ptDef->tEventFlags.bToggleEnable    && ( eEvent == BTNMNGR_EVENT_BTNOFF ))    ||
-      ( ptDef->tEventFlags.bLongHoldEnable  && ( eEvent == BTNMNGR_EVENT_LONGHOLD )))
+  if (( ptDef->tEventFlags.bReleaseEnable    && ( eEvent == BTNMNGR_EVENT_RELEASED ))   ||
+      ( ptDef->tEventFlags.bPressEnable      && ( eEvent == BTNMNGR_EVENT_PRESSED ))    ||
+      ( ptDef->tEventFlags.bRepeatEnable     && ( eEvent == BTNMNGR_EVENT_REPEAT ))     ||
+      ( ptDef->tEventFlags.bShortHoldEnable  && ( eEvent == BTNMNGR_EVENT_SHORTHOLD ))  ||
+      ( ptDef->tEventFlags.bMediumHoldEnable && ( eEvent == BTNMNGR_EVENT_MEDIUMHOLD )) ||
+      ( ptDef->tEventFlags.bToggleEnable     && ( eEvent == BTNMNGR_EVENT_BTNON ))      ||
+      ( ptDef->tEventFlags.bToggleEnable     && ( eEvent == BTNMNGR_EVENT_BTNOFF ))     ||
+      ( ptDef->tEventFlags.bLongHoldEnable   && ( eEvent == BTNMNGR_EVENT_LONGHOLD )))
   {
     // determine the reporting method
     switch( ptDef->eRptMethod )

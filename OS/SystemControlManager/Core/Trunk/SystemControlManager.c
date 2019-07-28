@@ -27,6 +27,7 @@
 #include "SystemControlManager/SystemControlManager.h"
 
 // library includes -----------------------------------------------------------
+#include "StateExecutionEngine/StateExecutionEngine.h"
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -95,25 +96,25 @@ static  const CODE STATEEXECENGTABLE  atStates[ SYSCTRLMNGR_MODE_MAX ] =
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_12_UNDEF,         SetTaskStates, Mode12_Execute, NULL, &atAnyEvents ),
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_13_UNDEF,         SetTaskStates, Mode13_Execute, NULL, &atAnyEvents ),
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_14_UNDEF,         SetTaskStates, Mode14_Execute, NULL, &atAnyEvents ),
-  STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_15_UNDEF,         SetTaskStates, Mode15_Execute, NULL, &atAnyEvents )
+  STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_15_MANUFACTURING, SetTaskStates, Mode15_Execute, NULL, &atAnyEvents )
 };
 
 /// command strings
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-static  const CODE C8 szQryMod[ ]   = { "QMOD" };
-static  const CODE C8 szSetMod[ ]   = { "SMOD" };
+static  const CODE C8 szQryMod[ ]   = { "QRYMOD" };
+static  const CODE C8 szSetMod[ ]   = { "SETMOD" };
 static  const CODE C8 szEntDag[ ]   = { "DIAG" };
-static  const CODE C8 szEntMan[ ]   = { "MANL" };
+static  const CODE C8 szEntMan[ ]   = { "MANF" };
 static  const CODE C8 szExtSpc[ ]   = { "EXIT" };
 
 /// initialize the command table
-const CODE ASCCMDENTRY atSysCtrlMngrCmdHandlerTable[ ] =
+const CODE ASCCMDENTRY g_atSysCtrlMngrCmdHandlerTable[ ] =
 {
-  ASCCMD_ENTRY( szQryMod, 4, 0, ASCFLAG_COMPARE_NONE, 0,                               CmdQryMod ),
-  ASCCMD_ENTRY( szSetMod, 4, 1, ASCFLAG_COMPARE_NONE, 0,                               CmdSetMod ),
-  ASCCMD_ENTRY( szEntDag, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,        CmdEntDag ),
-  ASCCMD_ENTRY( szEntMan, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,        CmdEntMan ),
-  ASCCMD_ENTRY( szExtSpc, 4, 0, ASCFLAG_COMPARE_GE,   SYSCTRLMNGR_LCLMODE_DIAGNOSTICS, CmdExtSpc ),
+  ASCCMD_ENTRY( szQryMod, 4, 0, ASCFLAG_COMPARE_NONE, 0,                                 CmdQryMod ),
+  ASCCMD_ENTRY( szSetMod, 4, 1, ASCFLAG_COMPARE_NONE, 0,                                 CmdSetMod ),
+  ASCCMD_ENTRY( szEntDag, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,          CmdEntDag ),
+  ASCCMD_ENTRY( szEntMan, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,          CmdEntMan ),
+  ASCCMD_ENTRY( szExtSpc, 4, 0, ASCFLAG_COMPARE_GE,   SYSTEMCONTROLMANAGER_DBGCMDS_MODE, CmdExtSpc ),
 
   // the entry below must be here
   ASCCMD_ENDTBL( )
@@ -134,6 +135,9 @@ static  const CODE C8 szRspMod[ ]   = { "RMOD, %3d:0x%02X\n\r" };
  *****************************************************************************/
 void SystemControlManager_Initialize( void )
 {
+  // call the local initialization
+  SystemControlManager_LocalInitialize( );
+
   // set the current mode
   tStateControl.nCurState = SYSCTRLMNGR_MODE_00_INITIALIZE;
   
@@ -142,9 +146,6 @@ void SystemControlManager_Initialize( void )
   
   // initialize the state controller
   StateExecutionEngine_Initialize( &tStateControl, SYSCTRLMNGR_MODE_00_INITIALIZE );
-  
-  // call the local initialization
-  SystemControlManager_LocalInitialize( );
 }
 
 /******************************************************************************
@@ -240,7 +241,7 @@ static BOOL CheckForModeExecution( SYSCTRLMGRMODE eNewMode, SYSCTRLMGRMODE eCurM
   PVSYSCTRLCHKFUNC  pvCheck;
 
   // is there a check handler for this mode
-  if (( pvCheck = ( PVSYSCTRLCHKFUNC )PGM_RDWORD( atSysCtrlMngrEntChkFuncs[ eCurMode ].pvCheck )) != NULL )
+  if (( pvCheck = ( PVSYSCTRLCHKFUNC )PGM_RDWORD( g_atSysCtrlMngrEntChkFuncs[ eCurMode ].pvCheck )) != NULL )
   {
     // call the check function
     bStatus = pvCheck( eNewMode );
@@ -263,29 +264,33 @@ static void SetTaskStates( void )
 {
   U8                      nTaskIndex;
   U16                     wData;
-  SYSCTRLMNGRDEF const*   ptDef;
+  SYSCTRLMNGRSCHDDEF const*   ptSchdDef;
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   TaskHandle_t pxTaskHandle;
   #else
   TASKSCHDENUMS	eTaskEnum;      ///< task enumeration
+  #if ( TASK_TICK_ENABLE == 1 )
+  TASKTICKENUMS eTickEnum;
+  SYSCTRLMNGRTICKDEF const*   ptTickDef;
+  #endif // TASK_TICK_ENABLE
   #endif // SYSTEMDEFINE_OS_SELECTION
   BOOL                    bState;
   PVSYSCTRLCTRLFUNC       pvCtrlFunc;
   PVSYSCTRLENTRYFUNC      pvEntryFunc;
 
   // for each item in the table
-  for( nTaskIndex = 0; nTaskIndex < SystemControlManager_GetNumberDefs( ); nTaskIndex++ )
+  for( nTaskIndex = 0; nTaskIndex < SystemControlManager_GetNumberSchdDefs( ); nTaskIndex++ )
   {
     // get the entry
-    ptDef = &atSysCtrlMngrDefs[ nTaskIndex ];
+    ptSchdDef = &g_atSysCtrlMngrSchdDefs[ nTaskIndex ];
 
     // get the task/data
     #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-    pxTaskHandle = PGM_RDWORD( ptDef->pxTaskHandle );
+    pxTaskHandle = PGM_RDWORD( ptSchdDef->pxTaskHandle );
     #else
-    eTaskEnum = PGM_RDBYTE( ptDef->eTaskEnum );
+    eTaskEnum = PGM_RDBYTE( ptSchdDef->eTaskEnum );
     #endif // SYSTEMDEFINE_OS_SELECTION
-    wData = PGM_RDWORD( ptDef->tModes.wData );
+    wData = PGM_RDWORD( ptSchdDef->tModes.wData );
 
     // calculate the state
     bState = (( wData & BIT( tStateControl.nCurState )) != 0 ) ? TRUE : FALSE;
@@ -315,15 +320,59 @@ static void SetTaskStates( void )
     #endif // SYSTEMDEFINE_OS_SELECTION
 
     // get the function pointer/if not null/execute with state
-    if (( pvCtrlFunc = ( PVSYSCTRLCTRLFUNC )PGM_RDWORD( ptDef->pvCtrlFunc )) != NULL )
+    if (( pvCtrlFunc = ( PVSYSCTRLCTRLFUNC )PGM_RDWORD( ptSchdDef->pvCtrlFunc )) != NULL )
     {
       // execute it
       pvCtrlFunc( bState );
     }
   }
 
+  #if ( TASK_TICK_ENABLE == 1 )
+  // for each item in the table
+  for( nTaskIndex = 0; nTaskIndex < SystemControlManager_GetNumberTickDefs( ); nTaskIndex++ )
+  {
+    // get the entry
+    ptTickDef = &g_atSysCtrlMngrTickDefs[ nTaskIndex ];
+
+    // get the task/data
+    #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+    pxTaskHandle = PGM_RDWORD( ptTickDef->pxTaskHandle );
+    #else
+    eTickEnum = PGM_RDBYTE( ptTickDef->eTaskEnum );
+    #endif // SYSTEMDEFINE_OS_SELECTION
+    wData = PGM_RDWORD( ptTickDef->tModes.wData );
+
+    // calculate the state
+    bState = (( wData & BIT( tStateControl.nCurState )) != 0 ) ? TRUE : FALSE;
+
+    // call the task disable/enable with the appropriate state
+    #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+    if ( pxTaskHandle != NULL )
+    {
+      // suspend or resume the task
+      if ( bState )
+      {
+        // resume task
+        vTaskResume( pxTaskHandle );
+      }
+      else
+      {
+        // suspend task
+        vTaskSuspend( pxTaskHandle );
+      }
+    }
+    #else
+    if( eTickEnum != TASK_TICK_ILLEGAL )
+    {
+      // enable/disable based on state
+      TaskManager_TickEnableDisable( eTickEnum, bState );
+    }
+    #endif // SYSTEMDEFINE_OS_SELECTION
+  }
+  #endif // TASK_TICK_ENABLE
+
   // execute the additional entry functions if not null
-  if (( pvEntryFunc = ( PVSYSCTRLENTRYFUNC )PGM_RDWORD( atSysCtrlMngrEntChkFuncs[ tStateControl.nCurState ].pvEntry )) != NULL )
+  if (( pvEntryFunc = ( PVSYSCTRLENTRYFUNC )PGM_RDWORD( g_atSysCtrlMngrEntChkFuncs[ tStateControl.nCurState ].pvEntry )) != NULL )
   {
     // execute it
     pvEntryFunc( );
@@ -412,7 +461,11 @@ static U8 Mode02_Execute( STATEEXECENGARG xArg )
     case SYSCTRLMNGR_EVENT_GORUN :
       nNewState = SYSCTRLMNGR_MODE_05_RUN;
       break;
-    
+
+    case SYSCTRLMNGR_MODE_15_MANUFACTURING :
+      nNewState = SYSCTRLMNGR_MODE_15_MANUFACTURING;
+      break;
+
     default :
       nNewState = STATEEXECENG_STATE_NONE;
       break;
@@ -484,7 +537,7 @@ static U8 Mode04_Execute( STATEEXECENGARG xArg )
     case SYSCTRLMNGR_MODE_12_UNDEF :
     case SYSCTRLMNGR_MODE_13_UNDEF :
     case SYSCTRLMNGR_MODE_14_UNDEF :
-    case SYSCTRLMNGR_MODE_15_UNDEF :
+    case SYSCTRLMNGR_MODE_15_MANUFACTURING :
       nNewState = xArg;
       break;
 
@@ -885,7 +938,7 @@ static  ASCCMDSTS CmdEntDag( U8 nCmdEnum )
   AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
 
   // set the mode
-  if (( eError = SystemControlManager_SetMode( SYSCTRLMNGR_LCLMODE_DIAGNOSTICS )) != SYSCTRLMNGR_ERROR_NONE )
+  if (( eError = SystemControlManager_SetMode( SYSTEMCONTROLMANAGER_DBGCMDS_MODE )) != SYSCTRLMNGR_ERROR_NONE )
   {
     // output the error
     SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
@@ -918,7 +971,7 @@ static ASCCMDSTS CmdEntMan( U8 nCmdEnum )
   AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
 
   // set the mode
-  if (( eError = SystemControlManager_SetMode( SYSCTRLMNGR_LCLMODE_DIAGNOSTICS )) != SYSCTRLMNGR_ERROR_NONE )
+  if (( eError = SystemControlManager_SetMode( SYSCTRLMNGR_LCLMODE_MANUFACTURING )) != SYSCTRLMNGR_ERROR_NONE )
   {
     // output the error
     SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );

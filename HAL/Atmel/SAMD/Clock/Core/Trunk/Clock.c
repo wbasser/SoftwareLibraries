@@ -48,6 +48,7 @@ static  void  ConfigureOscDfll( PCLOCKOSCDEF ptDef );
 static  void  ConfigureGenerator( PCLOCKGENDEF ptGen );
 static  void  ConfigureMultiplexer( PCLOCKMUXDEF ptMux );
 static  U32   GetSystemClockSource( CLOCKSRC eSrc );
+static  U32   ComputeClockGenFreq( CLOCKGENID eClockGen );
 
 /******************************************************************************
  * @function Clock_Initialization
@@ -66,12 +67,12 @@ void Clock_Initialize( void )
   BOOL          bRunFlag;
   
   // now configure the flash wait states/clock divides
-  NVMCTRL->CTRLB.bit.RWS = tClockMainDef.nFlashWaitStates;
+  NVMCTRL->CTRLB.bit.RWS = g_tClockMainDef.nFlashWaitStates;
   
   // configure the CPU/APBA/APBB dividers
-  PM->CPUSEL.reg = tClockMainDef.eCpuDiv;
-  PM->APBASEL.reg = tClockMainDef.eAPBADiv;
-  PM->APBBSEL.reg = tClockMainDef.eAPBBDiv;
+  PM->CPUSEL.reg = g_tClockMainDef.eCpuDiv;
+  PM->APBASEL.reg = g_tClockMainDef.eAPBADiv;
+  PM->APBBSEL.reg = g_tClockMainDef.eAPBBDiv;
     
   // perform a software reset
   GCLK->CTRL.reg = GCLK_CTRL_SWRST;
@@ -83,7 +84,7 @@ void Clock_Initialize( void )
   while( bRunFlag )
   {
     // get entry from table
-    ptClkDef = ( PCLOCKOSCDEF )&atClockOscDefs[ nIdx++ ];
+    ptClkDef = ( PCLOCKOSCDEF )&g_atClockOscDefs[ nIdx++ ];
     
     // check for end of table
     if ( ptClkDef->eClockOsc != CLOCK_OSC_EOT )
@@ -133,7 +134,7 @@ void Clock_Initialize( void )
   while( bRunFlag )
   {
     // get the definition
-    ptGenDef = ( PCLOCKGENDEF )&atClockGenDefs[ nIdx++ ];
+    ptGenDef = ( PCLOCKGENDEF )&g_atClockGenDefs[ nIdx++ ];
     
     // test for a valid entry
     if ( ptGenDef->nId != CLOCK_GENID_EOT )
@@ -154,7 +155,7 @@ void Clock_Initialize( void )
   while( bRunFlag )
   {
     // get the definition
-    ptMuxDef = ( PCLOCKMUXDEF )&atClockMuxDefs[ nIdx++ ];
+    ptMuxDef = ( PCLOCKMUXDEF )&g_atClockMuxDefs[ nIdx++ ];
     
     // test for a valid entry
     if ( ptMuxDef->eMuxId != CLOCK_MUXID_EOT )
@@ -198,7 +199,7 @@ void Clock_Close( void )
 U32 Clock_GetFreq( )
 {
   // GetSystemClockSource
-  return( uSystemClockFreq );
+  return( ComputeClockGenFreq( CLOCK_GENID_0 ));
 }
 
 /******************************************************************************
@@ -208,63 +209,21 @@ U32 Clock_GetFreq( )
  *
  * This function will return the current clock frequency
  *
- *  @return     the frequency of the main clock
+ * @param[in]   eMuxId      multiplexer ID
+ * 
+ *  @return     the frequency of the clock
  *
  *****************************************************************************/
 U32 Clock_GetMultiplexerFreq( CLOCKMUXID eMuxId )
 {
   CLOCKGENID  eClockGen;
-  U32         uGeneratorFreq, uDivider;
-  BOOL        bDivisorSelect;
-  CLOCKSRC    eClockSource;
-  
-  //  disable interrupts
-  Interrupt_Disable( );
   
   //  set the channel into the control register/read it
   *(( PU8 )&GCLK->CLKCTRL.reg ) = eMuxId;
   eClockGen = GCLK->CLKCTRL.bit.GEN;
   
-  //  wait for sync
-  while( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY );
-  
-  //  select the generator/sync
-  *(( PU8 )&GCLK->GENCTRL.reg ) = eClockGen;
-  while( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY );
-  
-  // get the souce/divisor
-  bDivisorSelect = GCLK->GENCTRL.bit.DIVSEL;
-  eClockSource = GCLK->GENCTRL.bit.SRC;
-  
-  // get the frequency for that source
-  uGeneratorFreq = GetSystemClockSource( eClockSource );
-  
-  //  select the appropatie generator
-  *(( PU8 )&GCLK->GENDIV.reg ) = eMuxId;
-  while( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY );
-
-  // get te dividor
-  uDivider = GCLK->GENDIV.bit.DIV;   
-  
-  // re-enable interrupts
-  Interrupt_Enable( );
-  
-  // compute the frequency
-  if ( !bDivisorSelect && uDivider > 1 )
-  {
-    // device the freq by the divider
-    uGeneratorFreq /= uDivider;
-  }
-  else if ( bDivisorSelect )
-  {
-    // shift the frequency by the diver + 1
-    uGeneratorFreq >>= ( uDivider + 1 );
-  } 
-  
-  // return the frequency
-  return( uGeneratorFreq );
+  return ( ComputeClockGenFreq( eClockGen ));
 }
-
 
 /******************************************************************************
  * @function ConfigureXosc
@@ -420,16 +379,13 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
   SYSCTRL_DFLLVAL_Type  tVal;
   SYSCTRL_DFLLMUL_Type  tMult;
   U32                   uCoarse, uFine;
-  CLOCKMUXDEF           tClockMux;
-
-  // configure the reference clock generator
-  ConfigureGenerator( &ptDef->tRefGenDef );
+//  CLOCKMUXDEF           tClockMux;
 
   // enable the multiplexer for the reference 
-  tClockMux.bWriteLock = OFF;
-  tClockMux.eClockGenId = CLOCK_GENID_1;
-  tClockMux.eMuxId = CLOCK_MUXID_DFLL48M_REF;
-  ConfigureMultiplexer( &tClockMux );
+//  tClockMux.bWriteLock = OFF;
+//  tClockMux.eClockGenId = CLOCK_GENID_1;
+//  tClockMux.eMuxId = CLOCK_MUXID_DFLL48M_REF;
+//  ConfigureMultiplexer( &tClockMux );
 
   // workaround for errate 9905
   SYSCTRL->DFLLCTRL.bit.ONDEMAND = OFF;
@@ -437,23 +393,20 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
 
   // fill the control structure
   tCtrl.reg = 0;
-  #ifdef __SAM_D21_SUBFAMILY
-  tCtrl.bit.WAITLOCK = OFF;
-  tCtrl.bit.BPLCKC = OFF;
-  tCtrl.bit.USBCRM = ptDef->tFlags.bEnableUsbRecovery;
-  #endif
-  tCtrl.bit.QLDIS = ON;
-  tCtrl.bit.CCDIS = ( ptDef->tFlags.bEnableChillCycle ) ? FALSE : TRUE;
-  tCtrl.bit.ONDEMAND = OFF;
-  tCtrl.bit.RUNSTDBY = OFF;
-  tCtrl.bit.LLAW = ptDef->tFlags.bKeepLockWakeup;
-  tCtrl.bit.STABLE = OFF;
-  tCtrl.bit.MODE = ptDef->tFlags.bClosedLoopMode;
-  tCtrl.bit.ENABLE = OFF;
-  
-  // write it/wait for sync
-  SYSCTRL->DFLLCTRL.reg = tCtrl.reg;
-  while( !SYSCTRL->PCLKSR.bit.DFLLRDY );
+//  #ifdef __SAM_D21_SUBFAMILY
+//  tCtrl.bit.WAITLOCK = OFF;
+//  tCtrl.bit.BPLCKC = OFF;
+//  tCtrl.bit.USBCRM = ptDef->tFlags.bEnableUsbRecovery;
+//  #endif
+//  tCtrl.bit.QLDIS = ON;
+//  tCtrl.bit.CCDIS = ( ptDef->tFlags.bEnableChillCycle ) ? FALSE : TRUE;
+//  tCtrl.bit.ONDEMAND = OFF;
+//  tCtrl.bit.RUNSTDBY = OFF;
+//  tCtrl.bit.LLAW = ptDef->tFlags.bKeepLockWakeup;
+//  tCtrl.bit.STABLE = OFF;
+//  tCtrl.bit.MODE = ptDef->tFlags.bClosedLoopMode;
+//  tCtrl.bit.ENABLE = OFF;
+    tCtrl.reg = SYSCTRL_DFLLCTRL_ENABLE | SYSCTRL_DFLLCTRL_USBCRM | SYSCTRL_DFLLCTRL_BPLCKC | SYSCTRL_DFLLCTRL_CCDIS | SYSCTRL_DFLLCTRL_STABLE;
 
   // clear the multipler/value registers
   tMult.reg = 0;
@@ -463,16 +416,13 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
   if ( ptDef->tFlags.bClosedLoopMode )
   {
     // fill the coarse/fine/write it
-	
     uCoarse =  *(( PU32 )( FUSES_DFLL48M_COARSE_CAL_ADDR )) >> FUSES_DFLL48M_COARSE_CAL_Pos;
     uFine = *(( PU32 )( FUSES_DFLL48M_FINE_CAL_ADDR )) & FUSES_DFLL48M_FINE_CAL_Msk;
     tVal.reg = SYSCTRL_DFLLVAL_COARSE( uCoarse );
     tVal.reg |= SYSCTRL_DFLLVAL_FINE( uFine );
 
     // set the coarse/fine step/multipler
-    tMult.reg = SYSCTRL_DFLLMUL_MUL( 1500 );
-    tMult.reg |= SYSCTRL_DFLLMUL_CSTEP( uCoarse >> 1 );
-    tMult.reg |= SYSCTRL_DFLLMUL_FSTEP( uFine >> 1 );
+    tMult.reg = SYSCTRL_DFLLMUL_MUL( 48000 );
   }
   else
   {
@@ -483,9 +433,9 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
   SYSCTRL->DFLLVAL.reg = tVal.reg;
   SYSCTRL->DFLLMUL.reg = tMult.reg;
 
-  // enable it
-  SYSCTRL->DFLLCTRL.bit.ENABLE = ON;
-  while( !SYSCTRL->PCLKSR.bit.DFLLLCKF );
+  // write it/wait for sync
+  SYSCTRL->DFLLCTRL.reg = tCtrl.reg;
+  while( !SYSCTRL->PCLKSR.bit.DFLLRDY );
 
   // now configure the output generator
   ConfigureGenerator( &ptDef->tOutGenDef );
@@ -626,6 +576,67 @@ static U32 GetSystemClockSource( CLOCKSRC eSrc )
   
   // return the frequency
   return( uFreqHz );
+}
+
+/******************************************************************************
+ * @function ComputeClockGenFreq
+ *
+ * @brief Gets the frequency of a clock generator
+ *
+ * This function will return the frequency of a given clock generrator
+ *
+ * @param[in]   eClockGen   clock generator
+ *
+ * @return        frequency of a given clock generator
+ *
+ *****************************************************************************/
+static U32 ComputeClockGenFreq( CLOCKGENID eClockGen )
+{
+  U32         uGeneratorFreq, uDivider;
+  BOOL        bDivisorSelect;
+  CLOCKSRC    eClockSource;
+
+  //  disable interrupts
+  Interrupt_Disable( );
+  
+  //  wait for sync
+  while( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY );
+  
+  //  select the generator/sync
+  *(( PU8 )&GCLK->GENCTRL.reg ) = eClockGen;
+  while( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY );
+  
+  // get the souce/divisor
+  bDivisorSelect = GCLK->GENCTRL.bit.DIVSEL;
+  eClockSource = GCLK->GENCTRL.bit.SRC;
+  
+  // get the frequency for that source
+  uGeneratorFreq = GetSystemClockSource( eClockSource );
+  
+  //  select the appropatie generator
+  *(( PU8 )&GCLK->GENDIV.reg ) = eClockGen;
+  while( GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY );
+
+  // get te dividor
+  uDivider = GCLK->GENDIV.bit.DIV;
+  
+  // re-enable interrupts
+  Interrupt_Enable( );
+  
+  // compute the frequency
+  if ( !bDivisorSelect && uDivider > 1 )
+  {
+    // device the freq by the divider
+    uGeneratorFreq /= uDivider;
+  }
+  else if ( bDivisorSelect )
+  {
+    // shift the frequency by the diver + 1
+    uGeneratorFreq >>= ( uDivider + 1 );
+  }
+  
+  // return the frequency
+  return( uGeneratorFreq );
 }
 
 /**@} EOF Clock.c */

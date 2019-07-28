@@ -42,16 +42,17 @@
   }
 
 /// helper macro for creating a function output pin  
-#define GPIOFNCDEF( port, pin, func, allowinp ) \
+#define GPIOFNCDEF( port, pin, func, allowinp, pullenb ) \
   { \
     .ePort          = port, \
     .nPin           = pin, \
     .eFunc          = func, \
     .bAllowInput    = allowinp, \
+    .bPullUpEnable  = pullenb, \
   }
   
 /// define the helper macro for creating an interrupt pin
-#define GPIOIRQDEF( port, pin, sense, wakeup, filter, callback, event ) \
+#define GPIOIRQDEF( port, pin, sense, wakeup, filter, callback, event, initon ) \
   { \
     .ePort          = port, \
     .nPin           = pin, \
@@ -60,20 +61,21 @@
     .bFilterEnb     = filter, \
     .pvCallback     = callback, \
     .nEvent         = event, \
-    .bEventType     = FALSE \
+    .bEventType     = FALSE, \
+    .bInitOn        = initon \
   }
 
 /// define the helper macro for creating an interrupt pin
 #define GPIOEVNDEF( port, pin, sense, wakeup, filter ) \
-{ \
-  .ePort          = port, \
-  .nPin           = pin, \
-  .eSense         = sense, \
-  .bWakeupEnb     = wakeup, \
-  .bFilterEnb     = filter, \
-  .pvCallback     = NULL, \
-  .bEventType     = TRUE \
-}
+  { \
+    .ePort          = port, \
+    .nPin           = pin, \
+    .eSense         = sense, \
+    .bWakeupEnb     = wakeup, \
+    .bFilterEnb     = filter, \
+    .pvCallback     = NULL, \
+    .bEventType     = TRUE \
+  }
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the ports
@@ -155,6 +157,7 @@ typedef struct _GPIOFNCDEF
   U8                nPin;           ///< port pin
   GPIOFUNCMUX       eFunc;          ///< port function
   BOOL              bAllowInput;    ///< allow pin to be an input
+  BOOL              bPullUpEnable;  ///< pull up enable
 } GPIOFNCDEF, *PGPIOFNCDEF;
 #define GPIOFNCDEF_SIZE  sizeof( GPIOFNCDEF )
 
@@ -169,6 +172,7 @@ typedef struct _GPIOIRQDEF
   PVGPIOIRQCALLBACK pvCallback;     ///< callback
   U8                nEvent;         ///< callback event
   BOOL              bEventType;     ///< event type
+  BOOL              bInitOn;        ///< initialial on
 } GPIOIRQDEF, *PGPIOIRQDEF;
 #define GPIOIRQDEF_SIZE  sizeof( GPIOIRQDEF )
 

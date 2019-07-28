@@ -286,8 +286,12 @@ void SenBME280_Initialize( void )
  * This function will read the values from the device and perform any
  * necessary calibration
  *
+ * @param[in]   xArg      task argument
+ *
+ * @return      TRUE flush event
+ *
  *****************************************************************************/
-void SenBME280_ProcessScan( void )
+BOOL SenBME280_ProcessScan( TASKARG xArg )
 {
   MEASUREMENTS  tMeasurements;
   S32           lMeasValue;
@@ -300,18 +304,15 @@ void SenBME280_ProcessScan( void )
     lMeasValue |= ( ((U32) tMeasurements.nTempLsb) << 4 );
     lMeasValue |= ( ((U32) tMeasurements.nTempXlsb) >> 4 );
     alRawValues[ SENBME280_MEASTYPE_TEMP ] = lMeasValue;
-    afActualValues[ SENBME280_MEASTYPE_TEMP ] = CompensateTemperature( lMeasValue );
       
     lMeasValue = ( ((U32) tMeasurements.nPressMsb) << 12 );
     lMeasValue |= ( ((U32) tMeasurements.nPressLsb) << 4 );
     lMeasValue |= ( ((U32) tMeasurements.nPressXlsb) >> 4 );
     alRawValues[ SENBME280_MEASTYPE_PRES ] = lMeasValue;
-    afActualValues[ SENBME280_MEASTYPE_PRES ] = CompensatePressure( lMeasValue );
       
     lMeasValue = ( ((U32) tMeasurements.nHumidMsb) << 8 );
     lMeasValue |= ( tMeasurements.nHumidLsb );
     alRawValues[ SENBME280_MEASTYPE_HUMD ] = lMeasValue;
-    afActualValues[ SENBME280_MEASTYPE_HUMD ] = CompensateHumidity( lMeasValue );
   }
   else
   {
@@ -322,6 +323,9 @@ void SenBME280_ProcessScan( void )
     memset( alRawValues, 0, sizeof( alRawValues ));
     memset( afActualValues, 0, sizeof( afActualValues ));
   }
+
+  // always return true to flush event
+  return( TRUE );
 }
 
 /******************************************************************************
@@ -424,14 +428,17 @@ BOOL SenBME280_GetMeasurement( SENBME280MEASTYPE eMeasType, PFLOAT pfValue )
     switch( eMeasType )
     {
       case SENBME280_MEASTYPE_TEMP :
+        afActualValues[ SENBME280_MEASTYPE_TEMP ] = CompensateTemperature( alRawValues[ SENBME280_MEASTYPE_TEMP ] );
         *( pfValue ) = afActualValues[ SENBME280_MEASTYPE_TEMP ];
         break;
     
       case SENBME280_MEASTYPE_HUMD :
+        afActualValues[ SENBME280_MEASTYPE_HUMD ] = CompensateHumidity( alRawValues[ SENBME280_MEASTYPE_HUMD ] );
         *( pfValue ) = afActualValues[ SENBME280_MEASTYPE_HUMD ];
         break;
     
       case SENBME280_MEASTYPE_PRES :
+        afActualValues[ SENBME280_MEASTYPE_PRES ] = CompensatePressure( alRawValues[ SENBME280_MEASTYPE_PRES ] );
         *( pfValue ) = afActualValues[ SENBME280_MEASTYPE_PRES ];
         break;
     

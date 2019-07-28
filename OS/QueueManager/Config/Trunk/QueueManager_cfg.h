@@ -31,6 +31,11 @@
 #include "QueueManager/QueueManager_def.h"
 
 // library includes -----------------------------------------------------------
+/// define the macro for enabling large queue entry size
+#define QUEUEMAMAGER_ENABLE_LARGE_ENTRY_SIZE            ( 1 )
+
+/// define the macro for enabling large number of queues
+#define QUEUEMANAGER_ENABLE_LARGE_NUMBER_ENTRIES        ( 0 )
 
 // Macros and Defines ---------------------------------------------------------
 

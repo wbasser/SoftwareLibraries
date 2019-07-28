@@ -27,7 +27,6 @@
 // system includes ------------------------------------------------------------
 
 // library includes -----------------------------------------------------------
-#include "Types/Types.h"
 
 // local includes -------------------------------------------------------------
 #include "ConfigManager/ConfigManager_prm.h"

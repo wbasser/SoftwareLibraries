@@ -41,7 +41,7 @@
 // Macros and Defines ---------------------------------------------------------
 /// helper macro to create the entry in the system control table
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-#define  SYSCNTRLMNGR_DEF( task, mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15, func ) \
+#define  SYSCNTRLMNGRSCHD_DEF( task, mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15, func ) \
   { \
     .pxTaskHandle = task, \
     .tModes = \
@@ -69,7 +69,66 @@
     .pvCtrlFunc = func \
   }
 #else
-#define  SYSCNTRLMNGR_DEF( task, mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15, func ) \
+#define  SYSCNTRLMNGRSCHD_DEF( task, mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15, func ) \
+  { \
+    .eTaskEnum = task, \
+    .tModes = \
+    { \
+      .tBits = \
+      { \
+        .bEnb00 = mode0, \
+        .bEnb01 = mode1, \
+        .bEnb02 = mode2, \
+        .bEnb03 = mode3, \
+        .bEnb04 = mode4, \
+        .bEnb05 = mode5, \
+        .bEnb06 = mode6, \
+        .bEnb07 = mode7, \
+        .bEnb08 = mode8, \
+        .bEnb09 = mode9, \
+        .bEnb10 = mode10, \
+        .bEnb11 = mode11, \
+        .bEnb12 = mode12, \
+        .bEnb13 = mode13, \
+        .bEnb14 = mode14, \
+        .bEnb15 = mode15 \
+      }, \
+    }, \
+    .pvCtrlFunc = func \
+  }
+#endif // SYSTEMDEFINE_OS_SELECTION
+
+/// helper macro to create the entry in the system control table
+#if ( TASK_TICK_ENABLE == 1 )
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+#define  SYSCNTRLMNGRTICK_DEF( task, mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15 ) \
+{ \
+  .pxTaskHandle = task, \
+  .tModes = \
+  { \
+    .tBits = \
+    { \
+      .bEnb00 = mode0, \
+      .bEnb01 = mode1, \
+      .bEnb02 = mode2, \
+      .bEnb03 = mode3, \
+      .bEnb04 = mode4, \
+      .bEnb05 = mode5, \
+      .bEnb06 = mode6, \
+      .bEnb07 = mode7, \
+      .bEnb08 = mode8, \
+      .bEnb09 = mode9, \
+      .bEnb10 = mode10, \
+      .bEnb11 = mode11, \
+      .bEnb12 = mode12, \
+      .bEnb13 = mode13, \
+      .bEnb14 = mode14, \
+      .bEnb15 = mode15 \
+    }, \
+  }, \
+}
+#else
+#define  SYSCNTRLMNGRTICK_DEF( task, mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15 ) \
 { \
   .eTaskEnum = task, \
   .tModes = \
@@ -94,9 +153,9 @@
       .bEnb15 = mode15 \
     }, \
   }, \
-  .pvCtrlFunc = func \
 }
 #endif // SYSTEMDEFINE_OS_SELECTION
+#endif // TASK_TICK_ENABLE
 
 /// define the helper macro for defining an table entry for entry/check
 #define SYSCTRLMNGGR_ENTCHK( entry, check ) \
@@ -132,7 +191,7 @@ typedef enum _SYSCTRLMGRMODE
   SYSCTRLMNGR_MODE_12_UNDEF,              ///< undefined
   SYSCTRLMNGR_MODE_13_UNDEF,              ///< undefined
   SYSCTRLMNGR_MODE_14_UNDEF,              ///< undefined
-  SYSCTRLMNGR_MODE_15_UNDEF,              ///< undefined
+  SYSCTRLMNGR_MODE_15_MANUFACTURING,      ///< manufacturing
   SYSCTRLMNGR_MODE_MAX,
   SYSCTRLMNGR_MODE_ILLEGAL
 } SYSCTRLMGRMODE;
@@ -160,7 +219,7 @@ typedef void  ( *PVSYSCTRLENTRYFUNC )( void );
 typedef BOOL  ( *PVSYSCTRLCHKFUNC )( SYSCTRLMGRMODE );
 
 /// define the control structure
-typedef struct PACKED _SYSCTRLMNGRDEF
+typedef struct PACKED _SYSCTRLMNGRSCHDDEF
 {
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   TaskHandle_t pxTaskHandle;
@@ -191,8 +250,44 @@ typedef struct PACKED _SYSCTRLMNGRDEF
     U16 wData;
   } tModes;
   PVSYSCTRLCTRLFUNC pvCtrlFunc; ///< optional control function
-} SYSCTRLMNGRDEF, *PSYSCTRLMNGRDEF;
-#define SYSCTRLMNGRDEF_SIZE   sizeof( SYSCTRLMNGRDEF )
+} SYSCTRLMNGRSCHDDEF, *PSYSCTRLMNGRSCHDDEF;
+#define SYSCTRLMNGRSCHDDEF_SIZE   sizeof( SYSCTRLMNGRSCHDDEF )
+
+/// define the control structure
+#if ( TASK_TICK_ENABLE == 1 )
+typedef struct PACKED _SYSCTRLMNGRTICKDEF
+{
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+  TaskHandle_t pxTaskHandle;
+  #else
+  TASKTICKENUMS	eTaskEnum;      ///< task enumeration
+  #endif // SYSTEMDEFINE_OS_SELECTION
+  union
+  {
+    struct
+    {
+      U16   bEnb00 : 1;         ///< mode  0 enable flag
+      U16   bEnb01 : 1;         ///< mode  1 enable flag
+      U16   bEnb02 : 1;         ///< mode  2 enable flag
+      U16   bEnb03 : 1;         ///< mode  3 enable flag
+      U16   bEnb04 : 1;         ///< mode  4 enable flag
+      U16   bEnb05 : 1;         ///< mode  5 enable flag
+      U16   bEnb06 : 1;         ///< mode  6 enable flag
+      U16   bEnb07 : 1;         ///< mode  7 enable flag
+      U16   bEnb08 : 1;         ///< mode  8 enable flag
+      U16   bEnb09 : 1;         ///< mode  9 enable flag
+      U16   bEnb10 : 1;         ///< mode 10 enable flag
+      U16   bEnb11 : 1;         ///< mode 11 enable flag
+      U16   bEnb12 : 1;         ///< mode 12 enable flag
+      U16   bEnb13 : 1;         ///< mode 13 enable flag
+      U16   bEnb14 : 1;         ///< mode 14 enable flag
+      U16   bEnb15 : 1;         ///< mode 15 enable flag
+    } tBits;
+    U16 wData;
+  } tModes;
+} SYSCTRLMNGRTICKDEF, *PSYSCTRLMNGRTICKDEF;
+#define SYSCTRLMNGRTICKDEF_SIZE   sizeof( SYSCTRLMNGRTICKDEF )
+#endif // TASK_TICK_ENABLE
 
 /// define the structure for the local entry/check functions
 typedef struct _SYSCTRLMGRENTCHK 

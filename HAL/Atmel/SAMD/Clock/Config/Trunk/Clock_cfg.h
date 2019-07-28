@@ -39,10 +39,10 @@
 // enumerations ---------------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE CLOCKOSCDEF  atClockOscDefs[ ];
-extern  const CODE CLOCKMAINDEF tClockMainDef;
-extern  const CODE CLOCKGENDEF  atClockGenDefs[ ];
-extern  const CODE CLOCKMUXDEF  atClockMuxDefs[ ];
+extern  const CODE CLOCKOSCDEF  g_atClockOscDefs[ ];
+extern  const CODE CLOCKMAINDEF g_tClockMainDef;
+extern  const CODE CLOCKGENDEF  g_atClockGenDefs[ ];
+extern  const CODE CLOCKMUXDEF  g_atClockMuxDefs[ ];
 
 /**@} EOF Clock_cfg.h */
 

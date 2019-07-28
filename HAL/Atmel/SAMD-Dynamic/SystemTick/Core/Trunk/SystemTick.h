@@ -30,15 +30,21 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the system tick functions
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+typedef void ( *PVSYSTEMTICKFUNC )( U16 );
+#else
 typedef void ( *PVSYSTEMTICKFUNC )( void );
+#endif // SYSTEMDEFINE_OS_SELECTION
 
 // global function prototypes --------------------------------------------------
 extern  void  SystemTick_Initialize( U32 uTickRateHz, PVSYSTEMTICKFUNC pvCallback );
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 extern  U32   SystemTick_GetTickRateUsec( void );
 extern  U64   SystemTick_GetTimeUsec( void );
 extern  U32   SystemTick_GetTimeMsec( void );
 extern  void  SystemTick_DelayMsec( U16 wMilliSeconds );
 extern  BOOL  SystemTick_IsDelayExpired( void );
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 
 /**@} EOF SystemTick.h */
 

@@ -31,6 +31,8 @@
 
 // libary includes -------------------------------------------------------------
 #include "I2C/I2c.h"
+#include "SystemControlManager/SystemControlManager.h"
+#include "SystemTick/SystemTick.h"
 
 // define ---------------------------------------------------------------------
 /// define the slave address
@@ -66,20 +68,27 @@
 /// define the macro to enable debug commands
 #define EEPROMHANDLER_ENABLE_DEBUGCOMMANDS          ( 0 )
 
+#if ( EEPROMHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
 /// define the system mode to allow debug commands in
-#define EEPROMHANDLER_DIAGMODE_ENUM                 ( 0 )
+#define EEPROMHANDLER_DIAGMODE_ENUM                 ( SYSCTRLMNGR_LCLMODE_DIAGNOSTICS )
+#endif
 
 /// define the macro to enable EEPROM emulation
-#define EEPROMHANDER_ENABLE_EMULATTION              ( 0 )
+#define EEPROMHANDLER_ENABLE_EMULATION              ( 0 )
 
 /// define the macro to enable background writes
 #define EEPROMHANDLER_ENABLE_BACKGROUND_WRITES      ( 0 )
 
+#if (( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER ) && ( EEPROMHANDLER_ENABLE_BACKGROUND_WRITES == 1 ))
 /// define the background write task enum
-#define EEPROM_HANDLER_BACKGROUND_TASK_ENUM         ( TASK_ILLEGAL_ENUM )
+#define EEPROM_HANDLER_BACKGROUND_TASK_ENUM         ( TASK_SCHD_ILLEGAL )
+#endif
 
 /// define the function to get system time
-#define EEPROMHANDLER_GET_SYSTEMTIME                ( )
+#define EEPROMHANDLER_GET_SYSTEMTIME                ( SystemTick_GetTimeMsec )
+
+/// define the page write time
+#define EEPROMHANDLER_PAGE_WRITE_MSECS              ( 10 )
 
 #endif  // _EEPROMHANDLER_PRM_H
 

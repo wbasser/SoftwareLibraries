@@ -6,7 +6,7 @@
  * This file declares the system control manager configurations
  *
  * @copyright Copyright (c) 2012 CyberIntegration
- * This document contains proprietary data and information of Nan Integration 
+ * This document contains proprietary data and information of Cyber Integration 
  * LLC. It is the exclusive property of CyberIntegration, LLC and will not be 
  * disclosed in any form to any party without prior written permission of 
  * CyberIntegration, LLC. This document may not be reproduced or further used 
@@ -29,7 +29,7 @@
 
 // macros and defines ---------------------------------------------------------
 /// define the debug command enable macro
-#define SYSTEMCONTROLMANAGER_ENABLE_DEBUGOMMANDS           ( 0 )
+#define SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS           ( 1 )
 
 /**@} EOF SystemControlManager_prm.h */
 

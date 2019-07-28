@@ -67,6 +67,18 @@ typedef enum _GPIOFUNCMUX
   GPIO_FUNCMUX_MAX
 } GPIOFUNCMUX;
 
+/// enumerate the IRQ pin edge
+typedef enum _GPIOIRQSENSE
+{
+  GPIO_SENSE_NONE = 0,       ///< no sense
+  GPIO_SENSE_RISE,          ///< rising edge
+  GPIO_SENSE_FALL,          ///< falling edge
+  GPIO_SENSE_BOTH,          ///< both edges
+  GPIO_SENSE_HILVL,         ///< HI level
+  GPIO_SENSE_LOLVL,         ///< LO level
+  GPIO_EDGE_MAX
+} GPIOIRQSENSE;
+
 /// enumerate the errors
 typedef enum _GPIOERR
 {
@@ -75,13 +87,20 @@ typedef enum _GPIOERR
 } GPIOERR;
 
 // structures -----------------------------------------------------------------
+/// define the GPIOENUM type
 typedef U32     GPIOENUM;
 
+/// define the GPIOIRQ callback type
+typedef void	( *PVGPIOIRQCALLBACK )( U8 nIrqNum );
+
+
 // global function prototypes --------------------------------------------------
-extern  GPIOENUM Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bHiDriveEnb, GPIOFUNCMUX eFunc, BOOL bInvert );
-extern  GPIOERR  Gpio_Set( GPIOENUM uGpioSel, BOOL bState );
-extern  GPIOERR  Gpio_Get( GPIOENUM uGpioSel, PBOOL pbState );
-extern  GPIOERR  Gpio_Toggle( GPIOENUM uGpioSel );
+extern  GPIOENUM 	Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bHiDriveEnb, GPIOFUNCMUX eFunc, BOOL bInvert );
+extern	GPIOENUM 	Gpio_ConfigureIRQ( GPIOPORT ePort, U8 nPin, GPIOIRQSENSE eSense, BOOL bPullupEnable, BOOL bFilterEnable, BOOL bWakeup, BOOL bInitOn, PVGPIOIRQCALLBACK pvCallback );
+extern  GPIOERR  	Gpio_Set( GPIOENUM uGpioSel, BOOL bState );
+extern  GPIOERR  	Gpio_Get( GPIOENUM uGpioSel, PBOOL pbState );
+extern  GPIOERR  	Gpio_Toggle( GPIOENUM uGpioSel );
+extern	GPIOERR		Gpio_IrqControl( GPIOENUM uGpioSel, BOOL bState );
 
 /**@} EOF Gpio.h */
 

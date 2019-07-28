@@ -78,7 +78,7 @@ KEYHANDERR KeyHandler_GetKeyState( KEYHANDENUM eKeyEnum, PBOOL pbState )
   PKEYHANDDEF ptDef;
   GPIOPINENUM eRowEnum;
   PVGETFUNC   pvGetFunc;
-  
+
   // first determine if a valid key enum
   if ( eKeyEnum < KEYHAND_ENUM_MAX )
   {
@@ -116,7 +116,6 @@ KEYHANDERR KeyHandler_GetKeyState( KEYHANDENUM eKeyEnum, PBOOL pbState )
 
       default :
         break;
-
     }
   }
   else

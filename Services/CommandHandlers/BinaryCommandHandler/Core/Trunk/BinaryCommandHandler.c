@@ -172,6 +172,9 @@ static  U8    RcvStateOptnExc( STATEEXECENGARG xArg );
 // RCV_STATE_SEQN functions
 static  U8    RcvStateSeqnExc( STATEEXECENGARG xArg );
 
+// RCV_STATE_HDR2 function
+static  U8    RcvStateHdr2Exc( STATEEXECENGARG xArg );
+
 // RCV_STATE_CTRL functions
 static  U8    RcvStateCtrlExc( STATEEXECENGARG xArg );
 
@@ -242,7 +245,7 @@ void BinaryCommandHandler_Initialize( void )
   {
     // get the pointers
     ptLclCtl = &atCtrls[ eProtEnum ];  
-    ptLclDef = ( PBINCMDDEF )&atBinCmdDefs[ eProtEnum ];
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
     
     // set the state engine
     ptLclCtl->tStateCtl.ptStates = atRcvStates;
@@ -299,7 +302,7 @@ void BinaryCommandHandler_Initialize( void )
  * @return      appropriate protocol status/error
  *
  *****************************************************************************/
-BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdEnum, U8 nOption, U8 nDstAddr )
+BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdEnum, U8 nOption, U8 nDstAddr, S16 sSpecialCmd )
 {
   BINCMDSTS               eStatus = BINCMD_STS_IDLE;
   BINCMDMSTENTRY const *  ptCmdTbl;
@@ -315,13 +318,13 @@ BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdE
     if ( ptLclCtl->eLclSts == LCL_STS_IDLE )
     {
       // test for master mode
-      if ( PGM_RDBYTE( atBinCmdDefs[ eProtEnum ].bMasterMode ) == TRUE )
+      if ( PGM_RDBYTE( g_atBinCmdDefs[ eProtEnum ].bMasterMode ) == TRUE )
       {
         // test for a valid command
-        if ( nMstCmdEnum < ( U8 )PGM_RDBYTE( atBinCmdDefs[ eProtEnum ].nCmdTblLen ))
+        if ( nMstCmdEnum < ( U8 )PGM_RDBYTE( g_atBinCmdDefs[ eProtEnum ].nCmdTblLen ))
         {
           // get a pointer to the command table
-          ptCmdTbl = ( BINCMDMSTENTRY const * )PGM_RDWORD( atBinCmdDefs[ eProtEnum ].ptMstCmdTbl );  
+          ptCmdTbl = ( BINCMDMSTENTRY const * )PGM_RDWORD( g_atBinCmdDefs[ eProtEnum ].ptMstCmdTbl );  
           ptLclCtl->ptCurMstCmdTable = ( ptCmdTbl + nMstCmdEnum );
 
           // set master in progress
@@ -336,7 +339,7 @@ BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdE
             // set the command to the special command
             nCommand = ( U8 )sSpecialCmd;            
           }
-          else if ( sSpecialCmd == -1 )
+          else if ( sSpecialCmd == BINCMD_DISABLE_SPECIAL_CMD )
           {
             // set the command to the value from the table
             nCommand = PGM_RDBYTE( ptLclCtl->ptCurMstCmdTable->nCommand );
@@ -410,7 +413,7 @@ BINCMDSTS BinaryCommandHandler_ProcessChar( BINCMDENUM eProtEnum, U8 nRcvChar, U
     
     // get the pointers to the control/definition structures
     ptLclCtl = &atCtrls[ eProtEnum ];  
-    ptLclDef = ( PBINCMDDEF )&atBinCmdDefs[ eProtEnum ];
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
     
     // add to CRC if we are in the CRC state
     if ( ptLclCtl->tStateCtl.nCurState < RCV_STATE_CRCM )
@@ -607,7 +610,7 @@ BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, 
   {
     // get the pointers to the control/definition structures
     ptLclCtl = &atCtrls[ eProtEnum ];  
-    ptLclDef = ( PBINCMDDEF )&atBinCmdDefs[ eProtEnum ];
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
 
     // get a pointer to the transmit buffer
     ptBufCtl = &ptLclCtl->tXmtBuffer;
@@ -685,7 +688,7 @@ BINCMDSTS BinaryCommandHandler_SetOption( BINCMDENUM eProtEnum, U8 nOption )
   {
     // get the pointers to the control/definition structures
     ptLclCtl = &atCtrls[ eProtEnum ];  
-    ptLclDef = ( PBINCMDDEF )&atBinCmdDefs[ eProtEnum ];
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
     
     // check for dual buffer
     if ( PGM_RDBYTE( ptLclDef->bDualBufferMode ) == TRUE )
@@ -1337,7 +1340,7 @@ BINCMDSTS BinaryCommandHandler_GetRcvBufferSize( BINCMDENUM eProtEnum, PU16 pwBu
   if ( eProtEnum < BINCMD_ENUM_MAX )
   {
     // get the pointers to the control
-    ptLclDef = ( PBINCMDDEF )&atBinCmdDefs[ eProtEnum ];
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
     *( pwBufSize ) = PGM_RDWORD( ptLclDef->wRcvBufferSize );
 
     // set status to idle
@@ -1368,7 +1371,7 @@ BINCMDSTS BinaryCommandHandler_GetXmtBufferSize( BINCMDENUM eProtEnum, PU16 pwBu
   if ( eProtEnum < BINCMD_ENUM_MAX )
   {
     // get the pointers to the control
-    ptLclDef = ( PBINCMDDEF )&atBinCmdDefs[ eProtEnum ];
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
     *( pwBufSize ) = PGM_RDWORD( ptLclDef->wRcvBufferSize );
 
     // set status to idle
@@ -1561,6 +1564,15 @@ static U8 RcvStateSeqnExc( STATEEXECENGARG xArg )
   // store the sequence/goto header 2
   ptLclCtl->tRcvBuffer.nSequence = xArg;
   return( RCV_STATE_HDR2 );
+}
+
+/******************************************************************************
+ * RCV_STATE_HDR2 function
+ *****************************************************************************/
+static U8 RcvStateHdr2Exc( STATEEXECENGARG xArg )
+{
+  // if we have reached here there is a protocol error, go back to idle
+  return( RCV_STATE_IDLE );
 }
 
 /******************************************************************************

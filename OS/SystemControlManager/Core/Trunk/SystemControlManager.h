@@ -26,20 +26,17 @@
 #define _SYSTEMCONTROLMANAGER_H
 
 // local includes -------------------------------------------------------------
-#include "SystemControlManager/SystemControlManager_cfg.h"
+#if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
+  #include "SystemControlManager/SystemControlManager_cfg.h"
+#endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
 
 // library includes -------------------------------------------------------------
 #include "Types/Types.h"
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-#include "AsciiCommandHandler/AsciiCommandHandler.h"
+  #include "AsciiCommandHandler/AsciiCommandHandler.h"
 #endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
 
 // Macros and Defines ---------------------------------------------------------
-#include "Types/Types.h"
-#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-/// define the process event  size
-#define SYSCTRLMNGR_TASK_EVENT_SIZE   ( 4 )
-#endif // SYSTEMDEFINE_OS_SELECTION
 
 // global function prototypes --------------------------------------------------
 /// initialization and task process
@@ -47,7 +44,7 @@ extern  void            SystemControlManager_Initialize( void );
 extern  void            SystemControlManager_ProcessEvent( STATEEXECENGARG xEvent );
 
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-extern  const CODE ASCCMDENTRY atSysCtrlMngrCmdHandlerTable[ ];
+extern  const CODE ASCCMDENTRY g_atSysCtrlMngrCmdHandlerTable[ ];
 #endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
 
 /// user callable functions

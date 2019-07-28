@@ -26,7 +26,6 @@
 #include "SystemTick/SystemTick_cfg.h"
 
 // library includes
-#include "Types/Types.h"
 #include "Clock/CLock.h"
 #include "Interrupt/Interrupt.h"
 #if (SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
@@ -36,7 +35,7 @@
 // local parameter declarations -----------------------------------------------
 static  U64   hSystemTime;
 static  U32   uTickRateUsec;
-static  U32   uDelayTime;
+static  VU32  vuDelayTime;
 
 /******************************************************************************
  * @function SystemTick_Initialize
@@ -147,7 +146,7 @@ void SystemTick_DelayMsec( U16 wMilliSeconds )
 {
   // calculate the delay time
   Interrupt_Disable( );
-  uDelayTime = ( wMilliSeconds * 1000 ) / uTickRateUsec;
+  vuDelayTime = ( wMilliSeconds * 1000 ) / uTickRateUsec;
   Interrupt_Enable( );
   
   // loop while not done
@@ -168,7 +167,7 @@ void SystemTick_DelayMsecNoWait( U16 wMilliSeconds )
 {
   // calculate the delay time
   Interrupt_Disable( );
-  uDelayTime = ( wMilliSeconds * 1000 ) / uTickRateUsec;
+  vuDelayTime = ( wMilliSeconds * 1000 ) / uTickRateUsec;
   Interrupt_Enable( );
 }
 
@@ -185,7 +184,7 @@ void SystemTick_DelayMsecNoWait( U16 wMilliSeconds )
 BOOL SystemTick_IsDelayExpired( void )
 {
   // return the state of delay time
-  return(( uDelayTime == 0 ) ? TRUE : FALSE );
+  return(( vuDelayTime == 0 ) ? TRUE : FALSE );
 }
 
 /******************************************************************************
@@ -213,10 +212,13 @@ void SysTick_Handler( void )
   hSystemTime += uTickRateUsec;
   
   // decrement the delay time
-  uDelayTime--;
+  if ( vuDelayTime != 0 )
+  {
+    vuDelayTime--;
+  }
 
   // process the loop
-  while (( pvTickFunc = ( PVSYSTEMTICKFUNC )PGM_RDWORD( apvSystemTickFunctions[ nIdx++ ])) != NULL )
+  while (( pvTickFunc = ( PVSYSTEMTICKFUNC )PGM_RDWORD( g_apvSystemTickFunctions[ nIdx++ ])) != NULL )
   {
     // call the init function
     pvTickFunc( );

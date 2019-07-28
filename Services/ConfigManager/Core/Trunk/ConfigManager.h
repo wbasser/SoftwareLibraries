@@ -25,18 +25,27 @@
 
 // system includes ------------------------------------------------------------
 
-// library includes -----------------------------------------------------------
-
 // local includes -------------------------------------------------------------
 #include "ConfigManager/ConfigManager_cfg.h"
 
+// library includes -----------------------------------------------------------
+#if ( CONFIGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+#include "AsciiCommandHandler/AsciiCommandHandler.h"
+#endif  // CONFIGMANAGER_ENABLE_DEBUG_COMMANDS
+
+
 // Macros and Defines ---------------------------------------------------------
+/// define the number of task events
+#define CONFIG_MANAGER_NUM_EVENTS       ( 4 )
 
 // enumerations ---------------------------------------------------------------
 
 // structures -----------------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
+#if ( CONFIGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+extern  const CODE ASCCMDENTRY g_atConfigManagerCmdHandlerTable[ ];
+#endif  // CONFIGMANAGER_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------
 extern  void  ConfigManager_Initialize( void );

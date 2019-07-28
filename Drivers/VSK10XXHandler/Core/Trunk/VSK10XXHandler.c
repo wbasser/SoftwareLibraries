@@ -45,14 +45,14 @@
 #define MODE_CLKSL 	    ( 0x0100 )
 #define MODE_ORDER	    ( 0x0200 )
 #define MODE_SHARE	    ( 0x0400 )
-#define	MODE_INEW	      ( 0x0800 )
+#define	MODE_INEW       ( 0x0800 )
 #define	MODE_ADPCM	    ( 0x1000 )
 #define	MODE_HIFIL	    ( 0x2000 )
 #define	MODE_LINEI	    ( 0x4000 )
 
 // define the read/write commands
-#define	VSK_CMD_RD		  ( 0x03 )
-#define	VSK_CMD_WR		  ( 0x02 )
+#define	VSK_CMD_RD      ( 0x03 )
+#define	VSK_CMD_WR      ( 0x02 )
 
 // enumerations ---------------------------------------------------------------
 
@@ -79,10 +79,12 @@ void VSK10XXHandler_Initialize( void )
 {
   U16UN tData;
 
+  #if ( VSK10XX_RST_ENABLED == 1 )
   // reset the device
   Gpio_Set( VSK10XX_RST_ENUM, ON );
   SystemTick_DelayMsec( 1 );
   Gpio_Set( VSK10XX_RST_ENUM, OFF );
+  #endif // ( VSK10XX_RST_ENABLED )
 
   // generate a reset
   SystemTick_DelayMsec( 1 );

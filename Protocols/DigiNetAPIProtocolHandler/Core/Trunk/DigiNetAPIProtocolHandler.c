@@ -24,6 +24,7 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
+#include "DigiNetAPIProtocolHandler/DigiNetAPIProtocolHandler.h"
 
 // library includes -----------------------------------------------------------
 
@@ -35,20 +36,6 @@
 #define MAX_BUFFER_SIZE                           ( 1500 )
 
 // enumerations ---------------------------------------------------------------
-/// enumerate the frame types
-typedef enum _FRAMETYPEENUM
-{
-  FRAME_TYPE_ENUM_ATCOMMAND = 0,
-  FRAME_TYPE_ENUM_XMTSMS,
-  FRAME_TYPE_ENUM_XMTIP,
-  FRAME_TYPE_ENUM_ATRESPONSE,
-  FRAME_TYPE_ENUM_XMTSTATUS,
-  FRAME_TYPE_ENUM_MDMSTATUS,
-  FRAME_TYPE_ENUM_RCVSMS,
-  FRAME_TYPE_ENUM_RCVIP,
-  FRAME_TYPE_ENUM_MAX
-} FRAMETYPEENUM;
-
 /// enumerate the decode states
 typedef enum _RCVDECSTATE
 {
@@ -86,24 +73,24 @@ typedef struct _FRMTYPESIZE
 static  APIFRAMEHDR tApiFrameHdr;                     ///< API frame header
 static  U8          nRcvChecksum;                     ///< receive checksum
 static  U8          nFrameId;                         ///< frame ID
-static  U16         wFramDataWrIndex;                 ///< buffer index
+static  U16         wFrameDataWrIndex;                 ///< buffer index
 static  RCVDECSTATE eRcvDecState;                     ///< receive decode state
 
 // local function prototypes --------------------------------------------------
-static  void  TransmitApiPacket( FRAMETYPEENUM eFrameType, U16 wDataLength );
+static  void  TransmitApiPacket( DIGIFRAMETYPEENUM eFrameType, U16 wDataLength );
 
 // constant parameter initializations -----------------------------------------
 // instantiate the type/size table
-typedef const CODE  FRMTYPESIZE atFrameTypeSizes[ FRAME_TYPE_ENUM_MAX ] =
+static const CODE  FRMTYPESIZE atFrameTypeSizes[ DIGIFRAME_TYPE_ENUM_MAX ] =
 {
-  { FRAME_TYPE_ATCOMMAND,  ATCOMMAND_SIZE  },
-  { FRAME_TYPE_XMTSMS,     XMTSMS_SIZE     },
-  { FRAME_TYPE_XMTIP,      XMTIP_SIZE      },
-  { FRAME_TYPE_ATRESPONSE, ATRESPONSE_SIZE },
-  { FRAME_TYPE_XMTSTATUS,  XMTSTATUS_SIZE  },
-  { FRAME_TYPE_MDMSTATUS,  MDMSTATUS_SIZE  },
-  { FRAME_TYPE_RCVSMS,     RCVSMS_SIZE     },
-  { FRAME_TYPE_RCVIP,      RCVIP_SIZE      },
+  { DIGIFRAME_TYPE_ATCOMMAND,  DIGIATCOMMAND_SIZE  },
+  { DIGIFRAME_TYPE_XMTSMS,     DIGIXMTSMS_SIZE     },
+  { DIGIFRAME_TYPE_XMTIP,      DIGIXMTIP_SIZE      },
+  { DIGIFRAME_TYPE_ATRESPONSE, DIGIATRESPONSE_SIZE },
+  { DIGIFRAME_TYPE_XMTSTATUS,  DIGIXMTSTATUS_SIZE  },
+  { DIGIFRAME_TYPE_MDMSTATUS,  DIGIMDMSTATUS_SIZE  },
+  { DIGIFRAME_TYPE_RCVSMS,     DIGIRCVSMS_SIZE     },
+  { DIGIFRAME_TYPE_RCVIP,      DIGIRCVIP_SIZE      },
 };
 
 /******************************************************************************
@@ -120,7 +107,7 @@ void DigiNetAPIProtocolHandler_Initialize( void )
   nFrameId = 1;
   
   // reset the state
-  eRcvDecState = RCVDEC_STATE_IDLE;
+  eRcvDecState = RCVDET_STATE_IDLE;
 }
 
 /******************************************************************************
@@ -138,7 +125,7 @@ void DigiNetAPIProtocolHandler_Initialize( void )
  * @return      length of the data in the transmit buffer
  *
  *****************************************************************************/
-U16 DigiNetAPIProtocolHandler_SendCommand( FRAMETYPEENUM eFrameType, PU8 pnFrameData, U16 wFrameLength, PU8 pnXmtBuffer )
+U16 DigiNetAPIProtocolHandler_SendCommand( DIGIFRAMETYPEENUM eFrameType, PU8 pnFrameData, U16 wFrameLength, PU8 pnXmtBuffer )
 {
   PAPIFRAMEHDR  ptFrameHdr;
   U16           wLength = 0;
@@ -155,14 +142,14 @@ U16 DigiNetAPIProtocolHandler_SendCommand( FRAMETYPEENUM eFrameType, PU8 pnFrame
   wLength += 2;
   
   // add the length
-  ptFrameHdr->tLength.anValue[ BE_U16_MSB_IDX ] = HI( wLength );
-  ptFrameHdr->tLength.anValue[ BE_U16_LSB_IDX ] = LO( wLength );
+  ptFrameHdr->tLength.anValue[ BE_U16_MSB_IDX ] = HI16( wLength );
+  ptFrameHdr->tLength.anValue[ BE_U16_LSB_IDX ] = LO16( wLength );
   
   // add the frame type
   ptFrameHdr->nFrameType = eFrameType;
   
   // add the frame id/increment/adjust
-  ptFrameHdr->nFrameId = nFrameId++;
+  ptFrameHdr->nFrameID = nFrameId++;
   if ( nFrameId == 0 )
   {
     // set to one
@@ -170,7 +157,7 @@ U16 DigiNetAPIProtocolHandler_SendCommand( FRAMETYPEENUM eFrameType, PU8 pnFrame
   }
   
   // copy the frame data to the buffer
-  memcpy( *( pnXmtBuffer + APIFRAMEHDR_SIZE ), pnFrameData, wFrameLength );
+  memcpy(( pnXmtBuffer + APIFRAMEHDR_SIZE ), pnFrameData, wFrameLength );
   
   // now compute the checksum
   nChecksum = 0;
@@ -205,7 +192,7 @@ U16 DigiNetAPIProtocolHandler_SendCommand( FRAMETYPEENUM eFrameType, PU8 pnFrame
  * @return      appropriate frame decode status
  *
  *****************************************************************************/
-DIGIFRMDECSTS DigiNetAPIProtocolHandler_ProcessRcvChar( PDIGIAPIFRMEDAT ptFrameData, U8 nChar )
+DIGIFRMDECSTS DigiNetAPIProtocolHandler_ProcessRcvChar( PDIGIAPIFRAMEDAT ptFrameData, U8 nChar )
 {
   DIGIFRMDECSTS eStatus = DIGI_FRMDEC_STS_NONE;
   
@@ -250,11 +237,11 @@ DIGIFRMDECSTS DigiNetAPIProtocolHandler_ProcessRcvChar( PDIGIAPIFRMEDAT ptFrameD
       
     case RCVDET_STATE_FRMID :
       // store the frame id
-      tApiFrameHdr.nFrameId = nChar;
+      tApiFrameHdr.nFrameID = nChar;
       eRcvDecState = RCVDET_STATE_FRMDATA;
       
       // reset the data write index
-      wFramDataWrIndex = 0;
+      wFrameDataWrIndex = 0;
       break;
       
     case RCVDET_STATE_FRMDATA :
@@ -271,10 +258,10 @@ DIGIFRMDECSTS DigiNetAPIProtocolHandler_ProcessRcvChar( PDIGIAPIFRMEDAT ptFrameD
       
     case RCVDET_STATE_CHECKSUM :
       // check for a valid checksum
-      if ( nRcvCheckSum == 0xFF )
+      if ( nRcvChecksum == 0xFF )
       {
         // set the status to the frame type
-        eStatus = tAPiFrameHdr.nFrameType;
+        eStatus = tApiFrameHdr.nFrameType;
       }
       
       // in all cases, back to idle

@@ -45,6 +45,9 @@
     a =	array
 *************************************************************************************/
 
+// system defines
+#include "SystemDefines/SystemDefines_prm.h"
+
 // process defines
 #include <sam.h>
 

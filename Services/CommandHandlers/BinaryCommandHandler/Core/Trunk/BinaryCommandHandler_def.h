@@ -35,6 +35,10 @@
 #include "Types/Types.h"
 
 // Macros and Defines ---------------------------------------------------------
+/// define the special characters
+#define BINCMD_CHACK                  ( 0x06 )
+#define BINCMD_CHNAK                  ( 0x15 )
+
 /// define the helper macro for creating storage for a single buffer
 #define BINCMD_SNGBUF( name, bufsize ) \
   static U8 anBuf ## name[ bufsize ];

@@ -30,6 +30,10 @@
 #include "LedManager/LedManager.h"
 
 // library includes -----------------------------------------------------------
+#include "SystemTick/SystemTick.h"
+#if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+#include "SystemControlManager/SystemControlManager.h"
+#endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -74,6 +78,7 @@ typedef struct _SEQSTACK
 
 // local parameter declarations -----------------------------------------------
 static  LEDCTL          atLedCtls[ LEDMANAGER_ENUM_MAX ];
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 static  ANIMATIONSTATE  eAnimationState;
 static  LEDMNGRANIMENUM eCurrentAnimation;
 static  U16             wAnimationOption;
@@ -84,6 +89,7 @@ static  U16             wCurrentCount;
 static  SEQSTACK        atSeqStack[ LEDMANAGER_ANIMATION_CALLSTACK_DEPTH ];
 static  U8              nStackIndex;
 #endif
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
 static  U8              anColVals[ LEDMANAGER_MATRIX_MAX_NUM_ROWS ];
 static  U8              nCurScanRow;
@@ -93,7 +99,36 @@ static  U8              nCurScanRow;
 static  void  SetLedAction( LEDMANAGERSELENUM eLedSel, LEDACTION eAction, U16 wOption );
 static  void  ChangeLedState( PLEDDEF ptDef, BOOL bState );
 
+/// command handlers
+#if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+static  ASCCMDSTS CmdSetLed( U8 nCmdEnum );
+#if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+static  ASCCMDSTS CmdSetRgb( U8 nCmdEnum );
+#endif  // LEDMANAGER_RGB_LEDS_ENABLED
+#endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
+
 // constant parameter initializations -----------------------------------------
+// commands
+#if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+static  const CODE C8 szSetLed[ ]   = { "SETLED" };
+#if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+static  const CODE C8 szSetRgb[ ]   = { "SETRGB" };
+#endif  // LEDMANAGER_RGB_LEDS_ENABLED
+#endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
+
+#if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+const CODE ASCCMDENTRY g_atLedManagerCmdHandlerTable[ ] = 
+{
+  ASCCMD_ENTRY( szSetLed, 6, 2, ASCFLAG_COMPARE_EQ, SYSCTGRLMNGR_LCLMODE_DIAGNOSTICS,  CmdSetLed ),
+  // populate command table  
+  #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+  ASCCMD_ENTRY( szSetRgb, 6, 3, ASCFLAG_COMPARE_EQ, SYSCTGRLMNGR_LCLMODE_DIAGNOSTICS,  CmdSetRgb ),
+  #endif  // LEDMANAGER_RGB_LEDS_ENABLED
+
+  // the entry below must be here
+  ASCCMD_ENDTBL( )
+};
+#endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 /******************************************************************************
  * @function LedManager_Initialize
@@ -108,6 +143,7 @@ void LedManager_Initialize( void )
   // clear the control
   memset( &atLedCtls, 0, ( LEDCTL_SIZE * LEDMANAGER_ENUM_MAX ));
 
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   // reset the stack index
   #if ( LEDMANAGER_ANIMATION_CALLSTACK_DEPTH != 0 )
   nStackIndex = 0;
@@ -115,6 +151,7 @@ void LedManager_Initialize( void )
   
   // clear the animation state
   eAnimationState = ANIMATION_STATE_IDLE;  
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
   
   // call the local initialization
   LedManager_LocalInitialize( );
@@ -222,7 +259,7 @@ LEDMANAGERERR LedManager_Control( LEDMANAGERSELENUM eLedSel, LEDACTION eAction, 
  * @return      an approriate error
  * 
  *****************************************************************************/
-LEDMANAGERERR LedManager_RgbControl( LEDMNGRRGBENUM eLedSel, LEDACTION eAction, LEDRGBCOLOR eColor, U16 wOption )
+LEDMANAGERERR LedManager_RgbControl( LEDMANAGERRGBENUM eLedSel, LEDACTION eAction, LEDRGBCOLOR eColor, U16 wOption )
 {
   LEDMANAGERERR     eError = LEDMANAGER_ERR_NONE;
   LEDRGBDEF         tRgbDef;
@@ -236,7 +273,7 @@ LEDMANAGERERR LedManager_RgbControl( LEDMNGRRGBENUM eLedSel, LEDACTION eAction, 
       if ( eColor < LED_RGBCOLOR_MAX )
       {
         // get the def structure for this RGB LED
-        MEMCPY_P( &tRgbDef, &atLedRgbDefs[ eLedSel ], LEDRGBDEF_SIZE );
+        MEMCPY_P( &tRgbDef, &g_atLedRgbDefs[ eLedSel ], LEDRGBDEF_SIZE );
 
         // now for each LED - set the action
         switch( eColor )
@@ -319,6 +356,7 @@ LEDMANAGERERR LedManager_RgbControl( LEDMNGRRGBENUM eLedSel, LEDACTION eAction, 
 }
 #endif  // LEDMANAGER_RGB_LEDS_ENABLED
 
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 /******************************************************************************
  * @function LedManager_PlayAnimation
  *
@@ -373,6 +411,7 @@ LEDMANAGERERR LedManager_PlayAnimation( LEDMNGRANIMENUM eAnimation, U16 wOption 
   // return the error
   return( eError );
 }
+#endif // ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 
 /******************************************************************************
  * @function LedManager_ProcessAnimation
@@ -389,8 +428,10 @@ void LedManager_ProcessAnimation( void )
   LEDMANAGERSELENUM eLed;
   PLEDCTL           ptCtl;
   LEDDEF            tDef;
-  LEDSEQENTRY       tSequence;
   
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  LEDSEQENTRY       tSequence;
+
   // run till done
   do
   {
@@ -404,7 +445,7 @@ void LedManager_ProcessAnimation( void )
       
       case ANIMATION_STATE_START :
         // get the current entry
-        ptCurAnimation = ( PLEDSEQENTRY )PGM_RDWORD( apLedAnimationsDef[ eCurrentAnimation ] );
+        ptCurAnimation = ( PLEDSEQENTRY )PGM_RDWORD( g_apLedAnimationsDef[ eCurrentAnimation ] );
 
         // process the first event/switch to execution state
         eAnimationState = ANIMATION_STATE_EXEC;
@@ -420,7 +461,19 @@ void LedManager_ProcessAnimation( void )
           MEMCPY_P( &tSequence, &ptCurAnimation[ nCurAnimationIdx++ ], LEDSEQENTRY_SIZE );
           if ( tSequence.eEvent != LED_SEQEVENT_CALL )
           {
-            LedManager_Control( tSequence.nLedEnum, tSequence.eAction, 0 );
+            // check for RGB
+            if ( tSequence.bRgbFlag )
+            {
+              // process it as a RGB
+              #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+              LedManager_RgbControl( tSequence.nLedEnum, tSequence.eAction, tSequence.eRgbColor, tSequence.nOption );
+              #endif  // LEDMANAGER_RGB_LEDS_ENABLED
+            }
+            else
+            {
+              // process it as a single
+              LedManager_Control( tSequence.nLedEnum, tSequence.eAction, tSequence.nOption );
+            }
           }
       
           // determine the next state
@@ -452,7 +505,7 @@ void LedManager_ProcessAnimation( void )
                 nCurAnimationIdx = atSeqStack[ nStackIndex ].nAnimationIdx;
 
                 // get the current entry
-                ptCurAnimation = ( PLEDSEQENTRY )PGM_RDWORD( apLedAnimationsDef[ eCurrentAnimation ] );
+                ptCurAnimation = ( PLEDSEQENTRY )PGM_RDWORD( g_apLedAnimationsDef[ eCurrentAnimation ] );
 
                 // force a reloop
                 wCurrentCount = 1;
@@ -514,7 +567,7 @@ void LedManager_ProcessAnimation( void )
               nCurAnimationIdx = 0;
 
               // get the current entry
-              ptCurAnimation = ( PLEDSEQENTRY )PGM_RDWORD( apLedAnimationsDef[ eCurrentAnimation ] );
+              ptCurAnimation = ( PLEDSEQENTRY )PGM_RDWORD( g_apLedAnimationsDef[ eCurrentAnimation ] );
              
               // force a reloop
               wCurrentCount = 1;
@@ -531,6 +584,7 @@ void LedManager_ProcessAnimation( void )
         break;
     }
   } while( bRunFlag );
+#endif // ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   
   // process the led's based on their action
   for ( eLed = 0; eLed < LEDMANAGER_ENUM_MAX; eLed++ )
@@ -539,7 +593,7 @@ void LedManager_ProcessAnimation( void )
     ptCtl = &atLedCtls[ eLed ];
     
     // copy the control structure
-    MEMCPY_P( &tDef, &atLedDefs[ eLed ], LEDDEF_SIZE );
+    MEMCPY_P( &tDef, &g_atLedDefs[ eLed ], LEDDEF_SIZE );
 
     // process the state
     switch( ptCtl->eCurState )
@@ -620,24 +674,29 @@ void LedManager_ProcessScan( void )
 {
   GPIOPINENUM ePin;
   U8          nIdx;
+  BOOL        bColsEnabled = FALSE;
+  BOOL        bColEnb;
   
+  // now turn off the row
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+  ePin = g_aeLedMatrixRows[ nCurScanRow ];
+  #else
+  ePin = PGM_RDBYTE( g_aeLedMatrixRows[ nCurScanRow ] );
+  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
+  Gpio_Set( ePin, !LEDMANAGER_MATRIX_ROW_ACTIVE_LEVEL );
+
   // now turn off all columns in this row
   for ( nIdx = 0; nIdx < LEDMANAGER_MATRIX_MAX_NUM_COLS; nIdx++ )
   {
     // get the pin
-    ePin = PGM_RDBYTE( aeLedMatrixCols[ nIdx ] );
+    #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+    ePin = g_aeLedMatrixCols[ nIdx ];
+    #else
+    ePin = PGM_RDBYTE( g_aeLedMatrixCols[ nIdx ] );
+    #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
     Gpio_Set( ePin, !LEDMANAGER_MATRIX_COL_ACTIVE_LEVEL );
   }
-  
-  // delay for a while
-  #ifdef __ATMEL_AVR__
-  _delay_us( 25 );
-  #endif
 
-  // turn off the current row index
-  ePin = PGM_RDBYTE( aeLedMatrixRows[ nCurScanRow ] );
-  Gpio_Set( ePin, !LEDMANAGER_MATRIX_ROW_ACTIVE_LEVEL );
-  
   // increment the row
   nCurScanRow++;
   nCurScanRow %= LEDMANAGER_MATRIX_MAX_NUM_ROWS;
@@ -646,17 +705,32 @@ void LedManager_ProcessScan( void )
   for ( nIdx = 0; nIdx < LEDMANAGER_MATRIX_MAX_NUM_COLS; nIdx++ )
   {
     // is this column on
-    if ( anColVals[ nCurScanRow ] & BIT( nIdx ))
+    bColEnb = anColVals[ nCurScanRow ] & BIT( nIdx );
+    bColsEnabled |= bColEnb;
+    if ( bColEnb )
     {
       // turn on this column
-      ePin = PGM_RDBYTE( aeLedMatrixCols[ nIdx ] );
+      // get the pin
+      #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+      ePin = g_aeLedMatrixCols[ nIdx ];
+      #else
+      ePin = PGM_RDBYTE( g_aeLedMatrixCols[ nIdx ] );
+      #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
       Gpio_Set( ePin, LEDMANAGER_MATRIX_COL_ACTIVE_LEVEL );
     }
   }
   
   // now turn on the row
-  ePin = PGM_RDBYTE( aeLedMatrixRows[ nCurScanRow ] );
-  Gpio_Set( ePin, LEDMANAGER_MATRIX_ROW_ACTIVE_LEVEL );
+  if ( bColsEnabled )
+  {
+    // get the pin
+    #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+    ePin = g_aeLedMatrixRows[ nCurScanRow ];
+    #else
+    ePin = PGM_RDBYTE( g_aeLedMatrixRows[ nCurScanRow ] );
+    #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
+    Gpio_Set( ePin, LEDMANAGER_MATRIX_ROW_ACTIVE_LEVEL );
+  }
 }
 #endif  // MATRIX DEFS
 
@@ -793,5 +867,79 @@ static void ChangeLedState( PLEDDEF ptDef, BOOL bState )
       break;
   }
 }
+
+#if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+/******************************************************************************
+ * @function CmdSetLed
+ *
+ * @brief set an led to a state
+ *
+ * This function sets an LED to an appropriate state
+ *
+ * @param[in]   nCmdEnum    command handler enumeration
+ *
+ * @return  appropriate status
+ *****************************************************************************/
+static  ASCCMDSTS CmdSetLed( U8 nCmdEnum )
+{
+  ASCCMDSTS         eStatus = ASCCMD_STS_NONE;
+  LEDMANAGERERR     eError;
+  LEDMANAGERSELENUM eLedSel;
+  U32UN             tValue;
+  PC8               pcBuffer;
+  
+  // get the led selection/action
+  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tValue.uValue );
+  eLedSel = tValue.anValue[ LE_U32_LSB_IDX ];
+  AsciiCommandHandler_GetValue( nCmdEnum, 1, &tValue.uValue );
+  
+  // set the led
+  if (( eError = LedManager_Control( eLedSel, ( LEDACTION )tValue.anValue[ LE_U32_LSB_IDX ], 0 )) != LEDMANAGER_ERR_NONE )
+  {
+    // get the buffer
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+    
+    // report the error
+    sprintf( pcBuffer, g_szAsciiErrStrn, eError, eError );
+    eStatus = ASCCMD_STS_OUTPUTBUFFER;
+  } 
+  
+  // return the status
+  return( eStatus );
+}
+
+#if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+static  ASCCMDSTS CmdSetRgb( U8 nCmdEnum )
+{
+  ASCCMDSTS         eStatus = ASCCMD_STS_NONE;
+  LEDMANAGERERR     eError;
+  LEDMANAGERSELENUM eLedSel;
+  LEDACTION         eAction;
+  U32UN             tValue;
+  PC8               pcBuffer;
+ 
+  // get the led selection/action
+  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tValue.uValue );
+  eLedSel = tValue.anValue[ LE_U32_LSB_IDX ];
+  AsciiCommandHandler_GetValue( nCmdEnum, 1, &tValue.uValue );
+  eAction = tValue.anValue[ LE_U32_LSB_IDX ];
+  AsciiCommandHandler_GetValue( nCmdEnum, 2, &tValue.uValue );
+  
+  // set the led  
+  if (( eError = LedManager_RgbControl( eLedSel, eAction, ( LEDRGBCOLOR )tValue.anValue[ LE_U32_LSB_IDX ], 0 )) != LEDMANAGER_ERR_NONE )
+  {
+    // get the buffer
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+    
+    // report the error
+    sprintf( pcBuffer, g_szAsciiErrStrn, eError, eError );
+    eStatus = ASCCMD_STS_OUTPUTBUFFER;
+  }
+  
+  // return the status
+  return( eStatus );
+}
+#endif  // LEDMANAGER_RGB_LEDS_ENABLED
+#endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 /**@} EOF LedManager.c */

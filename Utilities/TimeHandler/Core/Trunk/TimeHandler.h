@@ -37,8 +37,32 @@
 // Macros and Defines ---------------------------------------------------------
 
 // enumeration ----------------------------------------------------------------
+typedef enum _TIMEOSTYPE
+{
+  TIME_OS_ANDROID = 0,
+  TIME_OS_MICRODOS,
+  TIME_OS_IOS,
+  TIME_OS_UNIX,
+  TIME_OS_IBMPCBIOS,
+  TIME_OS_NTP,
+  TIME_OS_MAX
+} TIMEOSTYPE;
 
 // structures -----------------------------------------------------------------
+/// define the date/time	structures
+typedef	struct _DATETIME
+{
+  U8	nMonth;       ///< month ( 1-12 )
+  U8	nDay;         ///< day ( 1-31 )
+  U16	wYear;        ///< year ( xxxx )
+  U16	wJulian;      ///< julian day( 1-365 )
+  U8	nDayOfWeek;   ///< day of week ( 1-7)
+  U8	nHours;       ///< hours ( 0-23 )
+  U8	nMinutes;     ///< minutes ( 0-59 )
+  U8	nSeconds;     ///< seconds ( 0-59 )
+  C8  cZone;        ///< zone -12-12 )
+} DATETIME, *PDATETIME;
+#define DATETIME_SIZE	  sizeof( DATETIME )
 
 // global parameter declarations -----------------------------------------------
 
@@ -50,6 +74,8 @@ extern  U64   TimeHandler_ConvertTime( TIMEOSTYPE eSrcType, TIMEOSTYPE eDstType,
 extern  U16   TimeHandler_GetEpochYear( TIMEOSTYPE eOsType );
 extern  void  TimeHandler_PopulateDayOfWeek( TIMEOSTYPE eOsType, PDATETIME ptDateTime );
 extern  void  TimeHandler_AddTime( PDATETIME ptCurTime, PDATETIME ptTimeToAdd );
+extern  void  TimeHandler_AdjustTimeForZone( PDATETIME ptDateTime );
+extern  void  TimeHandler_InitializeDateTime( TIMEOSTYPE eOsType, PDATETIME ptDateTime );
 
 /**@} EOF TimeHandler.h */
 

@@ -5,7 +5,7 @@
  *
  * This file provides the manufacturing info decarlations
  *
- * @copyright Copyright (c) 2012 Cyber Intergration
+ * @copyright Copyright (c) 2012 Guardhat
  * This document contains proprietary data and information of Cyber Integration 
  * LLC. It is the exclusive property of Cyber Integration, LLC and will not be 
  * disclosed in any form to any party without prior written permission of 
@@ -32,7 +32,7 @@
 #include "ManufInfo/ManufInfo_prm.h"
 
 // library includes -----------------------------------------------------------
-#if ( MANUFINFO_ENABLE_DEBUGCOMMANDS  == 1 )
+#if ( MANUFINFO_ENABLE_DEBUGCOMMANDS == 1 )
 #include "AsciiCommandHandler/AsciiCommandHandler.h"
 #endif // MANUFINFO_ENABLE_DEBUGCOMMANDS
 
@@ -44,12 +44,15 @@
 
 // global parameter declarations -----------------------------------------------
 #if ( MANUFINFO_ENABLE_DEBUGCOMMANDS  == 1 )
-extern  const CODE ASCCMDENTRY atManufInfoCmdHandlerTable[ ];
+extern  const CODE ASCCMDENTRY g_atManufInfoCmdHandlerTable[ ];
 #endif // MANUFINFO_ENABLE_DEBUGCOMMANDS
 
 // global function prototypes --------------------------------------------------
 extern  U8        ManufInfo_GetSfwMajor( void );
 extern  U8        ManufInfo_GetSfwMinor( void );
+#if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+extern  U8        ManufInfo_GetSfwTest( void );
+#endif // MANUFINFO_REV_SFW_TST_ENABLE
 extern  U8        ManufInfo_GetHdwMajor( void );
 extern  U8        ManufInfo_GetHdwMinor( void );
 extern  const PC8 ManufInfo_GetTitle( void );

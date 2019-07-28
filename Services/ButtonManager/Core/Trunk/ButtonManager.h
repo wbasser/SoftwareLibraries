@@ -55,10 +55,11 @@ typedef enum _BTNMNGREVENTS
   BTNMNGR_EVENT_PRESSED,          ///< 1 - button pressed
   BTNMNGR_EVENT_REPEAT,           ///< 2 - button repeat
   BTNMNGR_EVENT_SHORTHOLD,        ///< 3 - button short hold
-  BTNMNGR_EVENT_LONGHOLD,         ///< 4 - button long hold
-  BTNMNGR_EVENT_STUCK,            ///< 5 - button stuck
-  BTNMNGR_EVENT_BTNOFF,           ///< 6 - button toggle off
-  BTNMNGR_EVENT_BTNON             ///< 7 - button toggle on
+  BTNMNGR_EVENT_MEDIUMHOLD,       ///< 4 - button medimum hold
+  BTNMNGR_EVENT_LONGHOLD,         ///< 5 - button long hold
+  BTNMNGR_EVENT_STUCK,            ///< 6 - button stuck
+  BTNMNGR_EVENT_BTNOFF,           ///< 7 - button toggle off
+  BTNMNGR_EVENT_BTNON             ///< 8 - button toggle on
 } BTNMNGREVENTS;
 
 // structures -----------------------------------------------------------------
@@ -67,8 +68,9 @@ typedef enum _BTNMNGREVENTS
 
 // global function prototypes --------------------------------------------------
 extern  void  ButtonManager_Initialize( void );
-extern  BOOL  ButtonManager_Process( TASKARG xArg );
+extern  void  ButtonManager_Process( void );
 extern  void  ButtonManager_ResetAllStates( void );
+extern  void  ButtonManager_ForceButton( BTNMNGRENUM eBtnEnum, BTNMNGREVENTS eBtnEvent );
 
 /**@} EOF ButtonManager.h */
 

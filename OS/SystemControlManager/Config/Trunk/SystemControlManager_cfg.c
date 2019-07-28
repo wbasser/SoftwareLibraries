@@ -15,7 +15,6 @@
  * Version History
  * ======
  * $Rev: $
- * 
  *
  * \addtogroup SystemControlManager
  * @{
@@ -39,6 +38,9 @@
 // structures -----------------------------------------------------------------
 
 // global parameter declarations ----------------------------------------------
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+QueueHandle_t g_xSystemControlManagerQueue;
+#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
 // local parameter declarations -----------------------------------------------
 
@@ -50,42 +52,46 @@ static  void  LclInitEntry( void );
 static  void  LclConfigEntry( void );
 static  void  LclPowRcvEntry( void );
 static  void  LclStandbyEntry( void );
-static  void  LclIdleEntry( void );
-static  void  LclRunEntry( void );
-static  void  LclErrorEntry( void );
 
 // constant parameter initializations -----------------------------------------
 /// declare the control manager definitions
-const CODE  SYSCTRLMNGRDEF atSysCtrlMngrDefs[ ] = 
+const CODE  SYSCTRLMNGRSCHDDEF g_atSysCtrlMngrSchdDefs[ ] = 
 {
-  // SYSCNTRLMNGR_DEF( task, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15, mode16, func ) 
+  // SYSCNTRLMNGRSCHD_DEF( task,                mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15, func   ) 
 };
 
+#if ( TASK_TICK_ENABLE == 1 )
+const CODE  SYSCTRLMNGRTICKDEF g_atSysCtrlMngrTickDefs[ ] =
+{
+  // SYSCNTRLMNGRTICK_DEF( task,               mode0, mode1, mode2, mode3, mode4, mode5, mode6, mode7, mode8, mode9, mode10, mode11, mode12, mode13, mode14, mode15   )
+};
+#endif // TASK_TICK_ENABLE
+
 /// declare the functions for each mode
-const CODE  SYSCTRLMGRENTCHK atSysCtrlMngrEntChkFuncs[ SYSCTRLMNGR_MODE_MAX ] = 
+const CODE  SYSCTRLMGRENTCHK g_atSysCtrlMngrEntChkFuncs[ SYSCTRLMNGR_MODE_MAX ] = 
 {
   SYSCTRLMNGGR_ENTCHK( LclInitEntry,    NULL            ),   ///< initialization
   SYSCTRLMNGGR_ENTCHK( LclConfigEntry,  NULL            ),   ///< configuration
   SYSCTRLMNGGR_ENTCHK( LclPowRcvEntry,  NULL            ),   ///< power recovery
   SYSCTRLMNGGR_ENTCHK( LclStandbyEntry, NULL            ),   ///< standby
-  NULL,   ///< idle
-  NULL,   ///< run
-  NULL,   ///< power loss
-  NULL,   ///< error
-  NULL,   ///< undefined
-  NULL,   ///< undefined
-  NULL,   ///< undefined
-  NULL,   ///< undefined
-  NULL,   ///< undefined
-  NULL,   ///< undefined
-  NULL,   ///< undefined
-  NULL,   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< idle
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< run
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< power loss
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< error
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
+  SYSCTRLMNGGR_ENTCHK( NULL,            NULL            ),   ///< undefined
 };
 
 /******************************************************************************
  * @function SystemControlManager_LocalInitialize
  *
- * @brief initilize the system control manager
+ * @brief initialize the system control manager
  *
  * This function will perform the initialization of the system control manager
  * and enter the initialization state
@@ -96,23 +102,39 @@ void SystemControlManager_LocalInitialize( void )
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   // create the task and queue for the system control manager
   xTaskCreate( SystemControlTask, "SystemControl", configMINIMAL_STACK_SIZE, NULL, SYSCTRL_TASK_PRIORITY, NULL );
-  xSystemControlManagerQueue = xQueueCreate( SYSCTRL_QUEUE_SIZE, sizeof( STATEEXECENGARG ));
+  g_xSystemControlManagerQueue = xQueueCreate( SYSCTRL_QUEUE_SIZE, sizeof( STATEEXECENGARG ));
   #endif // SYSTEMDEFINE_OS_SELECTION
 }
 
 /******************************************************************************
- * @function SystemControlManage_GetNumberDefs
+ * @function SystemControlManage_GetNumberSchdDefs
  *
  * @brief get then number of entries
  *
  * This function will return the number of entries in the def table
  *
  *****************************************************************************/
-U8 SystemControlManager_GetNumberDefs( void )
+U8 SystemControlManager_GetNumberSchdDefs( void )
 {
   // return the number of entrys
-  return( sizeof( atSysCtrlMngrDefs ) / SYSCTRLMNGRDEF_SIZE );
+  return( sizeof( g_atSysCtrlMngrSchdDefs ) / SYSCTRLMNGRSCHDDEF_SIZE );
 }
+
+#if ( TASK_TICK_ENABLE == 1 )
+/******************************************************************************
+ * @function SystemControlManage_GetNumberTickDefs
+ *
+ * @brief get then number of entries
+ *
+ * This function will return the number of entries in the def table
+ *
+ *****************************************************************************/
+U8 SystemControlManager_GetNumberTickDefs( void )
+{
+  // return the number of entrys
+  return( sizeof( g_atSysCtrlMngrTickDefs ) / SYSCTRLMNGRTICKDEF_SIZE );
+}
+#endif // TASK_TICK_ENABLE
 
 /******************************************************************************
  * @function LclInitEntry
@@ -131,7 +153,7 @@ static void LclInitEntry( void )
   
   // mark local initialization done
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-  xQueueSendToBack( xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
+  xQueueSendToBack( g_xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
   #else
   TaskManager_PostEvent( TASK_SCHD_ENUM_SYSCTL, xStateArg );
   #endif // SYSTEMDEFINE_OS_SELECTION
@@ -149,19 +171,13 @@ static void LclConfigEntry( void )
 {
   STATEEXECENGARG xStateArg;
 
+ 
   // set the event
   xStateArg = SYSCTRLMNGR_EVENT_CONFIGDONE;
-  
-  // enable the log handler
-  LogHandler_Initialize( );
 
-  // initialize the config/parameter managers
-  //ParameterManager_Initialize( );
-  //ConfigManager_Initialize( );
-  
   // post a config done
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-  xQueueSendToBack( xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
+  xQueueSendToBack( g_xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
   #else
   TaskManager_PostEvent( TASK_SCHD_ENUM_SYSCTL, xStateArg );
   #endif // SYSTEMDEFINE_OS_SELECTION
@@ -179,8 +195,8 @@ static void LclPowRcvEntry( void )
 {
   STATEEXECENGARG xStateArg;
 
-  // set the event
-  xStateArg = SYSCTRLMNGR_EVENT_GOIDLE;
+   // set the event
+  xStateArg = ( bForceManufacturing ) ? SYSCTRLMNGR_LCLMODE_MANUFACTURING : SYSCTRLMNGR_LCLMODE_IDLE;
   
   // move to idle
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
@@ -248,7 +264,7 @@ static void SystemControlTask( PVOID pvParameters )
   FOREVER
   {
     // wait for an queue post
-    xQueueReceive( xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
+    xQueueReceive( g_xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
     
     // now call the event handler with the event
     SystemControlManager_ProcessEvent( xStateArg );

@@ -135,8 +135,8 @@ static  BOOL          bCurBit;              ///< current bit to decode
 static  BOOL          bFirstEdge;           ///< first edge flag
 static  VBOOL         bXmtInProgress;       ///< transmit in progress flag
 static  U8            nXmtBitCnt;           ///< transmit bit count
-static  TASKSCHDENUMS eRcvTaskEnum;         ///< receive task enumeration
-static  TASKSCHDENUMS eXmtTaskEnum;         ///< transmit task enumeration
+static  PVOID         pvRcvTask;            ///< receive task enumeration
+static  PVOID         pvXmtTask;            ///< transmit task enumeration
 
 // local function prototypes --------------------------------------------------
 static  void      ShiftRcvBit( SHIFTBIT eBit );
@@ -185,10 +185,10 @@ void ManchesterCodec_Initialize( void )
  *
  * @param[in]   pnData    pointer to the data to be sent
  * @param[in]   nLength   length of the data
- * @param[in]   eTaskEnum     task enumeration to post events
+ * @param[in]   pvTask    pointer to a void task argument
  *
  *****************************************************************************/
-void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum )
+void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, PVOID pvTask )
 {
   // copy the parameters
   pnXmtData = pnData;
@@ -202,7 +202,7 @@ void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum )
   nXmtBitCnt = 0;
 
   // save the enumeration
-  eXmtTaskEnum = eTaskEnum;
+  pvXmtTaskEnum = pvTask;
 
   #if ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 )
   DebugManager_AddElement( MANCHESTERCODEC_DBGXMT_BASE, 0x0000 );
@@ -224,10 +224,10 @@ void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum )
  *
  * @param[in]   pnData        pointer to the storage for the incoming data
  * @param[in]   nLength       expected length of the incoming data
- * @param[in]   eTaskEnum     task enumeration to post events
+ * @param[in]   pvTask    pointer to a void task argument
  *
  *****************************************************************************/
-void ManchesterCodec_Recv( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum )
+void ManchesterCodec_Recv( PU8 pnData, U8 nLength, PVOID pvTask )
 {
   // copy the parameters
   pnRcvData = pnData;
@@ -245,11 +245,10 @@ void ManchesterCodec_Recv( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum )
   nRcvBitCnt = 0;
 
   // save the enumeration
-  eRcvTaskEnum = eTaskEnum;
+  pvRcvTask = pvTask;
 
   // flush the queue/task manager too
-  QueueManager_Flush( MANCHESTER_INPCAP_QUEUE_ENUM );
-  TaskManager_FlushEvents( MANCHESTER_PROCESS_EVENT_TASK );
+  ManchesterCOdec_FlushRcvEvent( );
 
   // turn on the timer to start the process
   ManchesterCodec_RecvTimerControl( ON );
@@ -382,7 +381,7 @@ void ManchesterCodec_ProcessXmtTimer( void )
         bXmtInProgress = FALSE;
 
         // post done to the appropriate task
-        TaskManager_PostPriorityEvent( eXmtTaskEnum, MANCHESTERCODEC_XMIT_DONE );        
+        ManchesterCodec_PostPriorityEvent( pvXmtTask, MANCHESTERCODEC_XMIT_DONE 
       
         #if ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 )
         DebugManager_AddElement( MANCHESTERCODEC_DBGXMT_BASE, 0xD0EE );
@@ -402,7 +401,7 @@ void ManchesterCodec_ProcessXmtTimer( void )
     if ((( ++nRcvBitCnt & 0x01 ) == 0 ) && ( eRcvPhase != RCV_PHASE_DONE ))
     {
       // post a bit time event to the receive task
-      TaskManager_PostPriorityEvent( MANCHESTER_PROCESS_EVENT_TASK, RCV_LCL_EVENT_BITTIME );
+      ManchesterCodec_PostPriorityEvent( g_pvXmitMask, RCV_LCL_EVENT_BITTIME );
     }
   }
 }
@@ -460,7 +459,7 @@ BOOL ManchesterCodec_ProcessEvent( TASKARG xArg )
             wOnCapTime = wHalfBitMinTime;
 
             // post an edge event
-            TaskManager_PostPriorityEvent( eRcvTaskEnum, MANCHESTERCODEC_RECV_EDGE );
+            ManchesterCodec_PostPriorityEvent( pvRcvTask, MANCHESTERCODEC_RECV_EDGE );
           }
           else
           {
@@ -481,8 +480,8 @@ BOOL ManchesterCodec_ProcessEvent( TASKARG xArg )
       {
         // turn off the receiver/flush any events/post the event
         ManchesterCodec_RecvTimerControl( OFF );
-        TaskManager_FlushEvents( MANCHESTER_PROCESS_EVENT_TASK );
-        TaskManager_PostPriorityEvent( eRcvTaskEnum, MANCHESTERCODEC_RECV_EROR );        
+        ManchesterCodec_FlushXmtEvents( );
+        ManchesterCodec_PostPriorityEvent( pvRcvTask, MANCHESTERCODEC_RECV_EROR );        
 
         // reset the state
         eRcvPhase = RCV_PHASE_DONE;
@@ -511,7 +510,7 @@ BOOL ManchesterCodec_ProcessEvent( TASKARG xArg )
           // reset the receiver
           eRcvPhase = RCV_PHASE_DONE;
           ManchesterCodec_RecvTimerControl( OFF );
-          TaskManager_PostPriorityEvent( eRcvTaskEnum, MANCHESTERCODEC_RECV_DONE );        
+          ManchesterCodec_PostPriorityEvent( pvRcvTask, MANCHESTERCODEC_RECV_DONE );        
         }
       }
 
@@ -655,6 +654,7 @@ static void ShiftRcvBit( SHIFTBIT eBit )
         {
           // turn off the receiver/post the event
           ManchesterCodec_RecvTimerControl( OFF );
+
           TaskManager_FlushEvents( MANCHESTER_PROCESS_EVENT_TASK );
           TaskManager_PostPriorityEvent( eRcvTaskEnum, MANCHESTERCODEC_RECV_DONE );        
           

@@ -24,12 +24,14 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "ButtonManager/ButtonManager_cfg.h"
+#include "ButtonManager/ButtonManager.h"
 
 // library includes -----------------------------------------------------------
-#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+#define BTNMANAGER_PROCESS_TASK_PRIORITY              ( tskIDLE_PRIORITY + 4 )
+#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
 // enumerations ---------------------------------------------------------------
 
@@ -45,40 +47,77 @@
 /// fill out the defaults for the config
 const CODE BTNMNGRCFG tBtnMgrCfg = 
 {
-  // BTNMNGR_CFG_ENTRY( debnc, repdly, reprate, sh_time, lh_time, stuck_time )
-  BTNMNGR_CFG_ENTRY( 50, 500, 100, 1000, 3000, 7000 )
+  // BTNMNGR_CFG_ENTRY( debnc, repdly, reprate, sh_time, mh_time, lh_time, stuck_time )
+  BTNMNGR_CFG_ENTRY( 50, 500, 100, 1000, 2000, 3000, 7000 )
 };
 
 /// fill out the button defs
 const CODE BTNMNGRDEF atBtnMgrDefs[ BTNMNGR_ENUM_MAX ]  =
 {
-  // BTNMNGR_DEFCB_ENTRY( keyenum, rel_enb, prs_enb, rep_enb, shh_enb, lng_enb, tgl_enb, callback )
-  // BTNMNGR_DEFEVENT_ENTRY( keyenum, rel_enb, prs_enb, rep_enb, shh_enb, lng_enb, tgl_enb, task )
+  // BTNMNGR_DEFCB_ENTRY( keyenum,             rel_enb, prs_enb, rep_enb, shh_enb, mdh_enb, lng_enb, tgl_enb, getstatus, callback )
+  // BTNMNGR_DEFEVENT_ENTRY( keyenum,          rel_enb, prs_enb, rep_enb, shh_enb, mdh_enb, lng_enb, tgl_enb, getstatus, task )
 };
 
-
 /******************************************************************************
- * @function ButtonManager_GetKeyStatus
+ * @function ButtonManager_LocalInitialize
  *
- * @brief button manager get key status
+ * @brief local initialization
  *
- * This function calls the appropriate user defined function to return the
- * status of a given key enumeration
- *
- * @param[in]   nKeyEnum      key enumeration
- *  
- * @return      returns TRUE for key pressed, FALSE otherwise
+ * This function will perform any custom initialization
  *
  *****************************************************************************/
-BOOL ButtonManager_GetKeyStatus( U8 nKeyEnum )
+void ButtonManager_LocalInitialize( void )
 {
-  BOOL bButtonStatus = FALSE;
-  
-  // instantiate the call to the appropriate handler to test for key status
-  
-  // return the button status
-  return( bButtonStatus );
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+  // create the animation task
+  xTaskCreate( ProcessTask, "ButtonProcess", configMINIMAL_STACK_SIZE, NULL, BTNMANAGER_PROCESS_TASK_PRIORITY, NULL );
+  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 }
 
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+/******************************************************************************
+ * @function ProcessTask
+ *
+ * @brief process task
+ *
+ * This function is the process task
+ *
+ * @param[in]   pvParameters  not used
+ *
+ *****************************************************************************/
+static void ProcessTask( PVOID pvParameters )
+{
+  // main loop
+  FOREVER
+  {
+    // call the default handler
+    ButtonManager_Process( );
+
+    // sleep for the animate rate
+    vTaskDelay( LEDMANAGER_ANIMATE_RATE_MSECS / portTICK_RATE_MS );
+  }
+}
+#elif ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKAMANAGER )
+/******************************************************************************
+ * @function BUttonManager_ProcessTask
+ *
+ * @brief process task
+ *
+ * This function will call the animation process
+ *
+ * @param[in]   xArg      task argument
+ *
+ * @return      TRUE      flush event
+ *
+ *****************************************************************************/
+BOOL ButtonManager_ProcessTask( TASKARG xArg )
+{
+  // call the animation process
+  ButtonManager_Process( );
+  
+  // return true
+  return( TRUE );
+}
+#endif  // SYSTEMDEFINE_OS_SELECTION
 
 /**@} EOF ButtonManager_cfg.c */

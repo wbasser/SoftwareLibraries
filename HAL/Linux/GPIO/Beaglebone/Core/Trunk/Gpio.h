@@ -26,9 +26,32 @@
 #define _GPIO_H
 
 // local includes -------------------------------------------------------------
-#include "GPIO/Gpio_cfg.h"
+#include "Types/Types.h"
+
+// Macros and Defines ---------------------------------------------------------
 
 // enumerations ---------------------------------------------------------------
+/// enumerate the ports
+typedef enum _GPIOPORT
+{
+  GPIO_PORT_0 = 0,          ///< port 0
+  GPIO_PORT_1,              ///< port 1
+  GPIO_PORT_2,              ///< port 2
+  GPIO_PORT_3,              ///< port 3
+  GPIO_PORT_MAX
+} GPIOPORT;
+
+/// enumerate the pin mode
+typedef enum _GPIOMODE
+{
+  GPIO_MODE_INPUT,          ///< input
+  GPIO_MODE_OUTPUT,         ///< output mode
+  GPIO_MODE_INPUT_PULLDN,   ///< input, pull down
+  GPIO_MODE_INPUT_PULLUP,   ///< input, pull up
+  GPIO_MODE_INPUT_PULLUPDN, ///< input, pull up/down
+  GPIO_MODE_MAX
+} GPIOMODE;
+
 /// enumerate the GPIO errors
 typedef enum _GPIOERR
 {
@@ -40,22 +63,16 @@ typedef enum _GPIOERR
   GPIO_ERR_ILLDIR,      ///< illegal direction, (i.e. tryint to change a direction on a non IO pin )
 } GPIOERR;
 
-/// enumerate the GPIO IOCTL actions
-typedef enum _GPIOACT
-{
-  GPIO_ACT_NOOP = 0,    ///< no operation
-  GPIO_ACT_SETDIR,      ///< set direction
-  GPIO_ACT_SETMODE,     ///< set mode
-  GPIO_ACT_MAX,         ///< maximum number
-} GPIOACT;
+// structures -----------------------------------------------------------------
+typedef U32     GPIOENUM;
 
 // global function prototypes --------------------------------------------------
-extern  void    Gpio_Initialize( void );
-extern  void    Gpio_Close( void );
-extern  GPIOERR Gpio_Set( GPIOPINENUM eGpioSel, BOOL bState );
-extern  GPIOERR Gpio_Get( GPIOPINENUM eGpioSel, PBOOL pbState );
-extern  GPIOERR Gpio_Toggle( GPIOPINENUM eGpioSel );
-extern  GPIOERR Gpio_Ioctl( GPIOPINENUM eGpioSel, GPIOACT eGpioAct, PVOID pvData );
+extern  void      Gpio_Initialize( void );
+extern  void      Gpio_Close( void );
+extern  GPIOENUM  Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bInvert, BOOL bIntial );
+extern  GPIOERR   Gpio_Set( GPIOENUM eGpioEnum, BOOL bState );
+extern  GPIOERR   Gpio_Get( GPIOENUM eGpioEnum, PBOOL pbState );
+extern  GPIOERR   Gpio_Toggle( GPIOENUM eGpioEnum );
 
 /**@} EOF Gpio.h */
 

@@ -77,7 +77,7 @@ void Gpio_Initialize( void )
   for( nIdx = 0; nIdx < GPIO_PIN_ENUM_MAX; nIdx++ )
   {
     // get a pointer to the definition structure
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ nIdx ];
+    ptDef = ( PGPIOPINDEF )&g_atGpioPinDefs[ nIdx ];
     
     // get the port/pin mask
     ptPort = &PORT->Group[ ptDef->ePort ];
@@ -133,7 +133,7 @@ void Gpio_Initialize( void )
   for ( nIdx = 0; nIdx < GPIO_FNC_ENUM_MAX; nIdx++ )
   {
     // get a pointer to the definition structure
-    ptFnc = ( PGPIOFNCDEF )&atGpioFncDefs[ nIdx ];
+    ptFnc = ( PGPIOFNCDEF )&g_atGpioFncDefs[ nIdx ];
     
     // get the port/mask
     ptPort = &PORT->Group[ ptFnc->ePort ];
@@ -142,7 +142,7 @@ void Gpio_Initialize( void )
     // set the cmux enable
     tPinCfg.reg = PORT_PINCFG_PMUXEN;
     tPinCfg.reg |= ( ptFnc->bAllowInput ) ? PORT_PINCFG_INEN : 0;
-    tPinCfg.reg |= PORT_PINCFG_DRVSTR;
+    tPinCfg.reg |= ( ptFnc->bPullUpEnable ) ? PORT_PINCFG_PULLEN : 0;
     ptPort->PINCFG[ ptFnc->nPin ] = tPinCfg;
     
     // get the current value
@@ -169,7 +169,7 @@ void Gpio_Initialize( void )
   for ( nIdx = 0; nIdx < GPIO_IRQ_ENUM_MAX; nIdx++ )
   {
     // get a pointer to the definition structure
-    ptIrq = ( PGPIOIRQDEF )&atGpioIrqDefs[ nIdx ];
+    ptIrq = ( PGPIOIRQDEF )&g_atGpioIrqDefs[ nIdx ];
     bTemp = TRUE;
     
     // get the port
@@ -221,8 +221,8 @@ void Gpio_Initialize( void )
     }
 
     // get the register offset
-    nRegOfs = ( ptIrq->nPin & 0x0F ) / 4;
-    nPinOfs = ptIrq->nPin % 4;
+    nRegOfs = ( ptIrq->nPin & 0x0F ) / 8;
+    nPinOfs = ptIrq->nPin % 8;
      
     // get the new value
     tEicCfg = EIC->CONFIG[ nRegOfs ];
@@ -245,9 +245,13 @@ void Gpio_Initialize( void )
       EIC->EVCTRL.reg |= BIT( nPinOfs );
     }
     
-    // enable the interrupts
-    EIC->INTENSET.reg |= BIT( nPinOfs );
-    
+    // if initial on
+    if ( ptIrq->bInitOn )
+    {
+      // enable the interrupts
+      EIC->INTENSET.reg |= BIT( nPinOfs );
+    }
+
     // set the map
     atIrqMaps[ nPinOfs ].eIrqEnum = nIdx;
   }
@@ -305,7 +309,7 @@ GPIOERR Gpio_Set( GPIOPINENUM eGpioSel, BOOL bState )
   if ( eGpioSel < GPIO_PIN_ENUM_MAX )
   {
     // get a pointer to the definition
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ eGpioSel ];
+    ptDef = ( PGPIOPINDEF )&g_atGpioPinDefs[ eGpioSel ];
 
     // check for an output pin
     if (( ptDef->eMode != GPIO_MODE_OUTPUT_INPDSB ) || ( ptDef->eMode != GPIO_MODE_OUTPUT_INPENB ))
@@ -363,7 +367,7 @@ GPIOERR Gpio_Get( GPIOPINENUM eGpioSel, PBOOL pbState )
   if ( eGpioSel < GPIO_PIN_ENUM_MAX )
   {
     // get a pointer to the definition
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ eGpioSel ];
+    ptDef = ( PGPIOPINDEF )&g_atGpioPinDefs[ eGpioSel ];
     
     // compute the mask
     uMask = BIT( ptDef->nPin );
@@ -412,7 +416,7 @@ GPIOERR Gpio_GetIrq( GPIOIRQENUM eGpioSel, PBOOL pbState )
   if ( eGpioSel < GPIO_IRQ_ENUM_MAX )
   {
     // get a pointer to the definition
-    ptDef = ( PGPIOIRQDEF )&atGpioIrqDefs[ eGpioSel ];
+    ptDef = ( PGPIOIRQDEF )&g_atGpioIrqDefs[ eGpioSel ];
     
     // compute the mask
     uMask = BIT( ptDef->nPin );
@@ -454,7 +458,7 @@ GPIOERR Gpio_Toggle( GPIOPINENUM eGpioSel )
   if ( eGpioSel < GPIO_PIN_ENUM_MAX )
   {
     // get a pointer to the definition
-    ptDef = ( PGPIOPINDEF )&atGpioPinDefs[ eGpioSel ];
+    ptDef = ( PGPIOPINDEF )&g_atGpioPinDefs[ eGpioSel ];
     
     // compute the mask
     uMask = BIT( ptDef->nPin );
@@ -491,10 +495,16 @@ GPIOERR Gpio_Ioctl( GPIOPINENUM eGpioSel, GPIOACT eGpioAct, PVOID pvData )
 {
   GPIOERR           eError = GPIO_ERR_NONE;
   PGPIOFNCDEF       ptFnc;
+  PGPIOPINDEF       ptPin;
+  PGPIOIRQDEF       ptIrq;
   PortGroup*        ptPort;
   PORT_PINCFG_Type  tPinCfg;
   PORT_PMUX_Type    tPinMux;
   GPIOFUNCMUX       eFunction;
+  GPIODIR           eDir;
+  U32               uMask;
+  BOOL              bAction;
+  U8                nPinOfs;
   
   // test for valid GPIO select
   if ( eGpioSel < GPIO_PIN_ENUM_MAX )
@@ -503,12 +513,72 @@ GPIOERR Gpio_Ioctl( GPIOPINENUM eGpioSel, GPIOACT eGpioAct, PVOID pvData )
     switch( eGpioAct )
     {
       case GPIO_ACT_SETDIR :
+        // get the new dirction
+        eDir = ( GPIODIR )PARAMU8( pvData );
+      
+        // get a pointer to the definition structure
+        ptPin = ( PGPIOPINDEF )&g_atGpioPinDefs[ eGpioSel ];
+
+        // get the port/mask
+        ptPort = &PORT->Group[ ptPin->ePort ];
+        uMask = BIT( ptPin->nPin );
+        
+        // set/clear based on direction
+        if ( eDir == GPIO_DIR_IN )
+        {
+          // clear the direction
+          ptPort->DIRCLR.reg = uMask;   
+        }
+        else
+        {
+          // set the direction
+          ptPort->DIRSET.reg = uMask;
+        }
+
         break;
         
       case GPIO_ACT_SETMODE :
         break;
         
       case GPIO_ACT_ENBDSBIRQ :
+        // get the state
+        bAction = ( BOOL )PARAMU8( pvData );
+
+        // get the pin definition
+        ptIrq = ( PGPIOIRQDEF )&g_atGpioIrqDefs[ eGpioSel ];
+
+        // test for the odd Port A
+        if (( ptIrq->ePort == GPIO_PORT_A ) && ( ptIrq->nPin >= 24 ))
+        {
+          // adjust for pins 24-31
+          if (( ptIrq->nPin >= 24 ) && ( ptIrq->nPin <=27 ))
+          {
+          // set the pin offset
+            nPinOfs = (( ptIrq->nPin + 4 ) % 8 );
+          }
+          else
+          {
+          // set the pin offset
+            nPinOfs = (( ptIrq->nPin - 4 ) % 8 );
+          }
+        }
+        else
+        {
+          // set the pin offset
+          nPinOfs = ptIrq->nPin % 8;
+        }
+
+        // test fpr actopm
+        if ( bAction )
+        {
+          // enable it
+          EIC->INTENSET.reg |= BIT( nPinOfs );
+        }
+        else
+        {
+          // disable it
+          EIC->INTENCLR.reg |= BIT( nPinOfs );
+        }
         break;
 
       case GPIO_ACT_SETFUNCMUX :
@@ -516,7 +586,7 @@ GPIOERR Gpio_Ioctl( GPIOPINENUM eGpioSel, GPIOACT eGpioAct, PVOID pvData )
         eFunction = ( GPIOFUNCMUX )PARAMU8( pvData );
 
         // get a pointer to the definition structure
-        ptFnc = ( PGPIOFNCDEF )&atGpioFncDefs[ eGpioSel ];
+        ptFnc = ( PGPIOFNCDEF )&g_atGpioFncDefs[ eGpioSel ];
 
         // get the port/mask
         ptPort = &PORT->Group[ ptFnc->ePort ];
@@ -592,12 +662,13 @@ void EIC_Handler( void )
   // get the current IRQ status
   uStatus = EIC->INTFLAG.reg;
   
-  // we have the interrupt, now determine which one
-  for ( nIdx = 0; nIdx < EIC_EXTINT_NUM; nIdx++ )
+  // determine which interrupt
+  nIdx = 0;
+  while( uStatus != 0 )
   {
-    // generate a mask
+    // create the mask
     uMask = BIT( nIdx );
-    
+
     // is this interrupt set
     if ( uStatus & uMask )
     {
@@ -605,15 +676,21 @@ void EIC_Handler( void )
       EIC->INTFLAG.reg = uMask;
       
       // get the map
-      ptIrq = ( PGPIOIRQDEF )&atGpioIrqDefs[ atIrqMaps[ nIdx ].eIrqEnum ];
+      ptIrq = ( PGPIOIRQDEF )&g_atGpioIrqDefs[ atIrqMaps[ nIdx ].eIrqEnum ];
       
       // if callback is not null
       if ( ptIrq->pvCallback != NULL )
-       {
+      {
         // process the callback
         ptIrq->pvCallback( nIdx, ptIrq->nEvent );
       }
+
+      // clear the status bit
+      uStatus &= ~uMask;
     }
+
+    // increment the bit
+    nIdx++;
   }
 }
 

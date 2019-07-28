@@ -78,7 +78,7 @@ void Uart_Initialize( void )
   for ( eDev = 0; eDev < UART_DEV_ENUM_MAX; eDev++ )
   {
     // get pointer to the definition/control structures
-    ptDef = ( PUARTDEF )&atUartDefs[ eDev ];
+    ptDef = ( PUARTDEF )&g_atUartDefs[ eDev ];
     ptCtl = &atLclCtls[ eDev ];
 
     // clear the receive/transmit buffers
@@ -190,7 +190,8 @@ void Uart_Initialize( void )
 
       // enable the interrupt in the NVIC      
       NVIC_EnableIRQ( SERCOM0_IRQn + ptDef->eChan );
-      
+      NVIC_SetPriority( SERCOM0_IRQn + ptDef->eChan, 3 );
+
       // now enable the device
       ptUsart->CTRLA.reg |= SERCOM_USART_CTRLA_ENABLE;
       while( ptUsart->SYNCBUSY.bit.CTRLB & SERCOM_USART_SYNCBUSY_ENABLE );
@@ -216,7 +217,7 @@ void Uart_CloseAll( void )
   for ( eDev = 0; eDev < UART_DEV_ENUM_MAX; eDev++ )
   {
     // get pointer to the definition/control structures
-    ptDef = ( PUARTDEF )&atUartDefs[ eDev ];
+    ptDef = ( PUARTDEF )&g_atUartDefs[ eDev ];
 
     // get the pointer to the USART channel
     ptUsart = GetSercomChannel( ptDef->eChan );
@@ -261,7 +262,7 @@ UARTERR Uart_Write( UARTDEVENUM eDev, PU8 pnData, U16 wLength, PU16 pwBytesWritt
     *pwBytesWritten = 0;
 
     // get pointers to the control/def structure
-    ptDef = ( PUARTDEF )&atUartDefs[ eDev ];
+    ptDef = ( PUARTDEF )&g_atUartDefs[ eDev ];
     ptCtl = &atLclCtls[ eDev ];
     
     // get the pointer to the USART channel
@@ -330,7 +331,7 @@ UARTERR Uart_Read( UARTDEVENUM eDev, PU8 pnData, U16 wLength, PU16 pwBytesRead )
   if ( eDev < UART_DEV_ENUM_MAX )
   {
     // get pointers to the control/def structure
-    ptDef = ( PUARTDEF )&atUartDefs[ eDev ];
+    ptDef = ( PUARTDEF )&g_atUartDefs[ eDev ];
     ptCtl = &atLclCtls[ eDev ];
     
     // compute the bytes written
@@ -411,7 +412,7 @@ UARTERR Uart_Close( UARTDEVENUM eDev )
   if ( eDev < UART_DEV_ENUM_MAX )
   {
     // get the pointer to the USART channel
-    ptUsart = GetSercomChannel( atUartDefs[ eDev ].eChan );
+    ptUsart = GetSercomChannel( g_atUartDefs[ eDev ].eChan );
 
     // disable the USART
     ptUsart->CTRLA.reg &= ~SERCOM_USART_CTRLA_ENABLE;
@@ -557,7 +558,7 @@ static void IrqCommonHandler( UARTDEVENUM eDev )
   UARTIRQEVENTS             eEvent = UART_IRQ_EVENT_NONE;
   
   // get pointer to the definition/control structures
-  ptDef = ( PUARTDEF )&atUartDefs[ eDev ];
+  ptDef = ( PUARTDEF )&g_atUartDefs[ eDev ];
   ptCtl = &atLclCtls[ eDev ];
   
   // get a pointer to the UART registers

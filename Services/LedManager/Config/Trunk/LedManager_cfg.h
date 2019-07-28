@@ -16,7 +16,6 @@
  * ======
  * $Log: $
  * 
- *
  * \addtogroup LedManager
  * @{
  *****************************************************************************/
@@ -30,23 +29,22 @@
 // local includes -------------------------------------------------------------
 #include "LedManager/LedManager_prm.h"
 #include "LedManager/LedManager_def.h"
-#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-#include "TaskManager/TaskManager.h"
-#endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 
 // library includes -----------------------------------------------------------
 #include "GPIO/Gpio.h"
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+#include "TaskManager/TaskManager.h"
+#endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 
 // Macros and Defines ---------------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 #define LEDMANAGER_ANIMATE_EXEC_RATE    TASK_TIME_MSECS(( LEDMANAGER_ANIMATE_RATE_MSECS ))
 #define LEDMANAGER_ANIMATE_NUM_EVENTS   ( 4 )
-#endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
-#define LEDMANAGER_SCAN_EXEC_RATE       ( TASK_TIME_MSECS( 1 ))
+#define LEDMANAGER_SCAN_EXEC_RATE       ( TASK_TIME_MSECS( 2 ))
 #define LEDMANAGER_SCAN_NUM_EVENTS      ( 2 )
 #endif  // MATRIX DEFS
+#endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 
 
 // enumerations ---------------------------------------------------------------
@@ -57,6 +55,7 @@ typedef enum _LEDMANAGERSELENUM
   
   // do not remove the below entry
   LEDMANAGER_ENUM_MAX,
+  LEDMANAGER_ENUM_NONE,
   LEDMANAGER_ENUM_ALL = 0xFF
 } LEDMANAGERSELENUM;
 
@@ -68,6 +67,7 @@ typedef enum _LEDMANAGERRGBENUM
   
   // do not remove the below entries
   LEDMANAGER_RGBENUM_MAX,
+  LEDMANAGER_RGBENUM_NONE,
   LEDMANAGER_RGBENUM_ALL = 0xFF
 } LEDMANAGERRGBENUM;
 #endif  // LEDMANAGER_RGB_LEDS_ENABLED
@@ -76,25 +76,27 @@ typedef enum _LEDMANAGERRGBENUM
 typedef enum _LEDMNGRANIMENUM
 {
   // enumerate user animations here
-  
+
   // do not remove these below
   LEDMNGR_ANIMATION_MAX,
+  LEDMNGR_ANIMATION_NONE,
   LEDMNGR_ANIMATION_STOP = 0xFF
 } LEDMNGRANIMENUM;
 
 // global parameter declarations -----------------------------------------------
 /// declare the led definitions
-extern  const CODE LEDDEF  atLedDefs[ ];
+extern  const CODE LEDDEF  g_atLedDefs[ ];
 #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-extern  const CODE LEDRGBDEF  atLedRgbDefs[ ];
+extern  const CODE LEDRGBDEF  g_atLedRgbDefs[ ];
 #endif  // LEDMANAGER_RGB_LEDS_ENABLED
 
 /// declare the animation enumeration
-extern  const CODE PLEDSEQENTRY apLedAnimationsDef[ ];
+extern  const CODE PLEDSEQENTRY g_apLedAnimationsDef[ ];
+
 /// declare the LED matrix rows/cols
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
-extern  const CODE GPIOPINENUM aeLedMatrixRows[ ];
-extern  const CODE GPIOPINENUM aeLedMatrixCols[ ];
+extern  const CODE GPIOPINENUM g_aeLedMatrixRows[ ];
+extern  const CODE GPIOPINENUM g_aeLedMatrixCols[ ];
 #endif  // MATRIX DEFS
 #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
 extern  const CODE LEDRGBDEF  atLedsRgbDef[ ];
@@ -105,9 +107,7 @@ extern  void  LedManager_LocalInitialize( void );
 extern  void  LedManager_NotifyDone( void );
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 extern  BOOL  LedManager_AnimationTask( TASKARG xArg );
-#if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
 extern  BOOL  LedManager_ScanTask( TASKARG xArg );
-#endif  // MATRIX DEFS
 #endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 
 /**@} EOF LedManager_cfg.h */

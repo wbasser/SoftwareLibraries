@@ -28,6 +28,7 @@
 #include "Clock/Clock.h"
 #include "GPIO/Gpio.h"
 #include "Interrupt/Interrupt.h"
+#include "PowerManager/PowerManager.h"
 
 // macros and defines ---------------------------------------------------------
 /// define the macro to map the control pointer
@@ -49,7 +50,9 @@ typedef struct _BUFCTL
 typedef struct _LCLCTL
 {
   struct _LCLCTL*   ptSignature;  ///< signature
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
   BUFCTL            tRxBuf;       ///< receive buffer control
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
   BUFCTL            tTxBuf;       ///< transmit buffer control
   SercomUsart*      ptUsart;      ///< USART
   PVUARTINTCALLBACK pvCallback;   ///< pointer to the callback
@@ -62,7 +65,6 @@ static  PLCLCTL     aptLclCtls[ UART_CHAN_MAX ];
 
 // local function prototypes --------------------------------------------------
 static  SercomUsart*  GetSercomChannel( UARTCHAN eChan );
-static  void          EnableClockPower( UARTCHAN eChan );
 static  U16           ComputeBaudrate( PUARTDEF ptDef );
 static  void          IrqCommonHandler( PLCLCTL ptCtl );
 
@@ -90,18 +92,23 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
     ptCtl->ptSignature = ptCtl;
 
     // allocate the buffers
-    if (( ptCtl->tRxBuf.pnBuffer = malloc( ptCtl->tRxBuf.wSize )) != NULL )
+    if (( ptCtl->tTxBuf.pnBuffer = malloc( ptCtl->tTxBuf.wSize )) != NULL )
     {
-      if (( ptCtl->tTxBuf.pnBuffer = malloc( ptCtl->tTxBuf.wSize )) != NULL )
+      #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+      if (( ptCtl->tRxBuf.pnBuffer = malloc( ptCtl->tRxBuf.wSize )) != NULL )
+      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
       {
         // now compute the baud rate
         if (( wBaudRate = ComputeBaudrate( ptDef )) != 0 )
         {
           // clear the receive/transmit buffers
-          ptCtl->tRxBuf.wWrIdx = ptCtl->tRxBuf.wRdIdx = ptCtl->tRxBuf.wCount = 0;
-          ptCtl->tTxBuf.wWrIdx = ptCtl->tTxBuf.wRdIdx = ptCtl->tTxBuf.wCount = 0;
-          ptCtl->tRxBuf.wSize = ptDef->wRxBufSize;
+          ptCtl->tTxBuf.wWrIdx = ptCtl->tTxBuf.wCount = 0;
           ptCtl->tTxBuf.wSize = ptDef->wTxBufSize;
+          #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+          ptCtl->tTxBuf.wRdIdx = 0;
+          ptCtl->tRxBuf.wWrIdx = ptCtl->tRxBuf.wRdIdx = ptCtl->tRxBuf.wCount = 0;
+          ptCtl->tRxBuf.wSize = ptDef->wRxBufSize;
+          #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 
           // copy the callback and the event flags
           ptCtl->pvCallback = ptDef->pvCallback;
@@ -114,9 +121,6 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
           // get the pointer to the USART channel
           ptCtl->ptUsart = GetSercomChannel( ptDef->eChan );
 
-          // enable the channel power and clock
-          EnableClockPower( ptDef->eChan );
-  
           // clear the two registers
           ptCtl->ptUsart->CTRLA.reg = 0;
           ptCtl->ptUsart->CTRLB.reg = 0;
@@ -212,11 +216,13 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
           while( ptCtl->ptUsart->SYNCBUSY.bit.CTRLB & SERCOM_USART_SYNCBUSY_ENABLE );
         }
       }
+      #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
       else
       {
         // free the transmit buffer
-        free( ptCtl->tRxBuf.pnBuffer );
+        free( ptCtl->tTxBuf.pnBuffer );
       }
+      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
     }
     else
     {
@@ -228,7 +234,9 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
   else
   {
     // free all buffers/control
+    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
     free( ptCtl->tRxBuf.pnBuffer );
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
     free( ptCtl->tTxBuf.pnBuffer );
     free( ptCtl );
     ptCtl = NULL;
@@ -304,6 +312,7 @@ UARTERR Uart_Write( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesWr
   return( eError );
 }
 
+#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
 /******************************************************************************
  * @function Uart_Read
  *
@@ -352,6 +361,7 @@ UARTERR Uart_Read( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesRea
   // return the error
   return( eError );
 }
+#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 
 #ifdef SERCOM0
 /******************************************************************************
@@ -500,6 +510,7 @@ static void IrqCommonHandler( PLCLCTL ptCtl )
           eEvent = UART_IRQ_EVENT_RXCHAR;
           pvCallBack( eEvent, nOption );
         }
+        #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
         // check for room in local buffer
         else if ( ptCtl->tRxBuf.wCount < ptCtl->tRxBuf.wSize )
         {
@@ -508,6 +519,7 @@ static void IrqCommonHandler( PLCLCTL ptCtl )
           ptCtl->tRxBuf.wWrIdx %= ptCtl->tRxBuf.wSize;
           ptCtl->tRxBuf.wCount++;
         }
+        #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
       }
     }
   }
@@ -594,79 +606,27 @@ static void IrqCommonHandler( PLCLCTL ptCtl )
  *****************************************************************************/
 static SercomUsart* GetSercomChannel( UARTCHAN eChan )
 {
-  Sercom* ptSercom = NULL;
+  Sercom*     ptSercom = NULL;
+  CLOCKMUXID  eClockId;
+  U32         uPeriphId;
   
   switch( eChan )
   {
     case UART_CHAN_0 :
       ptSercom = SERCOM0;
-      break;
-      
-    case UART_CHAN_1 :
-      ptSercom = SERCOM1;
-      break;
-    
-    #ifdef SERCOM2
-    case UART_CHAN_2:
-      ptSercom = SERCOM2;
-      break;
-    #endif // SERCOM2
-    
-    #ifdef SERCOM3
-    case UART_CHAN_3 :
-      ptSercom = SERCOM3;
-      break;
-    #endif // SERCOM3
-    
-    #ifdef SERCOM4
-    case UART_CHAN_4 :
-      ptSercom = SERCOM4;
-      break;
-    #endif // SERCOM4
-    
-    #ifdef SERCOM5
-    case UART_CHAN_5 :
-      ptSercom = SERCOM5;
-      break;
-    #endif // SERCOM5
-    
-    default :
-      break;
-  }
-  
-  // return the pointer to the channlel
-  return( &ptSercom->USART );
-}
-
-/******************************************************************************
- * @function EnableClockPower
- *
- * @brief enables clock power for this device
- *
- * This function will enable the device in the power manager and the clocj
- *
- * @param[in]   eChan			SERCOM channel
- *
- *****************************************************************************/
-static void EnableClockPower( UARTCHAN eChan )
-{
-  CLOCKMUXID  eClockId;
-  U32         uPeriphId;
-
-  switch( eChan )
-  {
-    case UART_CHAN_0 :
       eClockId = CLOCK_MUXID_SERCOM_0;
       uPeriphId = PM_APBCMASK_SERCOM0;
       break;
       
     case UART_CHAN_1 :
+      ptSercom = SERCOM1;
       eClockId = CLOCK_MUXID_SERCOM_1;
       uPeriphId = PM_APBCMASK_SERCOM1;
       break;
     
     #ifdef SERCOM2
     case UART_CHAN_2:
+      ptSercom = SERCOM2;
       eClockId = CLOCK_MUXID_SERCOM_2;
       uPeriphId = PM_APBCMASK_SERCOM2;
       break;
@@ -674,6 +634,7 @@ static void EnableClockPower( UARTCHAN eChan )
     
     #ifdef SERCOM3
     case UART_CHAN_3 :
+      ptSercom = SERCOM3;
       eClockId = CLOCK_MUXID_SERCOM_3;
       uPeriphId = PM_APBCMASK_SERCOM3;
       break;
@@ -681,6 +642,7 @@ static void EnableClockPower( UARTCHAN eChan )
     
     #ifdef SERCOM4
     case UART_CHAN_4 :
+      ptSercom = SERCOM4;
       eClockId = CLOCK_MUXID_SERCOM_4;
       uPeriphId = PM_APBCMASK_SERCOM4;
       break;
@@ -688,6 +650,7 @@ static void EnableClockPower( UARTCHAN eChan )
     
     #ifdef SERCOM5
     case UART_CHAN_5 :
+      ptSercom = SERCOM5;
       eClockId = CLOCK_MUXID_SERCOM_5;
       uPeriphId = PM_APBCMASK_SERCOM5;
       break;
@@ -699,7 +662,10 @@ static void EnableClockPower( UARTCHAN eChan )
   
   // now enable the clock and power mask
   Clock_PeriphEnable( eClockId, CLOCK_GENID_0 );
-  PowerManager_DisableEnablePeriph( uPeriphId, ON );
+  PowerManager_DisableEnablePeriphC( uPeriphId, ON );
+
+  // return the pointer to the channlel
+  return( &ptSercom->USART );
 }
 
 /******************************************************************************
@@ -717,10 +683,9 @@ static void EnableClockPower( UARTCHAN eChan )
  *****************************************************************************/
 static U16 ComputeBaudrate( PUARTDEF ptDef )
 {
-  U32   uPeripheralClock, uBaudIntermediate;
+  U32   uPeripheralClock, uBaudIntermediate, uRatio;
   U8    nSampleRate, nFracIdx;
   BOOL  bFractional;
-  U64   hScale, hRatio;
   U16   wBaudRate = 0;
   
   // get the system clock value
@@ -734,6 +699,7 @@ static U16 ComputeBaudrate( PUARTDEF ptDef )
       bFractional = FALSE;
       break;
       
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
     case UART_SAMP_16XFRAC :
       nSampleRate = 16;
       bFractional = TRUE;
@@ -753,6 +719,7 @@ static U16 ComputeBaudrate( PUARTDEF ptDef )
       nSampleRate = 3;
       bFractional = TRUE;
       break;
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
       
     default :
       nSampleRate = 1;
@@ -763,6 +730,7 @@ static U16 ComputeBaudrate( PUARTDEF ptDef )
   // check for baud rate outside of normal range
   if (( ptDef->uBaudRate * nSampleRate ) <= uPeripheralClock )
   {
+    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
     // check for fractional
     if ( bFractional )
     {
@@ -788,11 +756,11 @@ static U16 ComputeBaudrate( PUARTDEF ptDef )
       }
     }
     else
-    {
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+  {
       // calculate the baud rate
-      hRatio = (( nSampleRate * ( U64 )ptDef->uBaudRate ) << 32 ) / uPeripheralClock;
-      hScale = (( U64 )1 << 32 ) - hRatio;
-      wBaudRate = ( 65536 * hScale ) >> 32;
+      uRatio = (( nSampleRate * ( U64 )ptDef->uBaudRate ) << 32 ) / uPeripheralClock;
+      wBaudRate = ( U16 )(( 65536 ) - uRatio );
     }
   }
   

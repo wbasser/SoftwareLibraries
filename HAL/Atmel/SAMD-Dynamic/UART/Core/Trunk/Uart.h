@@ -121,10 +121,12 @@ typedef enum _UARTMODE
 typedef enum _UARTSAMPLE
 {
   UART_SAMP_16XARITH = 0, ///< 16X oversampling, arithmatic baud rate
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
   UART_SAMP_16XFRAC,      ///< 16X oversampling, fractional baud rate
   UART_SAMP_8XARITH,      ///< 8X oversampling, arithmatic baud rate
   UART_SAMP_8XFRAC,       ///< 8X oversampling, fracitonal baud rate
   UART_SAMP_3XARITH,      ///< 3X oversampling, arithmatic baud rate
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 } UARTSAMP;
 
 /// enumerate the UART events
@@ -145,6 +147,25 @@ typedef enum _UARTDATAORDER
   UART_DATAORDER_MSB = 0,
   UART_DATAORDER_LSB,
 } UARTDATAORDER;
+
+/// enumerate the baud rate
+typedef enum _UARTBUADRATE
+{
+  UART_BAUD_RATE_300 = 0,
+  UART_BAUD_RATE_600,
+  UART_BAUD_RATE_1200,
+  UART_BAUD_RATE_2400,
+  UART_BAUD_RATE_3600,
+  UART_BAUD_RATE_4800,
+  UART_BAUD_RATE_7200,
+  UART_BAUD_RATE_9600,
+  UART_BAUD_RATE_19200,
+  UART_BAUD_RATE_38400,
+  UART_BAUD_RATE_56700,
+  UART_BAUD_RATE_115200,
+  UART_BAUD_RATE_230400,
+  UART_BAUD_RATE_MAX
+} UARTBUADRATE;
 
 
 // structures -----------------------------------------------------------------
@@ -194,7 +215,9 @@ typedef struct _UARTDEF
 // global function prototypes --------------------------------------------------
 extern  PTUARTHANDLE  Uart_Configure( PUARTDEF ptDef );
 extern  UARTERR       Uart_Write( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesWritten );
+#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
 extern  UARTERR       Uart_Read( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesRead );
+#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 
 /**@} EOF Uart.h */
 

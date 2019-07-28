@@ -29,25 +29,37 @@
 #include "ADC/Adc.h"
 
 // library includes -----------------------------------------------------------
+#include "Clock/Clock.h"
+#include "PowerManager/PowerManager.h"
 
 // Macros and Defines ---------------------------------------------------------
+/// define the macro to map the control pointer
+#define MAP_HANDLE_TO_POINTER( handle )   (( PADCCTL )handle )
 
 // enumerations ---------------------------------------------------------------
 
 // structures -----------------------------------------------------------------
+/// define the control structure
+typedef struct _ADCCTL
+{
+  ADC_REFCTRL_Type    tRefCtrl;
+  ADC_AVGCTRL_Type    tAvgCtrl;
+  ADC_SAMPCTRL_Type   tSampCtrl;
+  ADC_CTRLB_Type      tCtrlRegB;
+  ADC_INPUTCTRL_Type  tInpCtrl;
+  PVADCCALLBACK       pvCallback;
+} ADCCTL, *PADCCTL;
+#define ADCCTL_SIZE                       sizeof( ADCCTL )
 
 // global parameter declarations ----------------------------------------------
 
 // local parameter declarations -----------------------------------------------
 static  VBOOL         bConvertInProgress;
+static  U16           wCurrentResults;
 static  PVADCCALLBACK pvCurCallback;
-static  VU16          wLastResult;
 
 // local function prototypes --------------------------------------------------
-static  ADCERRS   SetupNormalMode( PADCDEF ptDef );
-static  ADCERRS   SetupAcumAvrgMode( PADCDEF ptDef );
-static  ADCERRS   ValidateCommonParameters( PADCDEF ptDef );
-static  void      SetCommonParameters( PADCDEF ptDef, ADC_CTRLB_Type* ptCtlB );
+static  void      SetCommonParameters( PADCCHANDEF ptChanDef, PADCCTL ptAdcCtl );
 
 // constant parameter initializations -----------------------------------------
 
@@ -56,29 +68,135 @@ static  void      SetCommonParameters( PADCDEF ptDef, ADC_CTRLB_Type* ptCtlB );
  *
  * @brief ADC initialization
  *
- * This function will performm any given initialization for the A2D converter
+ * This function will perform any given initialization for the A2D converter
  *
  *****************************************************************************/
 void Adc_Initialize( void )
 {
-}
+  // turn on the peripheral
+  PowerManager_DisableEnablePeriphC( PM_APBCMASK_ADC, ON );
 
-/******************************************************************************
- * @function Adc_Close
- *
- * @brief ADC close
- *
- * This function will close the ADC channel
- *
- *****************************************************************************/
-void Adc_Close( void )
-{
+  // turn on the clock
+  Clock_PeriphEnable( CLOCK_MUXID_ADC, CLOCK_GENID_0 );
+
   // reset the ADC
   ADC->CTRLA.bit.SWRST = TRUE;
   while( ADC->STATUS.bit.SYNCBUSY );
 
-  // disable interrupt
-  NVIC_DisableIRQ( ADC_IRQn );
+  // enable it
+  ADC->CTRLA.bit.ENABLE = ON;
+  while( ADC->STATUS.bit.SYNCBUSY );
+
+  // enable the interrupts
+  NVIC_EnableIRQ( ADC_IRQn );
+}
+
+/******************************************************************************
+ * @function Adc_Create
+ *
+ * @brief create an ADC chaqnnel
+ *
+ * This function will check parameters and create a ADC channel
+ *
+ * @param[in]   ptChanDef     pointer to channel definition
+ *
+ * @return      the handle for the ADC channel
+ *
+ *****************************************************************************/
+PADCHANDLE Adc_Create( PADCCHANDEF ptChanDef )
+{
+  PADCHANDLE  pvAdcHandle = NULL;
+  PADCCTL     ptAdcNew;
+  U8          nAdjRes;
+
+  // check for valid parameters
+  if (( ptChanDef->eInpMode < ADC_INPMODE_MAX ) && ( ptChanDef->ePosChan < ADC_POSCHAN_MAX ) && 
+      ( ptChanDef->eNegChan < ADC_NEGCHAN_MAX ) && ( ptChanDef->eRef < ADC_REF_MAX ) && 
+      ( ptChanDef->ePreScale < ADC_PRESCALE_MAX ) && ( ptChanDef->eNumSamps < ADC_NUMSAMP_MAX ) && 
+      ( ptChanDef->eGain < ADC_GAIN_MAX ) && ( ptChanDef->eAdcMode < ADC_MODE_MAX ) && ( ptChanDef->eDecRes < ADC_DECRES_MAX ))
+  {
+    // allocate space for the control
+    if (( ptAdcNew = malloc( ADCCTL_SIZE )) != NULL )
+    {
+      // set the handle
+      pvAdcHandle = ( PADCHANDLE )ptAdcNew;
+
+      // setup common parameters
+      SetCommonParameters( ptChanDef, ptAdcNew );
+      ptAdcNew->pvCallback = ptChanDef->pvCallback;
+
+      // now determine the mode
+      switch( ptChanDef->eAdcMode )
+      {
+        case ADC_MODE_NORMAL :
+          // set the refernce/average/samples
+          ptAdcNew->tAvgCtrl.reg = 0;
+
+          // set up the result select
+          ptAdcNew->tCtrlRegB.bit.RESSEL = 0;
+          break;
+
+        case ADC_MODE_ACCUM :
+        case ADC_MODE_AVERAGE :
+          // set the refernce/average/samples
+          ptAdcNew->tAvgCtrl.reg = ptChanDef->eNumSamps;
+
+          // if this is average mode
+          if ( ptChanDef->eAdcMode == ADC_MODE_AVERAGE )
+          {
+            // now set the resolution adjust
+            switch( ptChanDef->eNumSamps )
+            {
+              case ADC_NUMSAMP_1 :
+                nAdjRes = 0;
+                break;
+
+              case ADC_NUMSAMP_2 :
+                nAdjRes = 1;
+                break;
+
+              case ADC_NUMSAMP_4 :
+                nAdjRes = 2;
+                break;
+
+              case ADC_NUMSAMP_8 :
+                nAdjRes = 3;
+                break;
+
+              case ADC_NUMSAMP_16 :
+              case ADC_NUMSAMP_32 :
+              case ADC_NUMSAMP_64 :
+              case ADC_NUMSAMP_128 :
+              case ADC_NUMSAMP_256 :
+              case ADC_NUMSAMP_512 :
+              case ADC_NUMSAMP_1024 :
+                nAdjRes = 4;
+                break;
+
+              default :
+                nAdjRes = 0;
+                break;
+            }
+          }
+
+          // now set the resolution
+          ptAdcNew->tAvgCtrl.reg |= ADC_AVGCTRL_ADJRES( nAdjRes ); 
+
+          // set up  control B
+          ptAdcNew->tCtrlRegB.reg |= ADC_CTRLB_RESSEL_16BIT;
+          break;
+
+        case ADC_MODE_DECIMATE :
+          break;
+
+        default :
+          break;
+      }
+    }
+  }
+
+  // return the handle
+  return( pvAdcHandle );
 }
 
 /******************************************************************************
@@ -94,79 +212,53 @@ void Adc_Close( void )
  * @return      the current result of the operation
  *
  *****************************************************************************/
-ADCERRS Adc_ConvertChannel( ADCENUM eAdcChan, PU16 pwResult )
+ADCERRS Adc_ConvertChannel( PADCHANDLE pvHandle, PU16 pwResult )
 {
   ADCERRS eError = ADC_ERR_NONE;
-  PADCDEF ptDef;
+  PADCCTL ptAdcCtl;
 
-  // determine if we have a valid channel
-  if ( eAdcChan < ADC_ENUM_MAX )
+  // map the handle and test for validity
+  if (( ptAdcCtl = MAP_HANDLE_TO_POINTER( pvHandle )) != NULL )
   {
-    // get the definition
-    ptDef = ( PADCDEF )&atAdcDefs[ eAdcChan ];
+    // set the callback
+    pvCurCallback = ptAdcCtl->pvCallback;
 
-    // disable the interrupt
-    NVIC_DisableIRQ( ADC_IRQn );
+    // enable the interrupts
+    ADC->INTENSET.bit.RESRDY = ON;
 
-    // reset the ADC
-    ADC->CTRLA.bit.SWRST = TRUE;
+    // set the registers
+    ADC->AVGCTRL.reg = ptAdcCtl->tAvgCtrl.reg;
+    ADC->REFCTRL.reg = ptAdcCtl->tRefCtrl.reg;
+    ADC->SAMPCTRL.reg = ptAdcCtl->tSampCtrl.reg;
+    
+    // set the input control/wait sync
+    ADC->INPUTCTRL.reg = ptAdcCtl->tInpCtrl.reg;
     while( ADC->STATUS.bit.SYNCBUSY );
 
-    // now determine the mode
-    switch( ptDef->eMode )
+    // set control B 
+    ADC->CTRLB.reg = ptAdcCtl->tCtrlRegB.reg;
+    while( ADC->STATUS.bit.SYNCBUSY );
+
+    // set the conversion flag true
+    bConvertInProgress = TRUE;
+
+    // start the conversion 
+    ADC->SWTRIG.bit.START = ON;
+    while( ADC->STATUS.bit.SYNCBUSY );
+
+    //  now determine blocking/non-blocking
+    if ( ptAdcCtl->pvCallback == NULL )
     {
-      case ADC_MODE_NORMAL :
-        eError = SetupNormalMode( ptDef );
-        break;
-
-      case ADC_MODE_ACCUM :
-      case ADC_MODE_AVERAGE :
-        eError = SetupAcumAvrgMode( ptDef );
-        break;
-
-      case ADC_MODE_DECIMATE :
-        break;
-
-      default :
-        eError = ADC_ERR_ILLMODE;
-        break;
+      // wait till done
+      while( bConvertInProgress );
+  
+      // get result
+      *( pwResult ) = wCurrentResults;
     }
-
-    // if no error start the conversion
-    if ( eError == ADC_ERR_NONE )
+    else
     {
-      // set the callback
-      pvCurCallback = ptDef->pvCallback;
-
-      // enable the interrupts
-      ADC->INTENSET.bit.RESRDY = ON;
-      NVIC_EnableIRQ( ADC_IRQn );
-
-      // enable it
-      ADC->CTRLA.bit.ENABLE = ON;
-      while( ADC->STATUS.bit.SYNCBUSY );
-
-      // set the conversion flag true
-      bConvertInProgress = TRUE;
-
-      // start the conversion 
-      ADC->SWTRIG.bit.START = ON;
-      while( ADC->STATUS.bit.SYNCBUSY );
-
-      //  now determine blocking/non-blocking
-      if ( ptDef->pvCallback == NULL )
-      {
-        // wait till done
-        while( bConvertInProgress );
-        
-        // get result
-        *( pwResult ) = wLastResult;
-      }
-      else
-      {
-        // return blocking status
-        eError = ADC_ERR_BLOCKING;
-      }
+      // return blocking status
+      eError = ADC_ERR_BLOCKING;
     }
   }
   else
@@ -190,183 +282,17 @@ ADCERRS Adc_ConvertChannel( ADCENUM eAdcChan, PU16 pwResult )
 void ADC_Handler( void )
 {
   // get the last result
-  wLastResult = ADC->RESULT.reg;
+  wCurrentResults = ADC->RESULT.reg;
 
   // if callback do it
   if ( pvCurCallback != NULL )
   {
     // call it
-    pvCurCallback( wLastResult );
+    pvCurCallback( wCurrentResults );
   }
 
   // in all cases clear the convert in progress
   bConvertInProgress = FALSE;
-}
-
-/******************************************************************************
- * @function SetupNormLMode
- *
- * @brief setup for normal mode
- *
- * This function will setup the channel for a normal mode conversion
- *
- * @param[in]   ptDef         pointer to the definition
- *
- * @return      the current result of the operation
- *
- *****************************************************************************/
-static ADCERRS SetupNormalMode( PADCDEF ptDef )
-{
-  ADCERRS             eError = ADC_ERR_NONE;
-  ADC_CTRLB_Type      tCtlB;
-
-  // check for no error
-  if (( eError  = ValidateCommonParameters( ptDef )) == ADC_ERR_NONE )
-  {
-    // set up the common parameters
-    SetCommonParameters( ptDef, &tCtlB );
-
-    // set the refernce/average/samples
-    ADC->AVGCTRL.reg = 0;
-
-    // set up  control B
-    tCtlB.bit.RESSEL = 0;
-    ADC->CTRLB = tCtlB;
-    while( ADC->STATUS.bit.SYNCBUSY );
-  }
-
-  // return the error
-  return( eError );
-}
-
-/******************************************************************************
- * @function SetupAcumAvrgMode
- *
- * @brief setup for accum/average mode
- *
- * This function will setup the channel for a average mode conversion
- *
- * @param[in]   ptDef         pointer to the definition
- *
- * @return      the current result of the operation
- *
- *****************************************************************************/
-static ADCERRS SetupAcumAvrgMode( PADCDEF ptDef )
-{
-  ADCERRS           eError = ADC_ERR_NONE;
-  ADC_CTRLB_Type    tCtlB;
-  ADC_AVGCTRL_Type  tAvgCtl;
-  U8                nAdjRes;
-
-  // check for parameter errors
-  eError = ValidateCommonParameters( ptDef );
-
-  // check for no error
-  if ( eError == ADC_ERR_NONE )
-  {
-    // set up common parameters
-    SetCommonParameters( ptDef, &tCtlB );
-
-    // check for mode parameters
-    if ( ptDef->eNumSamples < ADC_NUMSAMP_MAX )
-    {
-      // set the refernce/average/samples
-      tAvgCtl.reg = ptDef->eNumSamples;
-
-      // if this is average mode
-      if ( ptDef->eMode == ADC_MODE_AVERAGE )
-      {
-        // now set the resolution adjust
-        switch( ptDef->eNumSamples )
-        {
-          case ADC_NUMSAMP_1 :
-            nAdjRes = 0;
-            break;
-
-          case ADC_NUMSAMP_2 :
-            nAdjRes = 1;
-            break;
-
-          case ADC_NUMSAMP_4 :
-            nAdjRes = 2;
-            break;
-
-          case ADC_NUMSAMP_8 :
-            nAdjRes = 3;
-            break;
-
-          case ADC_NUMSAMP_16 :
-          case ADC_NUMSAMP_32 :
-          case ADC_NUMSAMP_64 :
-          case ADC_NUMSAMP_128 :
-          case ADC_NUMSAMP_256 :
-          case ADC_NUMSAMP_512 :
-          case ADC_NUMSAMP_1024 :
-            nAdjRes = 4;
-            break;
-
-          default :
-            nAdjRes = 0;
-            break;
-        }
-
-        // now set the resolution
-        tAvgCtl.reg |= ADC_AVGCTRL_ADJRES( nAdjRes ); 
-      }
-
-      // store the average control
-      ADC->AVGCTRL = tAvgCtl;
-
-      // set up  control B
-      tCtlB.reg |= ADC_CTRLB_RESSEL_16BIT;
-      ADC->CTRLB = tCtlB;
-      while( ADC->STATUS.bit.SYNCBUSY );
-    }
-    else
-    {
-      // set the error
-      eError = ADC_ERR_ILLPRM;
-    }
-  }
-
-  // return the error
-  return( eError );
-}
-
-/******************************************************************************
- * @function ValidateCommonParameters
- *
- * @brief setup for average mode
- *
- * This function will setup the channel for a average mode conversion
- *
- * @param[in]   ptDef         pointer to the definition
- *
- * @return      the current result of the operation
- *
- *****************************************************************************/
-static ADCERRS ValidateCommonParameters( PADCDEF ptDef )
-{
-  ADCERRS eError = ADC_ERR_ILLPRM;
-
-  // validate the parameters
-  if (( ptDef->ePosChan < ADC_POSCHAN_INPMAX ) || (( ptDef->ePosChan >= ADC_POSCHAN_TEMP ) && ( ptDef->ePosChan < ADC_POSCHAN_MAX ))) 
-  {
-    if ( ptDef->eAdcRef < ADC_REF_MAX ) 
-    {
-      if (( ptDef->eGain <= ADC_GAIN_16 ) || ( ptDef->eGain == ADC_GAIN_HALF ))
-      {
-        if ( ptDef->nSampLength <= MAX_SAMPLE_LEN )
-        {
-          // no error detected
-          eError = ADC_ERR_NONE;
-        }
-      }
-    }
-  }
-
-  // return the error
-  return( eError );
 }
 
 /******************************************************************************
@@ -376,32 +302,29 @@ static ADCERRS ValidateCommonParameters( PADCDEF ptDef )
  *
  * This function will set the common parameters
  *
- * @param[in]   ptDef         pointer to the definition
+ * @param[in]   ptChanDefDef  pointer to the channel definition
+ * @param[io]   ptAdcCtl      pointer to the control
  *
  *****************************************************************************/
-static void SetCommonParameters( PADCDEF ptDef, ADC_CTRLB_Type* ptCtlB )
+static void SetCommonParameters( PADCCHANDEF ptChanDef, PADCCTL ptAdcCtl )
 {
-  ADC_INPUTCTRL_Type  tInpCtrl;
-
   // set the refernce/average/samples
-  ADC->REFCTRL.bit.REFSEL = ptDef->eAdcRef;
-  ADC->SAMPCTRL.reg = ptDef->nSampLength;
+  ptAdcCtl->tRefCtrl.bit.REFSEL = ptChanDef->eRef;
+  ptAdcCtl->tSampCtrl.reg = ptChanDef->eNumSamps;
 
   // set up the input mux
-  tInpCtrl.bit.MUXPOS = ptDef->ePosChan;
-  tInpCtrl.bit.MUXNEG = ptDef->eNegChan;
-  tInpCtrl.bit.INPUTSCAN = 0;
-  tInpCtrl.bit.INPUTOFFSET = 0,
-  tInpCtrl.bit.GAIN = ptDef->eGain;
-  ADC->INPUTCTRL = tInpCtrl;
-  while( ADC->STATUS.bit.SYNCBUSY );
+  ptAdcCtl->tInpCtrl.bit.MUXPOS = ptChanDef->ePosChan;
+  ptAdcCtl->tInpCtrl.bit.MUXNEG = ptChanDef->eNegChan;
+  ptAdcCtl->tInpCtrl.bit.INPUTSCAN = 0;
+  ptAdcCtl->tInpCtrl.bit.INPUTOFFSET = 0,
+  ptAdcCtl->tInpCtrl.bit.GAIN = ptChanDef->eGain;
 
   // set up  control B
-  ptCtlB->bit.DIFFMODE = OFF;
-  ptCtlB->bit.LEFTADJ = OFF;
-  ptCtlB->bit.FREERUN = OFF;
-  ptCtlB->bit.CORREN = OFF;
-  ptCtlB->bit.PRESCALER = ptDef->ePrescale;
+  ptAdcCtl->tCtrlRegB.bit.DIFFMODE = OFF;
+  ptAdcCtl->tCtrlRegB.bit.LEFTADJ = OFF;
+  ptAdcCtl->tCtrlRegB.bit.FREERUN = OFF;
+  ptAdcCtl->tCtrlRegB.bit.CORREN = OFF;
+  ptAdcCtl->tCtrlRegB.bit.PRESCALER = ptChanDef->ePreScale;
 }
 
 /**@} EOF .c */

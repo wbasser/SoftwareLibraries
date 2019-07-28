@@ -28,15 +28,27 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
+#include "NfcPN532Handler/NfcPN532Handler_cfg.h"
 
 // library includes -----------------------------------------------------------
-#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the number of events for the communications task
-#define NFCPN532HANDLER_NUM_EVENTS                    ( 4 )
+/// define the maximum UID length
+#define NFCPN532HANDLER_MAX_UID_LENGTH                          ( 7 )
 
 // enumerations ---------------------------------------------------------------
+/// enumerate the pre-defined authentication keys
+typedef enum _NFCPN532AUTHKEY
+{
+  NFCPN532_AUTHKEY_ALLZEROS = 0,
+  NFCPN532_AUTHKEY_A0SEQ,
+  NFCPN532_AUTHKEY_A1SEQ,
+  NFCPN532_AUTHKEY_B0SEQ,
+  NFCPN532_AUTHKEY_AASEQ,
+  NFCPN532_AUTHKEY_ALLONES,
+  NFCPN532_AUTHKEY_MAX,
+  NFCPN532_AUTHKEY_USRDEF = 0xFF,
+} NFCPN532AUTHKEY;
 
 // structures -----------------------------------------------------------------
 /// define the callback event
@@ -46,9 +58,13 @@ typedef void  ( *PVMSGCALLBACK )( BOOL );
 
 // global function prototypes --------------------------------------------------
 extern  void  NfcPN532Handler_Initialize( void );
-extern  BOOL  NfcPN532Handler_CommunicationsTask( TASKARG xArg );
-extern  void  NfcPN352Handler_RequestFirwareRevision( PVMSGCALLBACK pvCallback );
-extern  void  NfcPN352Handler_GetFirmwareRevision( PU8 
+extern  void  NfcPN532Handler_ProcessEvent( U16 wEvent );
+extern  void  NfcPN532Handler_RequestFirwareRevision( PVMSGCALLBACK pvCallback );
+extern  U32   NfcPN532Handler_GetFirmwareRevision( void ); 
+extern  void  NfcPN532Handler_ConfigureSecureAccessModule( PVMSGCALLBACK pvCallback );
+extern  void  NfcPN532Handler_ScanForCards( U8 nBaudrate, U16 wTimeoutMsecs, PVMSGCALLBACK pvCallback ); 
+extern  void  NfcPN532Handler_GetLastUID( PU8 pnUid, PU8 pnLength );
+extern  void  NfcPN532Handler_AuthenticateBlock( PU8 pnUid, U8 nUidLength, U32 uBblockNumber, U8 nKeyNumber, NFCPN532AUTHKEY eAuthKey, PU8 pnKeyData, PVMSGCALLBACK pvCallback );
 
 /**@} EOF NfcPN532Handler.h */
 

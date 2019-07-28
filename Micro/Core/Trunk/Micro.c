@@ -24,10 +24,36 @@
 
 // local includes -------------------------------------------------------------
 #include "Micro.h"
-#include "MicroConfig/Micro_cfg.h"
 
 // library includes -----------------------------------------------------------
 #include "Interrupt/Interrupt.h"
+#include "SystemTick/SystemTick.h"
+
+// local parameter declarations -----------------------------------------------
+static  U32 uMaxExecTimeMsec;
+
+// local function prototypes --------------------------------------------------
+#if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
+/// command handlers
+static  ASCCMDSTS CmdQrySys( U8 nCmdEnum );
+
+// constant parameter initializations -----------------------------------------
+/// declare the command strings
+static  const CODE C8 szQrySys[ ]   = { "QRYSYS" };
+
+/// initialize the command table
+const CODE ASCCMDENTRY g_atMicroCmdHandlerTable[ ] =
+{
+  ASCCMD_ENTRY( szQrySys,  6, 0, ASCFLAG_COMPARE_NONE, 0, CmdQrySys ),
+
+  // the entry below must be here
+  ASCCMD_ENDTBL( )
+};
+
+/// define the response strings
+static  const CODE C8 szRspSys[ ]   = { "RSYS, %8lu\n\r" };
+#endif // MICRO_ENABLE_SYSTIMECMDS
+
 
 /******************************************************************************
  * @function main
@@ -42,46 +68,87 @@
  *****************************************************************************/
 int main( void )
 {
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   U8              nIdx;
   PVMICROINITFUNC pvInitFunc;
   PVMICROIDLEFUNC pvIdleFunc;
-  
+  U32             uStartTime, uStopTime, uDiffTime;
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
+
   // disable interrupts
   Interrupt_Disable( );
   
- // call the local initialization
- Micro_LocalInitialize( );
+  // call the local initialization
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+    Micro_LocalInitialize( );
+  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
 
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  // clear the execution time
+  uMaxExecTimeMsec = 0;
+  
   // initialize IRQ disabled functions
   nIdx = 0;
-  while (( pvInitFunc = ( PVMICROINITFUNC )PGM_RDWORD( apvInitIrqDsbFunctions[ nIdx++ ])) != NULL )
+  while (( pvInitFunc = ( PVMICROINITFUNC )PGM_RDWORD( g_apvInitIrqDsbFunctions[ nIdx++ ])) != NULL )
   {
     // call the init function
     pvInitFunc( );
   }
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
   
   // enable interrupts
   Interrupt_Enable( );
   
+  // call the local initialization
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+    Micro_LocalIrqInitialize( );
+  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
+  
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   // initialize IRQ enabled functions
   nIdx = 0;
-  while (( pvInitFunc = ( PVMICROINITFUNC )PGM_RDWORD( apvInitIrqEnbFunctions[ nIdx++ ])) != NULL )
+  while (( pvInitFunc = ( PVMICROINITFUNC )PGM_RDWORD( g_apvInitIrqEnbFunctions[ nIdx++ ])) != NULL )
   {
     // call the init function
     pvInitFunc( );
   }
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
   
   // idle loop
   FOREVER
   {
-	  // reset index
-	  nIdx = 0;
+    // local the local idle
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+    // get the current time
+    uStartTime = SystemTick_GetTimeMsec();
+        
+    // reset index
+    nIdx = 0;
 	
-	  // while not a null entry
-    while (( pvIdleFunc = ( PVMICROIDLEFUNC )PGM_RDWORD( apvIdleFunctions[ nIdx++ ])) != NULL )
+    // while not a null entry
+    while (( pvIdleFunc = ( PVMICROIDLEFUNC )PGM_RDWORD( g_apvIdleFunctions[ nIdx++ ])) != NULL )
     {
       // call the init function
       pvIdleFunc( );
+    }
+
+    // get the stop time
+    uStopTime = SystemTick_GetTimeMsec();
+    
+    // compute time
+    if ( uStopTime < uStartTime )
+    {
+      uDiffTime = uStartTime - uStopTime;      
+    }
+    else
+    {
+      uDiffTime = uStopTime - uStartTime;
+    }
+    
+    // is this the max
+    if ( uDiffTime > uMaxExecTimeMsec )
+    {
+      uMaxExecTimeMsec = uDiffTime;
     }
     
     // check for pending tasks
@@ -90,12 +157,16 @@ int main( void )
       // go to sleep
       Micro_EnterSleepMode( );
     }
+#else
+    Micro_LocalIdle( );
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
   }
   
   // return a -1
   return( -1 );
 }
 
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 /******************************************************************************
  * @function Micro_Shutdown
  *
@@ -114,11 +185,37 @@ void Micro_Shutdown( void )
 
   // initialize IRQ disabled functions
   nIdx = 0;
-  while (( pvShutdownFunc = ( PVMICROSHUTDNFUNC ) PGM_RDWORD( apvShutdownFunctions[ nIdx++ ] )) != NULL )
+  while (( pvShutdownFunc = ( PVMICROSHUTDNFUNC ) PGM_RDWORD( g_apvShutdownFunctions[ nIdx++ ] )) != NULL )
   {
     // call the shutdown function
     pvShutdownFunc( );
   }
 } 
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
+
+#if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
+/******************************************************************************
+ * @function CmdQrySys
+ *
+ * @brief query system execution time command handler
+ *
+ * This function outputs the current board title and version
+ *
+ * @return  Aappropriate statue
+ *****************************************************************************/
+static ASCCMDSTS CmdQrySys( U8 nCmdEnum )
+{
+  PC8   pcBuffer;
+ 
+  // get a pointer to the buffer
+  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+  // output the version=
+  SPRINTF_P( ( pcBuffer ), ( char const * )szRspSys, uMaxExecTimeMsec );
+
+  // return the error
+  return( ASCCMD_STS_OUTPUTBUFFER);
+}
+#endif // MICRO_ENABLE_SYSTIMECMDS
 
 /**@} EOF Micro.c */

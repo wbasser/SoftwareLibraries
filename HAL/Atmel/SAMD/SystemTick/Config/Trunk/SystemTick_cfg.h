@@ -36,7 +36,7 @@ typedef void ( *PVSYSTEMTICKFUNC )( void );
 
 // global parameter declarations -----------------------------------------------
 /// declare the system tick structure
-extern  const CODE PVSYSTEMTICKFUNC apvSystemTickFunctions[ ];
+extern  const CODE PVSYSTEMTICKFUNC g_apvSystemTickFunctions[ ];
 
 /**@} EOF Micro_cfg.c */
 

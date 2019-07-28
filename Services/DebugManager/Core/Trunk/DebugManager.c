@@ -88,7 +88,7 @@ static  const CODE C8 szNewLine[ ]  = { "\n\r" };
 static  const CODE C8 szDmpDbg[ ]   = { "DDBG" };
 
 /// initialize the command table
-const CODE ASCCMDENTRY atDebugManagerCmdHandlerTable[ ] =
+const CODE ASCCMDENTRY g_atDebugManagerCmdHandlerTable[ ] =
 {
   ASCCMD_ENTRY( szDmpDbg, 4, 1, ASCFLAG_COMPARE_NONE, 0, CmdDmpDbg ),
 
