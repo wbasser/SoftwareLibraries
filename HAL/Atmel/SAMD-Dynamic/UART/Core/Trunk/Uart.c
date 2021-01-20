@@ -50,9 +50,9 @@ typedef struct _BUFCTL
 typedef struct _LCLCTL
 {
   struct _LCLCTL*   ptSignature;  ///< signature
-  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   BUFCTL            tRxBuf;       ///< receive buffer control
-  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
   BUFCTL            tTxBuf;       ///< transmit buffer control
   SercomUsart*      ptUsart;      ///< USART
   PVUARTINTCALLBACK pvCallback;   ///< pointer to the callback
@@ -61,7 +61,7 @@ typedef struct _LCLCTL
 #define LCLCTL_SIZE   sizeof( LCLCTL )
 
 // local parameter declarations -----------------------------------------------
-static  PLCLCTL     aptLclCtls[ UART_CHAN_MAX ];
+//static  PLCLCTL     aptLclCtls[ UART_CHAN_MAX ];
 
 // local function prototypes --------------------------------------------------
 static  SercomUsart*  GetSercomChannel( UARTCHAN eChan );
@@ -80,35 +80,43 @@ static  void          IrqCommonHandler( PLCLCTL ptCtl );
  *****************************************************************************/
 PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
 {
-  U16           wBaudRate;
-  U32           uTemp;
-  PLCLCTL       ptCtl = NULL;
+  U16                       wBaudRate;
+  U32                       uTemp;
+  PLCLCTL                   ptCtl = NULL;
+  SercomUsart*              ptUsart;
+  SERCOM_USART_CTRLA_Type   tCtrlA;
+  SERCOM_USART_CTRLB_Type   tCtrlB;
+
   
   // set the pointer
   if (( ptCtl = malloc( LCLCTL_SIZE )) != NULL )
   {
     // store it
-    aptLclCtls[ ptDef->eChan ] = ptCtl;
+//    aptLclCtls[ ptDef->eChan ] = ptCtl;
     ptCtl->ptSignature = ptCtl;
 
     // allocate the buffers
-    if (( ptCtl->tTxBuf.pnBuffer = malloc( ptCtl->tTxBuf.wSize )) != NULL )
+    if (( ptCtl->tTxBuf.pnBuffer = malloc( ptDef->wTxBufSize )) != NULL )
     {
-      #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
-      if (( ptCtl->tRxBuf.pnBuffer = malloc( ptCtl->tRxBuf.wSize )) != NULL )
-      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+      #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+      if (( ptCtl->tRxBuf.pnBuffer = malloc( ptDef->wRxBufSize )) != NULL )
+      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
       {
+        // get the pointer to the USART channel
+        ptUsart = GetSercomChannel( ptDef->eChan );
+        ptCtl->ptUsart = ptUsart;
+
         // now compute the baud rate
         if (( wBaudRate = ComputeBaudrate( ptDef )) != 0 )
         {
           // clear the receive/transmit buffers
           ptCtl->tTxBuf.wWrIdx = ptCtl->tTxBuf.wCount = 0;
           ptCtl->tTxBuf.wSize = ptDef->wTxBufSize;
-          #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+          #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
           ptCtl->tTxBuf.wRdIdx = 0;
           ptCtl->tRxBuf.wWrIdx = ptCtl->tRxBuf.wRdIdx = ptCtl->tRxBuf.wCount = 0;
           ptCtl->tRxBuf.wSize = ptDef->wRxBufSize;
-          #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+          #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
 
           // copy the callback and the event flags
           ptCtl->pvCallback = ptDef->pvCallback;
@@ -118,89 +126,90 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
           Gpio_Configure( ptDef->eDevPort, ptDef->nTxdPin, GPIO_MODE_OUTPUT_INPDSB, OFF, ptDef->eDevMux, OFF );
           Gpio_Configure( ptDef->eDevPort, ptDef->nRxdPin, GPIO_MODE_INPUT,         OFF, ptDef->eDevMux, OFF );
 
-          // get the pointer to the USART channel
-          ptCtl->ptUsart = GetSercomChannel( ptDef->eChan );
-
           // clear the two registers
-          ptCtl->ptUsart->CTRLA.reg = 0;
-          ptCtl->ptUsart->CTRLB.reg = 0;
+          tCtrlA.reg = 0;
+          tCtrlB.reg = 0;
 
           // disable the control adn wait for done
-          ptCtl->ptUsart->CTRLA.bit.SWRST = 1;
-          while( ptCtl->ptUsart->SYNCBUSY.bit.SWRST );
+          ptUsart->CTRLA.bit.SWRST = 1;
+          while( ptUsart->SYNCBUSY.bit.SWRST );
   
           // valid baud rate
-          ptCtl->ptUsart->BAUD.reg = wBaudRate;
+          ptUsart->BAUD.reg = wBaudRate;
     
           // now set the modes
           switch( ptDef->eMode )
           {
             case UART_MODE_ASYNCINT :
-              ptCtl->ptUsart->CTRLA.bit.MODE = 1;
-              ptCtl->ptUsart->CTRLA.bit.CMODE = 0;
+              tCtrlA.bit.MODE = 1;
+              tCtrlA.bit.CMODE = 0;
               break;
         
             case UART_MODE_SYNCEXT :
-              ptCtl->ptUsart->CTRLA.bit.MODE = 1;
-              ptCtl->ptUsart->CTRLA.bit.CMODE = 1;
+              tCtrlA.bit.MODE = 1;
+              tCtrlA.bit.CMODE = 1;
               break;
         
             case UART_MODE_SYNCINT :
-              ptCtl->ptUsart->CTRLA.bit.MODE = 1;
-              ptCtl->ptUsart->CTRLA.bit.CMODE = 1;
+              tCtrlA.bit.MODE = 1;
+              tCtrlA.bit.CMODE = 1;
               break;
         
             case UART_MODE_ASYNCEXT :
             default :
-              ptCtl->ptUsart->CTRLA.bit.MODE = 0;
-              ptCtl->ptUsart->CTRLA.bit.CMODE = 0;
+              tCtrlA.bit.MODE = 0;
+              tCtrlA.bit.CMODE = 0;
               break;
           }
     
           // set the run in standby/sample rate/TX pin/RX pin
-          ptCtl->ptUsart->CTRLA.bit.RUNSTDBY = ptDef->bRunStandby;
-          ptCtl->ptUsart->CTRLA.bit.SAMPR = ptDef->eSamp;
-          ptCtl->ptUsart->CTRLA.bit.TXPO = ptDef->eTxdPad;
-          ptCtl->ptUsart->CTRLA.bit.RXPO = ptDef->eRxdPad;
-          ptCtl->ptUsart->CTRLA.bit.DORD = UART_DATAORDER_LSB;
+          tCtrlA.bit.RUNSTDBY = ptDef->bRunStandby;
+          #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+            tCtrlA.bit.SAMPR = ptDef->eSamp;
+          #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
+          tCtrlA.bit.TXPO = ptDef->eTxdPad;
+          tCtrlA.bit.RXPO = ptDef->eRxdPad;
+          tCtrlA.bit.DORD = UART_DATAORDER_LSB;
     
           // set the frame/parity
-          ptCtl->ptUsart->CTRLA.bit.FORM = ( ptDef->eParity != UART_PARITY_NONE ) ? 1 : 0;
+          tCtrlA.bit.FORM = ( ptDef->eParity != UART_PARITY_NONE ) ? 1 : 0;
     
           // set the word length/stop bits/parity/TX enable/RX enable
           switch( ptDef->eWrdLen )
           {
             case UART_WRDLEN_5 : 
-              ptCtl->ptUsart->CTRLB.reg |= SERCOM_USART_CTRLB_CHSIZE( 5 );
+              tCtrlB.reg |= SERCOM_USART_CTRLB_CHSIZE( 5 );
               break;
         
             case UART_WRDLEN_6 :
-              ptCtl->ptUsart->CTRLB.reg |= SERCOM_USART_CTRLB_CHSIZE( 6 );
+              tCtrlB.reg |= SERCOM_USART_CTRLB_CHSIZE( 6 );
               break;
         
             case UART_WRDLEN_7 :
-              ptCtl->ptUsart->CTRLB.reg |= SERCOM_USART_CTRLB_CHSIZE( 7 );
+              tCtrlB.reg |= SERCOM_USART_CTRLB_CHSIZE( 7 );
               break;
         
             case UART_WRDLEN_8 :
-              ptCtl->ptUsart->CTRLB.bit.CHSIZE = 0;
+              tCtrlB.bit.CHSIZE = 0;
               break;
         
             case UART_WRDLEN_9 :
-              ptCtl->ptUsart->CTRLB.bit.CHSIZE = 1;
+              tCtrlB.bit.CHSIZE = 1;
               break;
         
             default :
-              ptCtl->ptUsart->CTRLB.bit.CHSIZE = 0;
+              tCtrlB.bit.CHSIZE = 0;
               break;
           }
-          ptCtl->ptUsart->CTRLB.bit.SBMODE = ptDef->eStopBit;
-          ptCtl->ptUsart->CTRLB.bit.PMODE = ( ptDef->eParity == UART_PARITY_ODD ) ? ON : 0;
-          ptCtl->ptUsart->CTRLB.bit.RXEN = ON;
-          ptCtl->ptUsart->CTRLB.bit.TXEN = ON;
+          tCtrlB.bit.SBMODE = ptDef->eStopBit;
+          tCtrlB.bit.PMODE = ( ptDef->eParity == UART_PARITY_ODD ) ? ON : 0;
+          tCtrlB.bit.RXEN = ON;
+          tCtrlB.bit.TXEN = ON;
     
           // now write CTRLA/CTRLB
-          while( ptCtl->ptUsart->SYNCBUSY.bit.CTRLB & SERCOM_USART_SYNCBUSY_CTRLB );
+          ptUsart->CTRLA = tCtrlA;
+          while( ptUsart->SYNCBUSY.bit.CTRLB & SERCOM_USART_SYNCBUSY_CTRLB );
+          ptUsart->CTRLB = tCtrlB;
 
           // set up the interrupts
           ptCtl->ptUsart->INTENSET.bit.TXC = ON;
@@ -212,17 +221,17 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
           NVIC_EnableIRQ( SERCOM0_IRQn + ptDef->eChan );
     
           // now enable the device
-          ptCtl->ptUsart->CTRLA.reg |= SERCOM_USART_CTRLA_ENABLE;
-          while( ptCtl->ptUsart->SYNCBUSY.bit.CTRLB & SERCOM_USART_SYNCBUSY_ENABLE );
+          while( ptUsart->SYNCBUSY.bit.CTRLB & SERCOM_USART_SYNCBUSY_ENABLE );
+          ptUsart->CTRLA.reg |= SERCOM_USART_CTRLA_ENABLE;
         }
       }
-      #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
-      else
-      {
-        // free the transmit buffer
-        free( ptCtl->tTxBuf.pnBuffer );
-      }
-      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+      #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+        else
+        {
+          // free the transmit buffer
+          free( ptCtl->tTxBuf.pnBuffer );
+        }
+      #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
     }
     else
     {
@@ -234,9 +243,9 @@ PTUARTHANDLE Uart_Configure( PUARTDEF ptDef )
   else
   {
     // free all buffers/control
-    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
-    free( ptCtl->tRxBuf.pnBuffer );
-    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+      free( ptCtl->tRxBuf.pnBuffer );
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
     free( ptCtl->tTxBuf.pnBuffer );
     free( ptCtl );
     ptCtl = NULL;
@@ -272,7 +281,7 @@ UARTERR Uart_Write( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesWr
   ptCtl = MAP_HANDLE_TO_POINTER( ptUart );
  
   // check for a valid UART
-  if ( ptCtl->ptSignature < ptCtl )
+  if ( ptCtl->ptSignature == ptCtl )
   {
     // set no error
     eError = UART_ERR_NONE;
@@ -312,7 +321,7 @@ UARTERR Uart_Write( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesWr
   return( eError );
 }
 
-#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 /******************************************************************************
  * @function Uart_Read
  *
@@ -338,7 +347,7 @@ UARTERR Uart_Read( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesRea
   ptCtl = MAP_HANDLE_TO_POINTER( ptUart );
  
   // check for a valid UART
-  if ( ptCtl->ptSignature < ptCtl )
+  if ( ptCtl->ptSignature == ptCtl )
   {
     // set no error
     eError = UART_ERR_NONE;
@@ -361,7 +370,7 @@ UARTERR Uart_Read( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesRea
   // return the error
   return( eError );
 }
-#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
 
 #ifdef SERCOM0
 /******************************************************************************
@@ -510,7 +519,7 @@ static void IrqCommonHandler( PLCLCTL ptCtl )
           eEvent = UART_IRQ_EVENT_RXCHAR;
           pvCallBack( eEvent, nOption );
         }
-        #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+        #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
         // check for room in local buffer
         else if ( ptCtl->tRxBuf.wCount < ptCtl->tRxBuf.wSize )
         {
@@ -519,7 +528,7 @@ static void IrqCommonHandler( PLCLCTL ptCtl )
           ptCtl->tRxBuf.wWrIdx %= ptCtl->tRxBuf.wSize;
           ptCtl->tRxBuf.wCount++;
         }
-        #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+        #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
       }
     }
   }
@@ -689,48 +698,53 @@ static U16 ComputeBaudrate( PUARTDEF ptDef )
   U16   wBaudRate = 0;
   
   // get the system clock value
-  uPeripheralClock = Clock_GetFreq( );
-  
-  // get the sample rate
-  switch( ptDef->eSamp )
-  {
-    case UART_SAMP_16XARITH :
-      nSampleRate = 16;
-      bFractional = FALSE;
-      break;
+  uPeripheralClock = Clock_GetGenClock( CLOCK_MUXID_SERCOM_0 + ptDef->eChan );
+
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+    // get the sample rate
+    switch( ptDef->eSamp )
+    {
+      case UART_SAMP_16XARITH :
+        nSampleRate = 16;
+        bFractional = FALSE;
+        break;
       
-  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
-    case UART_SAMP_16XFRAC :
-      nSampleRate = 16;
-      bFractional = TRUE;
-      break;
+      case UART_SAMP_16XFRAC :
+        nSampleRate = 16;
+        bFractional = TRUE;
+        break;
       
-    case UART_SAMP_8XARITH :
-      nSampleRate = 8;
-      bFractional = FALSE;
-      break;
+      case UART_SAMP_8XARITH :
+        nSampleRate = 8;
+        bFractional = FALSE;
+        break;
       
-    case UART_SAMP_8XFRAC :
-      nSampleRate = 8;
-      bFractional = TRUE;
-      break;
+      case UART_SAMP_8XFRAC :
+        nSampleRate = 8;
+        bFractional = TRUE;
+        break;
       
-    case UART_SAMP_3XARITH :
-      nSampleRate = 3;
-      bFractional = TRUE;
-      break;
-  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
-      
-    default :
+      case UART_SAMP_3XARITH :
+        nSampleRate = 3;
+        bFractional = TRUE;
+        break;
+
+      default :
       nSampleRate = 1;
       bFractional = FALSE;
       break;
+    }
+  #else
+  {
+    nSampleRate = 16;
+    bFractional = FALSE;
   }
+  #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
   
   // check for baud rate outside of normal range
   if (( ptDef->uBaudRate * nSampleRate ) <= uPeripheralClock )
   {
-    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+    #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
     // check for fractional
     if ( bFractional )
     {
@@ -756,13 +770,16 @@ static U16 ComputeBaudrate( PUARTDEF ptDef )
       }
     }
     else
-    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
+    #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_MINIMAL
   {
       // calculate the baud rate
       uRatio = (( nSampleRate * ( U64 )ptDef->uBaudRate ) << 32 ) / uPeripheralClock;
       wBaudRate = ( U16 )(( 65536 ) - uRatio );
     }
   }
+
+  // for debug
+  wBaudRate = 0xF62B;
   
   // return the baud rate
   return( wBaudRate );

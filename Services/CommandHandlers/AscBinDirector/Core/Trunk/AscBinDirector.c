@@ -82,8 +82,8 @@ void AscBinDirector_ProcessChar( ASCBINDIRENUMS eEnum, U8 nChar, U8 nCompareValu
   // check for a valid enum
   if ( eEnum < ASCBINDIR_ENUM_MAX )
   {
-    eAscProtEnum = PGM_RDBYTE( atAscBinDirectDefs[ eEnum ].eAscProtEnum );
-    eBinProtEnum = PGM_RDBYTE( atAscBinDirectDefs[ eEnum ].eBinProtEnum );
+    eAscProtEnum = PGM_RDBYTE( g_atAscBinDirectDefs[ eEnum ].eAscProtEnum );
+    eBinProtEnum = PGM_RDBYTE( g_atAscBinDirectDefs[ eEnum ].eBinProtEnum );
 
     // call the binary handler
     if ( BinaryCommandHandler_ProcessChar( eBinProtEnum, nChar, nCompareValue ) == BINCMD_STS_IDLE )

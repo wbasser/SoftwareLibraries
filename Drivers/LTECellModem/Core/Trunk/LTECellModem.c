@@ -27,9 +27,6 @@
 #include "LTECellModem/LTECellModem.h"
 
 // library includes -----------------------------------------------------------
-#include "GPIO/Gpio.h"
-#include "RedirectionManager/RedirectionManager.h"
-#include "UART/Uart.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the size of the transmit/receive buffers
@@ -37,7 +34,14 @@
 #define RECV_BUF_SIZE                       ( 512 )
 
 /// define the message timeout
-#define XMIT_MSG_TMO                        ( TASK_TIME_MSECS( 500 ))
+#define XMIT_MSG_TIME_MSECS                 ( 500 )
+
+/// define the power up delay time
+#define PWRUP_DELAY_TIME_MSECS              ( 3000 )
+
+/// define the carriage return/linefeed charasters
+#define CH_CR                               ( 0x0D )
+#define CH_LF                               ( 0x0A )
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the states
@@ -50,12 +54,43 @@ typedef enum _CTLSTATE
   CTL_STATE_MAX
 } CTLSTATE;
 
-/// enumerate the events
-typedef enum _CTLEVENT
+/// enumerate the decode states
+typedef enum _DECSTATE
 {
-  CTL_EVENT_XMTMSG = 0xCE10,
-  CTL_EVENT_RCVMSG,
-} CTLEVENT;
+  DEC_STATE_CR1 = 0,
+  DEC_STATE_LF1,
+  DEC_STATE_RSP,
+  DEC_STATE_ERR,
+  DEC_STATE_CR2,
+  DEC_STATE_LF2,
+  DEC_STATE_OK1,
+  DEC_STATE_OK2,
+  DEC_STATE_CR3,
+  DEC_STATE_LF3,
+  DEC_STATE_CR4,
+  DEC_STATE_LF4,
+  DEC_STATE_FLS,
+} DECSTATE;
+
+/// enumerate the MQTT op codes
+typedef enum _LTEMQTTOPCODE
+{
+  LTE_MQTTOPCODE_CLIENTID = 0,
+  LTE_MQTTOPCODE_LCLPORT,
+  LTE_MQTTOPCODE_SERVERNAME,
+  LTE_MQTTOPCODE_IPADDRESS,
+  LTE_MQTTOPCODE_USERCRED,
+  LTE_MQTTOPCODE_WILLQOS,
+  LTE_MQTTOPCODE_WILLRETAIN,
+  LTE_MQTTOPCODE_WILLTOPIC,
+  LTE_MQTTOPCODE_WILLMESSAGE,
+  LTE_MQTTOPCODE_INACTIVEPER,
+  LTE_MQTTOPCODE_SSECURE
+  LTE_MQTTOPCODE_CLEANSESSION,
+  LTE_MQTTOPCODE_UNUSED,
+  LTE_MQTTOPCODE_TERSEVERB,
+  LTE_MQTTOPCODE_MAX
+} LTEMQTTOPCODE;
 
 // structures -----------------------------------------------------------------
 
@@ -63,79 +98,103 @@ typedef enum _CTLEVENT
 
 // local parameter declarations -----------------------------------------------
 static  CTLSTATE      eCtlState;
+static  DECSTATE      eDecState;
 static  U8            anXmitBuffer[ XMIT_BUF_SIZE ];
 static  U8            anRecvBuffer[ RECV_BUF_SIZE ];
 static  U16           wXmitBufIdx;
 static  U16           wRecvBufIdx;
+static  U16           wRespBufIdx;
 static  PVLTECALLBACK pvCurCallback;
+static  PCC8          pszExpectedResult;
 
 // local function prototypes --------------------------------------------------
+static  void  SendCommand( PCC8 pszCommand, PC8 pszOption, PCC8 pszExpectedResult, BOOL bSendAT, PVLTECALLBACK pvCallback );
 static  void  ParseResponse( void );
 static  PVOID ParseResponseValue( void );
 
 // constant parameter initializations -----------------------------------------
 /// define the commands
 /// general
-static  const CODE C8  szCmdAT[ ]        = { "AT" };
-static  const CODE C8  szCmdECHO[ ]      = { "E%d" };
-static  const CODE C8  szCmdCGSN[ ]      = { "+CGSN" };
-static  const CODE C8  szCmdCIMI[ ]      = { "+CIMI" };
-static  const CODE C8  szCmdCCID[]       = { "+CCID" };
+static  const CODE C8   szCmdAT[ ]          = { "AT" };
+static  const CODE C8   szCmdECHO[ ]        = { "E%d" };
+static  const CODE C8   szCmdCGSN[ ]        = { "+CGSN" };
+static  const CODE C8   szCmdCIMI[ ]        = { "+CIMI" };
+static  const CODE C8   szCmdCCID[]         = { "+CCID" };
 
 /// control and status
-static  const CODE C8  szCmdCFUN[ ]      = { "+CFUN" };
-static  const CODE C8  szCmdCCLK[ ]      = { "+CCLK" };
-static  const CODE C8  szCmdCTZU[ ]      = { "+CTZU" };
+static  const CODE C8   szCmdCFUN[ ]        = { "+CFUN" };
+static  const CODE C8   szCmdCCLK[ ]        = { "+CCLK" };
+static  const CODE C8   szCmdCTZU[ ]        = { "+CTZU" };
 
 /// Network service
-static  const CODE C8  szCmdUMNOPROF[ ]  = { "+UMNOPROF" }; 
-static  const CODE C8  szCmdCSQ[ ]       = { "+CSQ" };
-static  const CODE C8  szCmdCREG[ ]      = { "+CREG" };
-static  const CODE C8  szCmdCGDCONT[ ]   = { "+CGDCONT" };
-static  const CODE C8  szCmdPPP[ ]       = { "D" };
-static  const CODE C8  szCmdCOPS[ ]      = { "+COPS" };
+static  const CODE C8   szCmdUMNOPROF[ ]    = { "+UMNOPROF" }; 
+static  const CODE C8   szCmdCSQ[ ]         = { "+CSQ" };
+static  const CODE C8   szCmdCREG[ ]        = { "+CREG" };
+static  const CODE C8   szCmdCGDCONT[ ]     = { "+CGDCONT" };
+static  const CODE C8   szCmdPPP[ ]         = { "D" };
+static  const CODE C8   szCmdCOPS[ ]        = { "+COPS" };
 
 /// baud rate
-static  const CODE C8  szCmdIPR[ ]       = { "+IPR" };
+static  const CODE C8   szCmdIPR[ ]         = { "+IPR" };
 
 /// GPIO
-static  const CODE C8  szCmdUGPIOC[ ]    = { "+UGPIOC=%d,%d" };
+static  const CODE C8   szCmdUGPIOC[ ]      = { "+UGPIOC" };
 
 /// IP
-static  const CODE C8  szCmdUSOCR[ ]     = { "+USOCR" };
-static  const CODE C8  szCmdUSCOL[ ]     = { "+USOCL" };
-static  const CODE C8  szCmdUSOCO[ ]     = { "+USOCO" };
-static  const CODE C8  szCmdUSOWR[ ]     = { "+USOWR" };
-static  const CODE C8  szCmdUSORD[ ]     = { "+USORD" };
-static  const CODE C8  szCmdUSOLI[ ]     = { "+USOLI" };
+static  const CODE C8   szCmdUSOCR[ ]       = { "+USOCR" };
+static  const CODE C8   szCmdUSCOL[ ]       = { "+USOCL" };
+static  const CODE C8   szCmdUSOCO[ ]       = { "+USOCO" };
+static  const CODE C8   szCmdUSOWR[ ]       = { "+USOWR" };
+static  const CODE C8   szCmdUSORD[ ]       = { "+USORD" };
+static  const CODE C8   szCmdUSOLI[ ]       = { "+USOLI" };
 
 /// SMS
-static  const CODE C8  szCmdCMGF[ ]      = { "+CMGF" };
-static  const CODE C8  szCmdCMGS[ ]      = { "+CMGS" };
+static  const CODE C8   szCmdCMGF[ ]        = { "+CMGF" };
+static  const CODE C8   szCmdCMGS[ ]        = { "+CMGS" };
 
 /// location
-static  const CODE C8  szCmdUPGS[ ]      = { "+UGPS" };
-static  const CODE C8  szCmdULOC[ ]      = { "+ULOC" };
-static  const CODE C8  szCmdUGPRMC[ ]    = { "+UGRMC" };
+static  const CODE C8   szCmdUPGS[ ]        = { "+UGPS" };
+static  const CODE C8   szCmdULOC[ ]        = { "+ULOC" };
+static  const CODE C8   szCmdUGPRMC[ ]      = { "+UGRMC" };
 
 /// MQQT
 
 /// on/off codes
-static  const CODE C8 szOptOff[ ]       = { "0" };
-static  const CODE C8 szOptOn[ ]        = { "1" };
+static  const CODE C8   szOptOff[ ]         = { "0" };
+static  const CODE C8   szOptOn[ ]          = { "1" };
+
+/// query codes
+static  const CODE C8   szQuery[ ]          = { "?" };
 
 /// response codes
-static  const CODE C8 szRspOK[ ]        = { "OK" };
-static  const CODE C8 szRspError[ ]     = { "ERROR" };
+static  const CODE C8   szRspOK[ ]          = { "OK" };
+static  const CODE C8   szRspError[ ]       = { "ERROR" };
 
 /// general format strings
-static  const CODE C8 szFmtCmd[ ]       = { "%s" };
+static  const CODE C8   szFmtStr[ ]         = { "%s" };
+static  const CODE C8   szFmtVal[ ]         = { "%d" };
+
+/// argument format strings
+static  const CODE C8   szFmtSngArg[ ]      = { "=%d" };
+static  const CODE C8   szFmtDblArg[ ]      = { "=%d,%d" };
+static  const CODE C8   szFmtCopsArg[ ]     = { "=%d,\"%s\",\"%S\"" };
 
 /// GPIO mapping
-static  const CODE U8 anGpioMode[ LTE_GPIO_MAX] =
+static  const CODE U8   anGpioMode[ LTE_GPIO_MAX ] =
 {
   16, 23, 24, 25, 42, 19
 };
+
+/// PDP types
+static  const CODE PC8 apszPdpType[ ]  =
+{
+  "IP",
+  "NONIP",
+  "IPV4V6",
+  "IPV6"
+};
+
+
 
 /******************************************************************************
  * @function LTECellModem_Intialize
@@ -147,6 +206,9 @@ static  const CODE U8 anGpioMode[ LTE_GPIO_MAX] =
  *****************************************************************************/
 void LTECellModem_Intialize( void )
 {
+  // call the local initialization
+  LTECellModem_LocalInitialize( );
+  
   // set the state
   eCtlState = CTL_STATE_PWRUP;
 
@@ -155,137 +217,255 @@ void LTECellModem_Intialize( void )
 }
 
 /******************************************************************************
- * @function LTECellModem_PutChar
- *
- * @brief output a single character
- *
- * This function will write a single character
- *
- * @param[in]    nData     data to send
- *
- *****************************************************************************/
-void LTECellModem_PutChar( U8 nData )
-{
-  U16 wBytesWritten = 0;
-
-  // write a byte of data to the device
-  Uart_Write( UART_DEV_ENUM_LTE, ( PU8 )&nData, 1, &wBytesWritten );
-}
-
-/******************************************************************************
- * @function LTECellModem_Write
- *
- * @brief output a block of characters
- *
- * This function will output a block of characters to the approrpiate device
- *
- * @param[in]    pcData     pointer to the data to send
- * @param[in]   nLength     length of the data
- *
- *****************************************************************************/
-void LTECellModem_Write( PC8 pcData, U16 wLength )
-{
-  U16 wBytesWritten = 0;
-
-  // write a byte of data to the device
-  do
-  {
-    // write a block to the UART
-    Uart_Write( UART_DEV_ENUM_LTE, ( PU8 )pcData, wLength, &wBytesWritten );
-    wLength -= wBytesWritten;
-    pcData += wBytesWritten;
-  } while( wLength != 0 ); 
-}
-
-/******************************************************************************
- * @function LTECellModem_ProcessChar
+ * @function LTECellModem_CharProcess
  *
  * @brief process character task
  *
  * This function will process the incoming character
  *
- * @param[in]   xArg    task argument
- *
- * @return      TRUE to flush events
+ * @param[in]   nChar   character to process
  *
  *****************************************************************************/
-BOOL LTECellModem_ProcessChar( TASKARG xArg )
+void LTECellModem_CharProcess( U8 nChar )
 {
-  // process redirection
-  if ( !RedirectionManager_RedirectChar( REDMNGR_DEV_LTE, ( U8 )xArg ))
+  // process the state
+  switch( eDecState )
   {
-    // add the character to the buffer
-    anRecvBuffer[ wRecvBufIdx++ ] = ( U8 )xArg;
+    case DEC_STATE_CR1 :
+      if ( CH_CR == nChar )
+      {
+        // go to LF1
+        eDecState = DEC_STATE_LF1;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
 
-    // check for a carriage return
-    if ( xArg == '\r' )
-    {
-      // message received - terminate it
-      anRecvBuffer[ wRecvBufIdx - 1 ] = '\0';
+    case DEC_STATE_LF1 :
+      if ( CH_LF == nChar )
+      {
+        // go to RSP
+        eDecState = DEC_STATE_RSP;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
 
-      // parse the buffer
-      ParseResponse( );
+    case DEC_STATE_RSP :
+      // check for the terminating carriage return
+      if ( CH_CR == nChar )
+      {
+        // terminate the receive buffer
+        anRecvBuffer[ wRecvBufIdx - 1 ] = '\0';
 
-      // in all cases - post a message received event
-      TaskManager_PostEvent( TASK_SCHD_ENUM_LEDCTL, CTL_EVENT_RCVMSG );
-    }
+        // goto LF2
+        eDecState = DEC_STATE_LF2;
+      }
+      else if ( *( pszExpectedResult + wRespBufIdx ) == nChar )
+      {
+        // add to receive buffer
+        anRecvBuffer[ wRecvBufIdx++ ] = nChar;
+
+        // increment the response index
+        wRespBufIdx++;
+      }
+      else if ( szRspError[ wRespBufIdx ] == nChar )
+      {
+        // add to receive buffer
+        anRecvBuffer[ wRecvBufIdx++ ] = nChar;
+
+        // increment the response index
+        wRespBufIdx++;
+
+        // go to error
+        eDecState = DEC_STATE_ERR;
+      }
+      break;
+
+    case DEC_STATE_ERR :
+      // check for the terminating carriage return
+      if ( CH_CR == nChar )
+      {
+        // goto LF4
+        eDecState = DEC_STATE_LF4;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_OK1 :
+      if ( szRspOK[ 0 ] == nChar )
+      {
+        // go to OK2
+        eDecState = DEC_STATE_OK2;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_OK2 :
+      if ( szRspOK[ 1 ] == nChar )
+      {
+        // go to CR4
+        eDecState = DEC_STATE_CR4;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_CR2 :
+      if ( CH_CR == nChar )
+      {
+        // go to LF1
+        eDecState = DEC_STATE_LF2;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_LF2 :
+      if ( CH_LF == nChar )
+      {
+        // go to RSP
+        eDecState = DEC_STATE_CR3;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_CR3 :
+      if ( CH_CR == nChar )
+      {
+        // go to LF1
+        eDecState = DEC_STATE_LF3;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_LF3 :
+      if ( CH_LF == nChar )
+      {
+        // go to OK1
+        eDecState = DEC_STATE_OK1;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_CR4 :
+      if ( CH_CR == nChar )
+      {
+        // go to LF1
+        eDecState = DEC_STATE_LF4;
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_LF4 :
+      if ( CH_LF == nChar )
+      {
+        // in all cases - post a message received event
+        LTECellModem_PostCtrlEvent( LTE_LCLEVENT_RCVMSG );
+      }
+      else
+      {
+        // go to error
+        eDecState = DEC_STATE_FLS;
+      }
+      break;
+
+    case DEC_STATE_FLS :
+      break;
+
+    default :
+      break;
   }
-
-  // return true to flush event
-  return( TRUE );
 }
 
 /******************************************************************************
- * @function LTECellModem_ProcessCtrl
+ * @function LTECellModem_CtrlProcess
  *
  * @brief process control task
  *
  * This function will process the control event
  *
- * @param[in]   xArg    task argument
- *
- * @return      TRUE to flush events
+ * @param[in]   eEvent  event 
  *
  *****************************************************************************/
-BOOL LTECellModem_ProcessCtrl( TASKARG xArg )
+void LTECellModem_CtrlProcess( LTELCLEVENT eEvent )
 {
   // determine the state
   switch( eCtlState )
   {
     case CTL_STATE_PWRUP :
       // turn on the power control/start a time delay
-      Gpio_Set( GPIO_PIN_ENUM_CELPWR, ON );
-      TaskManager_StartTimer( TASK_SCHD_ENUM_LTECTRL, TASK_TIME_SECS( 3 ));
+      LTECellModem_PowerControl( ON );
+      LTECellModem_StartStopTime( PWRUP_DELAY_TIME_MSECS );
       eCtlState = CTL_STATE_PWRDLY;
       break;
 
     case CTL_STATE_PWRDLY :
       // if this is a timeout - reset the 
-      if ( xArg == TASK_TIMEOUT_EVENT )
+      if ( LTE_LCLEVENT_TIMEOUT == eEvent )
       {
-        Gpio_Set( GPIO_PIN_ENUM_CELPWR, OFF );
+        LTECellModem_PowerControl( OFF );
         eCtlState = CTL_STATE_IDLE;
       }
       break;
 
     case CTL_STATE_IDLE :
       // check for a message request
-      if ( xArg == CTL_EVENT_XMTMSG )
+      if ( LTE_LCLEVENT_XMTMSG == eEvent )
       {
         // send it/start timer/goto wait state
         LTECellModem_Write( anXmitBuffer, wXmitBufIdx );
-        TaskManager_StartTimer( TASK_SCHD_ENUM_LTECTRL, XMIT_MSG_TMO );
+        LTECellModem_StartStopTime( XMIT_MSG_TIME_MSECS );
         eCtlState = CTL_STATE_WAIT;
       }
       break;
 
     case CTL_STATE_WAIT :
       // determine the event
-      switch( xArg )
+      switch( eEvent )
       {
-        case CTL_EVENT_RCVMSG :
+        case LTE_LCLEVENT_RCVMSG :
           // stop the timer
-          TaskManager_StopTimer( TASK_SCHD_ENUM_LTECTRL );
+          LTECellModem_StartStopTime( 0 );
+
+          // parse the buffer
+          ParseResponse( );
           break;
 
         case TASK_TIMEOUT_EVENT :
@@ -306,9 +486,6 @@ BOOL LTECellModem_ProcessCtrl( TASKARG xArg )
       eCtlState = CTL_STATE_IDLE;
       break;
   }
-
-  // return true to flush event
-  return( TRUE );
 }
 
 /******************************************************************************
@@ -324,16 +501,149 @@ BOOL LTECellModem_ProcessCtrl( TASKARG xArg )
  *****************************************************************************/
 void LteCellModem_EchoControlOff( BOOL bState, PVLTECALLBACK pvCallback )
 {
-  // store the callback
-  pvCurCallback = pvCallback;
+  C8    acLclBuffer[ 2 ];
 
-  // build the command
-  wXmitBufIdx = SPRINTF_P( anXmitBuffer, ( const char* )szFmtCmd, ( const char * )szCmdAT );
-  wXmitBufIdx += SPRINTF_P( &anXmitBuffer[ wXmitBufIdx ], ( const char *)szCmdECHO, bState );
-  anXmitBuffer[ wXmitBufIdx++ ] = '\r';
+  // create the option
+  SPRINTF_P( acLclBuffer, ( PCC8 )szFmtVal, bState );
+  
+  // send the command
+  SendCommand( szCmdECHO, acLclBuffer, szRspOK, TRUE, pvCallback );
+}
 
-  // post the message
-  TaskManager_PostEvent( TASK_SCHD_ENUM_LTECTRL, CTL_EVENT_XMTMSG );
+
+/******************************************************************************
+ * @function LTECellModem_SendRequest
+ *
+ * @brief send a request for data
+ *
+ * This function will send a request for data, register the callback
+ *
+ * @param[in]   eRequest    request enumeration
+ * @param[in]   pvCallback  pointer to the callback
+ *
+ * @return      apropriate error 
+ *
+ *****************************************************************************/
+LTEERR LTECellModem_SendRequest( LTEREQUEST eRequest, PVLTECALLBACK pvCallback )
+{
+  LTEERR  eError = LTE_ERR_NONE;
+  PCC8    pszCommand;
+  PCC8    pszOption = NULL;
+
+  // check for a command in progress
+  if ( CTL_STATE_IDLE != eCtlState )
+  {
+    // set the error
+    eError = LTE_ERR_BUSY;
+  }
+  else
+  {
+    // now get the command
+    switch( eRequest )
+    {
+      case LTE_REQUEST_CREG :
+        pszCommand = szCmdCREG;
+        break;
+
+      case LTE_REQUEST_CGSN :
+        pszCommand = szCmdCGSN;
+        break;
+
+      case LTE_REQUEST_CIMI :
+        pszCommand = szCmdCIMI;
+        break;
+
+      case LTE_REQUEST_CCID :
+        pszCommand = szCmdCCID;
+        break;
+
+      case LTE_REQUEST_CSQ :
+        pszCommand = szCmdCSQ;
+        break;
+
+      case LTE_REQUEST_MNO :
+        pszCommand = szCmdUMNOPROF;
+        pszOption = szQuery;
+        break;
+
+      case LTE_REQUEST_APN :
+        pszCommand = szCmdCOPS;
+        pszOption = szQuery;
+        break;
+
+      default :
+        // error
+        eError = LTE_ERR_ILLREQUEST;
+        pszCommand = NULL;
+        break;
+    }
+
+    // now check for valid command
+    if ( NULL != pszCommand )
+    {
+      // send the command
+      SendCommand( pszCommand, ( PC8 )pszOption, szRspOK, TRUE, pvCallback );
+    }
+  }
+
+  // return the error
+  return( eError );
+}
+
+/******************************************************************************
+ * @function LTECellModem_SetOperator
+ *
+ * @brief set the operator
+ *
+ * This function will set the operator
+ *
+ * @param[in]   eMno      MNO selection
+ * @param[in]   pvCallback  pointer to the callback
+ *
+ * @return      apropriate error 
+ *
+ *****************************************************************************/
+LTEERR LTECellModem_SetOperator( LTEMNO eMno, PVLTECALLBACK pvCallback )
+{
+  LTEERR  eError = LTE_ERR_NONE;
+  C8      acArgument[ 8 ];
+
+  // format the option
+  SPRINTF_P( acArgument, ( PCC8 )szFmtSngArg, eMno );
+
+  // send the command
+  SendCommand( szCmdUMNOPROF, acArgument, szRspOK, TRUE, pvCallback );
+
+  // return the error
+  return( eError );
+}
+
+/******************************************************************************
+ * @function LTECellModem_SetAPN
+ *
+ * @brief set the APN
+ *
+ * This function will set the APN
+ *
+ * @param[in]   pszOperator pointer to the operator
+ * @param[in]   pvCallback  pointer to the callback
+ *
+ * @return      apropriate error 
+ *
+ *****************************************************************************/
+LTEERR LTECellModem_SetAPN( PC8 pszOperator, LTEPDP ePdp, PVLTECALLBACK pvCallback )
+{
+  LTEERR  eError = LTE_ERR_NONE;
+  C8      acArgument[ 24 ];
+
+  // format the option
+  SPRINTF_P( acArgument, szFmtCopsArg, 1, ( PC8 )apszPdpType[ ePdp ], pszOperator );
+
+  // send the command
+  SendCommand( szCmdCOPS, acArgument, szRspOK, TRUE, pvCallback );
+
+  // return the error
+  return( eError );
 }
 
 /******************************************************************************
@@ -352,56 +662,17 @@ void LteCellModem_EchoControlOff( BOOL bState, PVLTECALLBACK pvCallback )
  *****************************************************************************/
 LTEERR LTECellModem_SetGpio( LTEGPIO eGpioEnum, LTEGPIOMODE eGpioMode, PVLTECALLBACK pvCallback )
 {
-  LTEERR eError = LTE_ERR_NONE;
-
-  // save the callback
-  pvCurCallback = pvCallback;
-
+  LTEERR  eError = LTE_ERR_NONE;
+  C8      acArguments[ 8 ];
+  
   // test for valid enum
   if ( eGpioEnum < LTE_GPIO_MAX )
   {
-    // build the command
-    wXmitBufIdx = SPRINTF_P( anXmitBuffer, ( const char* )szFmtCmd, ( const char * )szCmdAT );
-    wXmitBufIdx += SPRINTF_P( &anXmitBuffer[ wXmitBufIdx ], ( const char *)szCmdUGPIOC, eGpioEnum, anGpioMode[ eGpioMode ] );
-    anXmitBuffer[ wXmitBufIdx++ ] = '\r';
-
-    // post the message
-    TaskManager_PostEvent( TASK_SCHD_ENUM_LTECTRL, CTL_EVENT_XMTMSG );
-  }
-  else
-  {
-    // set the error
-    eError = LTE_ERR_ILLGPIOENUM;
-  }
-
-  // return the error
-  return( eError );
-}
-
-/******************************************************************************
- * @function LTECellModem_GetGpio
- *
- * @brief wet the gpio
- *
- * This function will get the GPIO to a givenfunction
- *
- * @param[in]   eGpioEnum     desried GPIO enumeration
- * @param[in]   eGpioMode     desired GPIO mode
- * @param[in]   pvCallback    pointer to the callback function
- *
- * @return      appropriate error
- *
- *****************************************************************************/
-LTEERR LTECellModem_GetGpio( LTEGPIO eGpioEnum, PLTEGPIOMODE peGpioMode, PVLTECALLBACK pvCallback )
-{
-  LTEERR eError = LTE_ERR_NONE;
-
-  // save the callback
-  pvCurCallback = pvCallback;
-
-  // test for valid enum
-  if ( eGpioEnum < LTE_GPIO_MAX )
-  {
+    // create the option
+    SPRINTF_P( acArguments, szFmtDblArg, eGpioEnum, eGpioMode );
+    
+    // send the command
+    SendCommand( szCmdUGPIOC, acArguments, szRspOK, TRUE, pvCallback );
   }
   else
   {
@@ -424,18 +695,71 @@ LTEERR LTECellModem_GetGpio( LTEGPIO eGpioEnum, PLTEGPIOMODE peGpioMode, PVLTECA
  * @param[in]   pvCallback    pointer to the callback function
  *
  *****************************************************************************/
-void LteCellModem_SetAutoTimeZone( BOOL bState, PVLTECALLBACK pvCallback )
+LTEERR LteCellModem_SetAutoTimeZone( BOOL bState, PVLTECALLBACK pvCallback )
 {
-  // store the callback
-  pvCurCallback = pvCallback;
+  LTEERR  eError = LTE_ERR_NONE;
+  C8      acArguments[ 8 ];
 
-  // build the command
-  wXmitBufIdx = SPRINTF_P( anXmitBuffer, ( const char* )szFmtCmd, ( const char * )szCmdAT );
-  wXmitBufIdx += SPRINTF_P( &anXmitBuffer[ wXmitBufIdx ], ( const char *)szCmdCTZU, bState );
+  // create the option
+  SPRINTF_P( acArguments, ( PCC8 )szFmtSngArg, bState );
+  
+  // send the command
+  SendCommand( szCmdCTZU, acArguments, szRspOK, TRUE, pvCallback );
+
+  // return the error
+  return( eError );
+}
+
+/******************************************************************************
+ * @function SendCommand
+ *
+ * @brief send a command
+ *
+ * This function will stuff the transmit buffer and send the command
+ *
+ * @param[in]   pszCommand    pointer to the command
+ * @param[in]   pszOption     pointer to the option
+ * @param[in]   pszExpected   pointer to the expected result
+ * @param[in]   bSendAT       send an AT also
+ * @param[in]   pvCallback    pointer to the callback function
+ *
+ *****************************************************************************/
+static void SendCommand( PCC8 pszCommand, PC8 pszOption, PCC8 pszExpected, BOOL bSendAT, PVLTECALLBACK pvCallback )
+{
+  // store the callback/result
+  pvCurCallback = pvCallback;
+  pszExpectedResult = pszExpected;
+
+  // clear the index
+  wXmitBufIdx = 0;
+  wRecvBufIdx = 0;
+  wRespBufIdx = 0;
+
+  // set the decode state
+  eDecState = DEC_STATE_CR1;
+  
+  // check for send AT
+  if ( bSendAT )
+  {
+    // stuff in buffer
+    wXmitBufIdx = SPRINTF_P( anXmitBuffer, ( PCC8 )szFmtStr, ( PCC8 )szCmdAT );
+  }
+  
+  // now stuff command
+  wXmitBufIdx += SPRINTF_P( &anXmitBuffer[ wXmitBufIdx ], ( PCC8 )szFmtStr, pszCommand );
+  
+  // check for option
+  if ( NULL != pszOption )
+  {
+    // now stuff option
+    wXmitBufIdx += SPRINTF_P( &anXmitBuffer[ wXmitBufIdx ], ( PCC8 )szFmtStr, pszOption );
+  }
+  
+  // terminate it
   anXmitBuffer[ wXmitBufIdx++ ] = '\r';
 
   // post the message
-  TaskManager_PostEvent( TASK_SCHD_ENUM_LTECTRL, CTL_EVENT_XMTMSG );
+  LTECellModem_PostCtrlEvent( LTE_LCLEVENT_XMTMSG );
 }
 
 /******************************************************************************
@@ -516,4 +840,91 @@ static PVOID ParseResponseValue( void )
  * @return      
  *
  *****************************************************************************/
+
+///******************************************************************************
+// * @function LTECellModem_GetGpio
+// *
+// * @brief wet the gpio
+// *
+// * This function will get the GPIO to a givenfunction
+// *
+// * @param[in]   eGpioEnum     desried GPIO enumeration
+// * @param[in]   eGpioMode     desired GPIO mode
+// * @param[in]   pvCallback    pointer to the callback function
+// *
+// * @return      appropriate error
+// *
+// *****************************************************************************/
+//LTEERR LTECellModem_GetGpio( LTEGPIO eGpioEnum, PLTEGPIOMODE peGpioMode, PVLTECALLBACK pvCallback )
+//{
+//  LTEERR eError = LTE_ERR_NONE;
+
+//  // save the callback
+//  pvCurCallback = pvCallback;
+
+//  // test for valid enum
+//  if ( eGpioEnum < LTE_GPIO_MAX )
+//  {
+//  }
+//  else
+//  {
+//    // set the error
+//    eError = LTE_ERR_ILLGPIOENUM;
+//  }
+
+//  // return the error
+//  return( eError );
+//}
+
+
+
+/******************************************************************************
+ * @function 
+ *
+ * @brief 
+ *
+ * This function 
+ *
+ * @param[in]   
+ *
+ * @return      
+ *
+ *****************************************************************************/
+/******************************************************************************
+ * @function 
+ *
+ * @brief 
+ *
+ * This function 
+ *
+ * @param[in]   
+ *
+ * @return      
+ *
+ *****************************************************************************/
+/******************************************************************************
+ * @function 
+ *
+ * @brief 
+ *
+ * This function 
+ *
+ * @param[in]   
+ *
+ * @return      
+ *
+ *****************************************************************************/
+/******************************************************************************
+ * @function 
+ *
+ * @brief 
+ *
+ * This function 
+ *
+ * @param[in]   
+ *
+ * @return      
+ *
+ *****************************************************************************/
+
 /**@} EOF LTECellModem.c */

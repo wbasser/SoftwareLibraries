@@ -38,11 +38,16 @@ typedef enum _SOUNDMANAGERERR
   SOUNDMANAGER_ERR_ILLSEQ,        ///< illegal sound sequence
 } SOUNDMANAGERERR;
 
+// structures -----------------------------------------------------------------
+/// define the callback function
+typedef void  (*PVSNDMNGRCBFNC)(void);
+
 // global function prototypes --------------------------------------------------
 extern 	void	            SoundManager_Initialize( void );
-extern	SOUNDMANAGERERR 	SoundManager_PlaySequence( SNDMNGRANIMENUM eSoundSeq );
+extern	SOUNDMANAGERERR 	SoundManager_PlaySequence( SNDMNGRANIMENUM eSoundSeq, PVSNDMNGRCBFNC pvCallbackFunc );
 extern  void              SoundManager_StopSequence( void );
 extern  void              SoundManager_PlayTask( void );
+extern  BOOL              SoundManager_IsPlayingSequence( void );
 
 /**@} EOF SoundManager.h */
 

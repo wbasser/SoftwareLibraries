@@ -46,7 +46,7 @@ typedef enum _BINCMDENUM
 } BINCMDENUM;
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE  BINCMDDEF   atBinCmdDefs[ BINCMD_ENUM_MAX ];
+extern  const CODE  BINCMDDEF   g_atBinCmdDefs[ BINCMD_ENUM_MAX ];
 
 /**@} EOF BinaryCommandHandler_cfg.h */
 

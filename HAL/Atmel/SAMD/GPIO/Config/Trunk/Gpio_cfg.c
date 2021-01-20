@@ -40,8 +40,8 @@ const CODE GPIOFNCDEF g_atGpioFncDefs[ GPIO_FNC_ENUM_MAX ] =
 const CODE GPIOIRQDEF g_atGpioIrqDefs[ GPIO_IRQ_ENUM_MAX ] =
 {
   // declare the pins using one of the helper macros below
-  // GPIOIRQDEF( port, pin, sense, wakeup, filter, callback, event, initon )
-  // GPIOEVNDEF( port, pin, sense, wakeup, filter )
+  // GPIOIRQDEF( port, pin, pupdn, sense, wakeup, filter, callback, event, initon )
+  // GPIOEVNDEF( port, pin, pupdn, sense, wakeup, filter )
 };
 
 /**@} EOF GPIO_cfg.c */

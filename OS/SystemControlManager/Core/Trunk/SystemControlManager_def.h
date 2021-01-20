@@ -190,7 +190,7 @@ typedef enum _SYSCTRLMGRMODE
   SYSCTRLMNGR_MODE_11_UNDEF,              ///< undefined
   SYSCTRLMNGR_MODE_12_UNDEF,              ///< undefined
   SYSCTRLMNGR_MODE_13_UNDEF,              ///< undefined
-  SYSCTRLMNGR_MODE_14_UNDEF,              ///< undefined
+  SYSCTRLMNGR_MODE_14_DIAGNOSTICS,        ///< diagnostics
   SYSCTRLMNGR_MODE_15_MANUFACTURING,      ///< manufacturing
   SYSCTRLMNGR_MODE_MAX,
   SYSCTRLMNGR_MODE_ILLEGAL
@@ -205,6 +205,7 @@ typedef enum _SYSCTLMNGREVENT
   SYSCTRLMNGR_EVENT_GOIDLE,             ///< go to the idle state
   SYSCTRLMNGR_EVENT_GORUN,              ///< go to the run state
   SYSCTRLMNGR_EVENT_INITDONE,           ///< initialization done
+  SYSCTRLMNGR_EVENT_GOMANUFACTURING,    ///< go to manufacturing state
 } SYSCTLMNGREVENT;
 
 

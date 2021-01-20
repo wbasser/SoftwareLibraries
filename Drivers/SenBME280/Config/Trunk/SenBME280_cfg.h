@@ -26,21 +26,28 @@
 #define _SENBME280_CFG_H
 
 // system includes ------------------------------------------------------------
+#include "SystemDefines/SystemDefines_prm.h"
 
 // local includes -------------------------------------------------------------
-#include "SenBME280/SenBME280_prm.h"
+#include "SenBME280/SenBME280.h"
 
 // library includes -----------------------------------------------------------
-#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_TASKMANAGER )
-#include "TaskManager/TaskManager.h"
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+  #include "TaskManager/TaskManager.h"
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 // Macros and Defines ---------------------------------------------------------
+/// define the scan rate for the sensor
+#define SENBME280_SCAN_RATE_MSECS               ( 500 )
+
+/// define the macro to allow for compensation at sensor measurement
+#define SENBME280_COMPENSATE_AT_MEASURE         ( TRUE )
+
 // global function prototypes --------------------------------------------------
-#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_TASKMANAGER )
-#define the number of events and execution rate for this task
-#define SENBME280_NUM_EVENTS                    ( 2 )
-#define SENBME280_EXEC_RATE                     ( TASK_TIME_MSECS( SENBME280_SCAN_RATE_MSECS ))
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+  #define the number of events and execution rate for this task
+  #define SENBME280_NUM_EVENTS                    ( 2 )
+  #define SENBME280_EXEC_RATE                     ( TASK_TIME_MSECS( SENBME280_SCAN_RATE_MSECS ))
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 // enumerations ---------------------------------------------------------------
@@ -51,8 +58,10 @@
 
 // global function prototypes --------------------------------------------------
 extern  void  SenBME280_LocalInitialize( void );
-#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_TASKMANAGER )
-extern  BOOL  SenBME280_ProcessScanTask( TASKARG xArg );
+extern  BOOL    SenBME280_WriteRegister( U8 nRegister, U8 nData );
+extern  BOOL    SenBME280_ReadRegisters( U8 nRegister, PU8 pnData, U8 nLength );
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+  extern  BOOL  SenBME280_ProcessScanTask( TASKARG xArg );
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 /**@} EOF SenBME280_cfg.h */

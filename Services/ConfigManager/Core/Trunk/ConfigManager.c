@@ -25,22 +25,21 @@
 #include "ConfigManager/ConfigManager.h"
 
 // library includes -----------------------------------------------------------
-#include "CRC16/CRC16.h"
+#include "CRC16/Crc16.h"
 #include "EepromHandler/EepromHandler.h"
 #if ( CONFIGMANAGER_ENABLE_LOGEVENTS == 1 )
-#include "LogHandler/LogHandler.h"
+  #include "LogHandler/LogHandler.h"
 #endif
-#include "ManufInfo/ManufInfo.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the address of the CRC
-#define CFGBLK_CHCK_ADDR         ( EEPROMHANDLER_CFGBLOCK_BASE_ADDR )
+#define CFGBLK_CHCK_ADDR          ( EEPROMHANDLER_CFGBLOCK_BASE_ADDR )
 
 /// define the address of the version block
-#define CFGBLK_VERS_ADDR         ( CFGBLK_CHCK_ADDR + sizeof( U16 ))
+#define CFGBLK_VERS_ADDR          ( CFGBLK_CHCK_ADDR + sizeof( U16 ))  
 
 /// define the address of the config block
-#define CFGBLK_DATA_ADDR        ( CFGBLK_VERS_ADDR + sizeof( U16 ))
+#define CFGBLK_DATA_ADDR          ( CFGBLK_VERS_ADDR + sizeof( U16 ))
 
 // enumerations ---------------------------------------------------------------
 
@@ -51,6 +50,8 @@
 // local parameter declarations -----------------------------------------------
 
 // local function prototypes --------------------------------------------------
+static  U16 GetBlockSize( PCONFIGMGRBLKDEF  ptDef );
+
 /// command handlers
 #if ( CONFIGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
 static  ASCCMDSTS CmdRstCfg( U8 nCmdEnum );
@@ -77,8 +78,10 @@ const CODE ASCCMDENTRY g_atConfigManagerCmdHandlerTable[ ] =
  * This function will check for a valid configuration, copy the defaults if
  * neccesary and update the CRC's
  *
+ * @param[in]   bForceReset     force a reset to defaults
+ *
  *****************************************************************************/
-void ConfigManager_Initialize( void )
+void ConfigManager_Initialize( BOOL bForceReset )
 {
   U16               wCalcCrc, wActCrc, wSize, wActVersion;
   CONFIGTYPE        eCfgBlkIdx;
@@ -92,18 +95,18 @@ void ConfigManager_Initialize( void )
   ConfigManager_LocalInitialize( );
 
   // get the expectant version
-  tExpVersion.anValue[ LE_U16_MSB_IDX ] = ManufInfo_GetSfwMajor( );
-  tExpVersion.anValue[ LE_U16_LSB_IDX ] = ManufInfo_GetSfwMinor( );
+  tExpVersion.anValue[ LE_U16_MSB_IDX ] = ConfigManager_GetVerMajor( );
+  tExpVersion.anValue[ LE_U16_LSB_IDX ] = ConfigManager_GetVerMinor( );
 
   // get the stored CRC/version
-  EepromHandler_RdWord( CFGBLK_CHCK_ADDR, &wActCrc );
-  EepromHandler_RdWord( CFGBLK_VERS_ADDR, &wActVersion );
+  ConfigManager_RdWord( CFGBLK_CHCK_ADDR, &wActCrc );
+  ConfigManager_RdWord( CFGBLK_VERS_ADDR, &wActVersion );
   
   // get the actual CRC
   wCalcCrc = ConfigManager_ComputeBlockCrc( CONFIG_SOURCE_EEPROM );
 
   // are they the same
-  if (( wActCrc != wCalcCrc ) || ( wActVersion != tExpVersion.wValue ))
+  if (( bForceReset == TRUE ) || ( wActCrc != wCalcCrc ) || ( wActVersion != tExpVersion.wValue ))
   {
     // reset to defaults
     ConfigManager_ResetDefaults( );
@@ -121,18 +124,18 @@ void ConfigManager_Initialize( void )
     // now get a pointer to the actual/size
     pvGetPointerActual = ( PVOID )PGM_RDWORD( ptDef->pvGetActual );
     pnActual = ( PU8 )pvGetPointerActual( );
-    wSize = PGM_RDWORD( ptDef->wSize );
+    wSize = GetBlockSize( ptDef );
       
     // now read the data from the EEPROM
-    EepromHandler_RdBlock( wBase, wSize, pnActual );
+    ConfigManager_RdBlock( wBase, wSize, pnActual );
       
     // adjust the size
     wBase += wSize;
   }
 
   // post the config done event
-  #if ( CONFIGMANAGER_ENABLE_NOTIFICATIONS == 1)
-  TaskManager_PostEvent( CONFIGMANGER_REPORTTING_TASK, SYSCTRLMNGR_EVENT_CONFIGDONE );
+  #if ( CONFIGMANAGER_ENABLE_NOTIFICATIONS == 1 )
+    TaskManager_PostEvent( CONFIGMANGER_REPORTTING_TASK, SYSCTRLMNGR_EVENT_CONFIGDONE );
   #endif // CONFIGMANAGER_ENABLE_NOTIFICATIONS
 }
 
@@ -158,11 +161,11 @@ BOOL ConfigManager_ResetDefaults( void )
   U16UN             tVersion;
 
   // get the expectant version
-  tVersion.anValue[ LE_U16_MSB_IDX ] = ManufInfo_GetSfwMajor( );
-  tVersion.anValue[ LE_U16_LSB_IDX ] = ManufInfo_GetSfwMinor( );
+  tVersion.anValue[ LE_U16_MSB_IDX ] = ConfigManager_GetVerMajor( );
+  tVersion.anValue[ LE_U16_LSB_IDX ] = ConfigManager_GetVerMinor( );
   
   // write it
-  EepromHandler_WrWord( CFGBLK_VERS_ADDR, tVersion.wValue );
+  ConfigManager_WrWord( CFGBLK_VERS_ADDR, tVersion.wValue );
 
   // set the base address for the config blocks  
   wBase = CFGBLK_DATA_ADDR;
@@ -178,13 +181,13 @@ BOOL ConfigManager_ResetDefaults( void )
     pnActual = ( PU8 )pvGetPointer( );
     pvGetPointer = ( PVOID )PGM_RDWORD( ptDef->pvGetDefault );
     pnDefault = ( PU8 )pvGetPointer( );
-    wSize = PGM_RDWORD( ptDef->wSize );
+    wSize = GetBlockSize( ptDef );
     
     // now copy the default to the actual
     MEMCPY_P( pnActual, pnDefault, wSize );
 
     // now write the data to the EEPROM
-    if ( EepromHandler_WrBlock( wBase, wSize, pnActual ) != EEPROM_ERR_NONE )
+    if ( ConfigManager_WrBlock( wBase, wSize, pnActual ))
     {
       // set the error flag/exit loop
       bStatus = TRUE;
@@ -204,7 +207,7 @@ BOOL ConfigManager_ResetDefaults( void )
 
   // test for log handler
   #if ( CONFIGMANAGER_ENABLE_LOGEVENTS == 1 )
-  LogHandler_AddEntry( LOG_TYPE_CFGRST, wCrc, bStatus );
+    LogHandler_AddEntry( LOG_TYPE_CFGRST, wCrc, bStatus );
   #endif
 
   // return the status
@@ -226,7 +229,7 @@ U16 ConfigManager_GetSignature( void )
   U16         wActCrc;
   
   // get the stored CRC
-  EepromHandler_RdWord( CFGBLK_CHCK_ADDR, &wActCrc );
+  ConfigManager_RdWord( CFGBLK_CHCK_ADDR, &wActCrc );
 
   // return the actual CRC
   return( wActCrc );
@@ -250,7 +253,7 @@ U16 ConfigManager_UpdateCRC( CONFIGSOURCE eSource )
 
   // calculate the CRC block
   wCalcCrc = ConfigManager_ComputeBlockCrc( eSource );
-  EepromHandler_WrWord( CFGBLK_CHCK_ADDR, wCalcCrc );
+  ConfigManager_WrWord( CFGBLK_CHCK_ADDR, wCalcCrc );
 
   // return the CRC
   return( wCalcCrc );
@@ -291,7 +294,7 @@ U16 ConfigManager_ComputeBlockCrc( CONFIGSOURCE eSource )
     pvGetPointer = ( PVOID )PGM_RDWORD( ptDef->pvGetActual );
     
     // now get the size
-    wSize = PGM_RDWORD( ptDef->wSize );
+    wSize = GetBlockSize( ptDef );
 
     // determine source
     switch( eSource )
@@ -301,7 +304,7 @@ U16 ConfigManager_ComputeBlockCrc( CONFIGSOURCE eSource )
         pnActData = malloc( wSize );
 
         // read a byte from EEPROM
-        EepromHandler_RdBlock( wBase, wSize, pnActData );
+        ConfigManager_RdBlock( wBase, wSize, pnActData );
         break;
         
       case CONFIG_SOURCE_RAM :
@@ -363,7 +366,7 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
   pnActData = ( PU8 )pvGetPointer( );
 
   // get the size
-  wSize = PGM_RDWORD( ptDef->wSize );
+  wSize = GetBlockSize( ptDef );
 
   // calculate the address
   wBase = CFGBLK_DATA_ADDR;
@@ -373,11 +376,11 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
     ptDef = ( PCONFIGMGRBLKDEF )&atConfigDefs[ eCfgType ];
 
     // add the size
-    wBase += PGM_RDWORD( ptDef->wSize );
+    wBase += GetBlockSize( ptDef );
   }
 
   // now write the EEPROM
-  if ( EepromHandler_WrBlock( wBase, wSize, pnActData ) == EEPROM_ERR_NONE )
+  if ( !ConfigManager_WrBlock( wBase, wSize, pnActData ))
   {
     // set the write OK
     bWriteOk = TRUE;
@@ -392,8 +395,42 @@ void ConfigManager_UpdateConfig( CONFIGTYPE eConfigType )
 
   // log event
   #if ( CONFIGMANAGER_ENABLE_LOGEVENTS == 1 )
-  LogHandler_AddEntry( LOG_TYPE_CFGUPD, xArg, 0 );
+    LogHandler_AddEntry( LOG_TYPE_CFGUPD, xArg, 0 );
   #endif
+}
+
+/******************************************************************************
+ * @function GetBLockSize
+ *
+ * @brief get the block size
+ *
+ * This function will determine the block size and return it
+ *
+ * @param[in]   ptDef     pointer to the definition block
+ *
+ * @return      size of the block
+ *
+ *****************************************************************************/
+static U16 GetBlockSize( PCONFIGMGRBLKDEF  ptDef )
+{
+  U16       wSize;
+  PVGETSIZE pvGetSize;
+
+  // get the size
+  if ( PGM_RDBYTE( ptDef->bFixedSize ) == TRUE )
+  {
+    // get the size from the structure
+    wSize = PGM_RDWORD( ptDef->wSize );
+  }
+  else
+  {
+    // call the function to get the size
+    pvGetSize = PGM_RDWORD( ptDef->pvGetSize );
+    wSize = pvGetSize( );
+  }
+
+  // return it 
+  return( wSize );
 }
 
 #if ( CONFIGMANAGER_ENABLE_DEBUG_COMMANDS == 1 )

@@ -48,7 +48,7 @@ typedef enum _ASCBINDIRENUMS
 // structures -----------------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE ASCBINDEF  atAscBinDirectDefs[ ];
+extern  const CODE ASCBINDEF  g_atAscBinDirectDefs[ ];
 
 // global function prototypes --------------------------------------------------
 extern  void  AscBinDirector_LocalInitialize( void );

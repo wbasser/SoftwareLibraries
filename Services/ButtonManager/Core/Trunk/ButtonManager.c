@@ -46,13 +46,6 @@ typedef enum
   BTN_STATE_STUCK,          ///< button is stuck
 } BTNSTATE;
 
-/// enumerate the event indices
-typedef enum _BTNMNGREVNINDICES
-{
-  BTNMNGR_EVNINDICES_EVENT = LE_U16_MSB_IDX,
-  BTNMNGR_EVNINDICES_BUTTON = LE_U16_LSB_IDX
-} BTNMNGREVNINDICES;
-
 // structures -----------------------------------------------------------------
 // define the control structure
 typedef struct
@@ -95,13 +88,13 @@ void ButtonManager_Initialize( void )
   MEMCPY_P( &tConfig, &tBtnMgrCfg, BTNMNGRCFG_SIZE );
   
   // adjust the times
-  tConfig.wDebounceTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
-  tConfig.wRepeatDelayMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
-  tConfig.wRepeatRateMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
-  tConfig.wShortHoldTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
-  tConfig.wMediumHoldTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
-  tConfig.wLongHoldTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
-  tConfig.wStuckTimeMsecs /= BTNMNGR_PROCESS_RATE_MSECS;
+  tConfig.wDebounceTimeMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
+  tConfig.wRepeatDelayMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
+  tConfig.wRepeatRateMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
+  tConfig.wShortHoldTimeMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
+  tConfig.wMediumHoldTimeMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
+  tConfig.wLongHoldTimeMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
+  tConfig.wStuckTimeMsecs /= BTNMANAGER_PROCESS_RATE_MSECS;
   
   // clear the control structure
   memset( atBtnCtls, 0, sizeof( atBtnCtls ));
@@ -328,8 +321,6 @@ void ButtonManager_Process( void )
  *****************************************************************************/
 static void PostEvent( BTNMNGRENUM eKey, BTNMNGREVENTS eEvent, PBTNMNGRDEF ptDef )
 {
-  U16UN tEvent;
-  
   // determine if there the event is enabled
   if (( ptDef->tEventFlags.bReleaseEnable    && ( eEvent == BTNMNGR_EVENT_RELEASED ))   ||
       ( ptDef->tEventFlags.bPressEnable      && ( eEvent == BTNMNGR_EVENT_PRESSED ))    ||
@@ -354,16 +345,7 @@ static void PostEvent( BTNMNGRENUM eKey, BTNMNGREVENTS eEvent, PBTNMNGRDEF ptDef
         
       case BTNMNGR_RPTMETHOD_EVENT :
         // post it
-        #if ( TASKARG_SIZE_BYTES == 1 )
-        tEvent.anValue[ BTNMNGR_EVNINDICES_BUTTON ] = ( eEvent < EVENT_SHIFT_CNT );
-        tEvent.anValue[ BTNMNGR_EVNINDICES_BUTTON ] |= eKey;
-        #else
-        tEvent.anValue[ BTNMNGR_EVNINDICES_EVENT ] = eEvent;
-        tEvent.anValue[ BTNMNGR_EVNINDICES_BUTTON ] = eKey;
-        #endif
-
-        // post it
-        TaskManager_PostEvent( ptDef->eTaskEnum, tEvent.wValue );
+        TaskManager_PostEvent( ptDef->eTaskEnum, BTNMNGR_MAKE_EVENT( eEvent, eKey ));
         break;
         
       default :

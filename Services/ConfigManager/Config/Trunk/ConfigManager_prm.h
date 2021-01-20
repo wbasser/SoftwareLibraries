@@ -28,10 +28,8 @@
 #define _CONFIGMANAGER_PRM_H
 
 // system includes ------------------------------------------------------------
-#include "SystemDefines/SystemDefines_prm.h"
 
 // library includes -----------------------------------------------------------
-#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the log event enable macro
@@ -53,6 +51,15 @@
     #define CONFIGMANAGER_ERROR_EVENT           ( 0 )
   #endif	// CONFIGMANAGER_ENABLE_CALLBACKS
 #endif	// CONFIGMANAGER_ENABLE_NOTIFICATIONS
+
+/// define the macro to enable config version reset
+#define CONFIGMGR_ENABLE_CONFIGFVER             ( ON )
+
+#if ( CONFIGMGR_ENABLE_CONFIGVER == ON )
+  /// define the configuration version
+  #define CONFIGMGR_CONFIG_VERMAJ               ( 2 )
+  #define CONFIGMGR_CONFIG_VERMIN               ( 0 )
+#endif
 
 /**@} EOF ConfigManager_prm.h */
 

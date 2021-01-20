@@ -24,7 +24,7 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "GraphFont5x7/GraphFont5x7.h"
+#include "GraphFonts/GraphFont5x7.h"
 
 // library includes -----------------------------------------------------------
 

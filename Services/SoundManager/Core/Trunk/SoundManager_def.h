@@ -61,9 +61,10 @@ typedef enum _SOUNDSEQEVENT
   SOUND_SEQEVENT_DONE = 0,    ///< sequence done
   SOUND_SEQEVENT_NEXT,        ///< next sequence
   SOUND_SEQEVENT_JMPBEG,      ///< jump to the beginning
-  SOUND_SEQEVENT_JUMPSEQ,     ///< jump to a step within this sequence
+  SOUND_SEQEVENT_JMPSEQ,     ///< jump to a step within this sequence
   SOUND_SEQEVENT_REPEAT,      ///< repeat till count is zero
   SOUND_SEQEVENT_SWEEP,       ///< sweep frequency, target is option
+  SOUND_SEQEVENT_CONTINUOUS,  ///< continuous output
   SOUND_SEQEVENT_MAX    
 } SOUNDSEQEVENT;
 

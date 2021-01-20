@@ -30,11 +30,13 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "Types/Types.h"
 
 // library includes -----------------------------------------------------------
+#include "GPIO/Gpio.h"
 
 // Macros and Defines ---------------------------------------------------------
+/// define the maximum counts
+#define ADC_MAX_COUNTS                          ( 4095 )
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the errors
@@ -188,6 +190,8 @@ typedef void    ( *PVADCCALLBACK )( U16 );
 /// define the channel definition structure
 typedef struct _ADCCHANDEF
 {
+  GPIOPORT      eDevPort;     ///< device port
+  U8            nAinPin;      ///< ain pin
   ADCINPMODE    eInpMode;
   ADCPOSCHAN    ePosChan;
   ADCNEGCHAN    eNegChan; 

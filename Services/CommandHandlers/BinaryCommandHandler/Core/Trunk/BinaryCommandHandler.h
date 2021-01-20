@@ -61,20 +61,22 @@ typedef enum _BINCMDSTS
 // global function prototypes --------------------------------------------------
 extern  void      BinaryCommandHandler_Initialize( void );
 #if ( BINCMDHAND_ENABLE_MASTERMODE == 1 )
-extern  BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdEnum, U8 nOption, U8 nDstAddr, S16 sSpecialCmd );
+extern  BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdEnum, U8 nOption1, U8 nOption2, U8 nDstAddr, S16 sSpecialCmd );
 #endif // BINCMDHAND_ENABLE_MASTERMODE
 extern  BINCMDSTS BinaryCommandHandler_ProcessChar( BINCMDENUM eProtEnum, U8 nRcvChar, U8 nCompareValue );
 extern  BINCMDSTS BinaryCommandHandler_ResetProtocol( BINCMDENUM eProtEnum );
 extern  BINCMDSTS BinaryCommandHandler_ResetXmtLength( BINCMDENUM eProtEnum );
-extern  BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, U8 nOption );
+extern  BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, U8 nOption1, U8 nOption2 );
 extern  BINCMDSTS BinaryCommandHandler_SendMessage( BINCMDENUM eProtEnum );
-extern  BINCMDSTS BinaryCommandHandler_SetOption( BINCMDENUM eProtEnum, U8 nOption );
+extern  BINCMDSTS BinaryCommandHandler_SetOption1( BINCMDENUM eProtEnum, U8 nOption );
+extern  BINCMDSTS BinaryCommandHandler_SetOption2( BINCMDENUM eProtEnum, U8 nOption );
 extern  BINCMDSTS BinaryCommandHandler_SetSequence( BINCMDENUM eProtEnum, U8 nSequence );
 extern  BINCMDSTS BinaryCommandHandler_SetDstAddr( BINCMDENUM eProtEnum, U8 nDstAddr );
 extern  BINCMDSTS BinaryCommandHandler_SetLclAddr( BINCMDENUM eProtEnum, U8 nLclAddr );
 extern  BINCMDSTS BinaryCommandHandler_GetLclAddr( BINCMDENUM eProtEnum, PU8 pnLclAddr );
 extern  BINCMDSTS BinaryCommandHandler_GetCommand( BINCMDENUM eProtEnum, PU8 pnCommand );
-extern  BINCMDSTS BinaryCommandHandler_GetOption( BINCMDENUM eProtEnum, PU8 pnOption );
+extern  BINCMDSTS BinaryCommandHandler_GetOption1( BINCMDENUM eProtEnum, PU8 pnOption );
+extern  BINCMDSTS BinaryCommandHandler_GetOption2( BINCMDENUM eProtEnum, PU8 pnOption );
 extern  BINCMDSTS BinaryCommandHandler_GetSequence( BINCMDENUM eProtEnum, PU8 pnSequence );
 extern  BINCMDSTS BinaryCommandHandler_GetSrcAddr( BINCMDENUM eProtEnum, PU8 pnSrcAddr );
 extern  BINCMDSTS BinaryCommandHandler_GetRcvLength( BINCMDENUM eProtEnum, PU16 pwRcvLength );

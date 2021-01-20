@@ -75,6 +75,7 @@ extern  void                TaskMinimal_Initialize( void );
 extern  PTASKMINIMALHANDLE  TaskMinimal_Create( PVCALLBACK pvHandler, U16 nExecRateMsecs, U8 nNumEvents, BOOL bInitialOn );
 extern  TASKMINIMALERR      TaskMinimal_PostEvent( PTASKMINIMALHANDLE pvHandle, TASKMINIMALEVENT xEvent );
 extern  TASKMINIMALERR      TaskMinimal_EnableDisable( PTASKMINIMALHANDLE pvHandle, BOOL bState );
+extern  TASKMINIMALERR      TaskMinimal_SetExecutionRate( PTASKMINIMALHANDLE pvHandle, U16 nExecRateMsecs );
 extern  void                TaskMinimal_IdleProcess( void );
 extern  void                TaskMinimal_TickProcess( U16 wTickTime );
 

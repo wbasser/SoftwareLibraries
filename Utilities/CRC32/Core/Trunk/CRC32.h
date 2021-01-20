@@ -43,7 +43,7 @@
 // global function prototypes --------------------------------------------------
 extern	U32	CRC32_GetInitialValue( void );
 extern	U32	CRC32_CalculateByte( U32 uOldCrc, U8 nData );
-extern	U32	CRC32_CalculateBlock( PU8 pnData, U16 wLength );
+extern	U32	CRC32_CalculateBlock( PU8 pnData, U32 uLength );
 
 /**@} EOF CRC32.h */
 

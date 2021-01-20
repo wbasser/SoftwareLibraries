@@ -42,6 +42,9 @@
 static  VBOOL         bConvertInProgress;
 static  PVADCCALLBACK pvCurCallback;
 static  VU16          wLastResult;
+static  S16           sLclGain;
+static  S16           sLclOffset;
+static  BOOL          bGainOffsetCorrEnabled;
 
 // local function prototypes --------------------------------------------------
 static  ADCERRS   SetupNormalMode( PADCDEF ptDef );
@@ -82,7 +85,11 @@ void Adc_Initialize( void )
   // read the non-volatile linearity/biascal values
   uTemp = ADC_CALIB_BIAS_CAL(( *( PU32 )ADC_FUSES_BIASCAL_ADDR >> ADC_FUSES_BIASCAL_Pos )) | ADC_CALIB_LINEARITY_CAL(( *( PU64 )ADC_FUSES_LINEARITY_0_ADDR >> ADC_FUSES_LINEARITY_0_Pos ));
   ADC->CALIB.reg = uTemp;
+
+  // clear the gain offset enabled flag
+  bGainOffsetCorrEnabled = FALSE;
 }
+
 
 /******************************************************************************
  * @function Adc_Close
@@ -100,6 +107,27 @@ void Adc_Close( void )
 
   // disable interrupt
   NVIC_DisableIRQ( ADC_IRQn );
+}
+
+/******************************************************************************
+ * @function Adc_EnableCorrection
+ *
+ * @brief set and enable the correction for offset/gain
+ *
+ * This function will setup and enable the offset/gain correction
+ *
+ * @param[in]   sGain     gain setting
+ * @param[in]   sOffset   Offset setting
+ *
+ *****************************************************************************/
+void Adc_EnableCorrection( S16 sGain, S16 sOffset )
+{
+  // store the values
+  sLclGain = sGain;
+  sLclOffset = sOffset;
+
+  // enable it
+  //bGainOffsetCorrEnabled = TRUE;
 }
 
 /******************************************************************************
@@ -489,6 +517,14 @@ static void SetCommonParameters( PADCDEF ptDef, ADC_CTRLB_Type* ptCtlB )
 {
   ADC_INPUTCTRL_Type  tInpCtrl;
 
+  // check for gain/correction
+  if ( bGainOffsetCorrEnabled )
+  {
+    // write the gain correction register values
+    ADC->GAINCORR.reg = sLclGain;
+    ADC->OFFSETCORR.reg = sLclOffset;
+  }
+
   // set the refernce/average/samples
   ADC->REFCTRL.bit.REFSEL = ptDef->eAdcRef;
   ADC->SAMPCTRL.reg = ptDef->nSampLength;
@@ -510,4 +546,4 @@ static void SetCommonParameters( PADCDEF ptDef, ADC_CTRLB_Type* ptCtlB )
   ptCtlB->bit.PRESCALER = ptDef->ePrescale;
 }
 
-/**@} EOF .c */
+/**@} EOF Adc.c */

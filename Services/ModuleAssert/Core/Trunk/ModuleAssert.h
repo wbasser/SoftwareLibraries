@@ -51,7 +51,7 @@ typedef enum _MODULEASSERTEST
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern	void	ModuleAssert_Execute( MODULEASSERTENUM eModuleEnum, MODULEASSERTTEST eTestEnum, PVOID pvCompare1, PVOID pvCompare2 );
+extern	void	ModuleAssert_Execute( MODULEASSERTENUM eModuleEnum, MODULEASSERTEST eTestEnum, PVOID pvCompare1, PVOID pvCompare2 );
 
 /**@} EOF ModuleAssert.h */
 

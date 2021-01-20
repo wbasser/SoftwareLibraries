@@ -81,16 +81,16 @@ typedef struct _WIFIMSGREQ
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern  void      WifiAMW006Handler_Initialize( void );
-extern  void      WifiAWM006Handler_InitialConfig( void );
-extern  void      WifiAWM006Handler_PutChar( U8 nChar );
-extern  BOOL      WifiAMW006Handler_ProcessCtrl( TASKARG xArg );
-extern  BOOL      WifiAMW006Handler_ProcessChar( TASKARG xArg );
-extern  void      WifiAMW006Handler_IrqCallback( U8 nIrq, U8 nEvent );
-extern  BOOL      WifiAWM006Handler_GetConnectionStatus( void );
-extern  WIFIERROR WifiAWM006Handler_OpenSocket( WIFISKTTYPE eSktType, PC8 pszAddress, U16 wPort, PVWIFICALLBACK pvCallback );
-extern  WIFIERROR WifiAWM006Handler_ReadSocket( WIFISKT tSocket, PU8 pnBuffer, U16 wBufSize, PU16 wBytesRead );
-extern  WIFIERROR WifiAWM006Handler_WriteSocket( WIFISKT tSocket, PU8 pnBuffer, U16 wBufSize, PU16 wBytesWritten );
+extern  void    WifiAMW006Handler_Initialize( void );
+extern  void    WifiAWM006Handler_InitialConfig( void );
+extern  BOOL    WifiAMW006Handler_ProcessCtrl( TASKARG xArg );
+extern  BOOL    WifiAMW006Handler_ProcessChar( TASKARG xArg );
+extern  void    WifiAMW006Handler_IrqCallback( U8 nIrq, U8 nEvent );
+extern  BOOL    WifiAWM006Handler_GetConnectionStatus( void );
+extern  WIFISKT WifiAWM006Handler_OpenSocket( WIFISKTTYPE eSktType, PC8 pszAddress, U16 wPort, PVWIFICALLBACK pvCallback );
+extern  U16     WifiAWM006Handler_ReadSocket( WIFISKT tSocket, PU8 pnBuffer, U16 wBufSize );
+extern  U16     WifiAWM006Handler_WriteSocket( WIFISKT tSocket, PU8 pnBuffer, U16 wBufSize );
+extern  void      WifiAWM006Handler_SetConnectParams( PC8 pcSSID, PC8 pcPasskey );
 
 /**@} EOF WifiAMW006Handler.h */
 

@@ -56,7 +56,7 @@
  * @param[in]		pvCompare2			pointer to the compare value #2
  *
  *****************************************************************************/
-void ModuleAssert_Execute( MODULEASSERTENUM eModuleEnum, MODULEASSERTTEST eTestEnum, PVOID pvCompare1, PVOID pvCompare2 )
+void ModuleAssert_Execute( MODULEASSERTENUM eModuleEnum, MODULEASSERTEST eTestEnum, PVOID pvCompare1, PVOID pvCompare2 )
 {
 	BOOL	bAssert = FALSE;
 	

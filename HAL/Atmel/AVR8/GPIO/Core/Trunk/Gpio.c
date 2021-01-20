@@ -139,7 +139,16 @@ void Gpio_Initialize( void )
       case GPIO_DIR_OUT :
         // set the initial state
         nMask = ( tDef.tFlags.bInitialState ^ tDef.tFlags.bInvert ) ? ptCtl->nMask : 0;
-        *( ptCtl->pnPortReg ) |= nMask;
+        if ( nMask != 0 )
+        {
+          // set it
+          *( ptCtl->pnPortReg ) |= nMask;
+        }
+        else
+        {
+          // clear it
+          *( ptCtl->pnPortReg ) &= ~nMask;
+        }
 
         // set the direction
         *( ptCtl->pnDirReg ) |= ptCtl->nMask;

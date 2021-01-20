@@ -328,72 +328,81 @@ static SYSMONERRS ProcessSetup( PU8 pnRcvBuffer, U16 wLength )
   // get the speed
   tPollTime.anValue[ LE_U16_LSB_IDX ] = *( pnRcvBuffer + 0 );
   tPollTime.anValue[ LE_U16_MSB_IDX ] = *( pnRcvBuffer + 1 );
-  
-  // now store it
-  SystemMonitor_SetScanTaskTime( tPollTime.wValue );
-  
-  // now process each entry in the buffer
-  for( wBufIdx = 2; wBufIdx < wLength; wBufIdx++ )
+
+  // check for minimum time
+  if ( tPollTime.wValue >= SYSTEMMONITOR_MINIMUM_POLL_TIME_MSEC )
   {
-    // check for a valid enumeration
-    if (( eEntry = *( pnRcvBuffer + wBufIdx )) < SYSMON_ENUM_MAX )
+    // now store it
+    SystemMonitor_SetScanTaskTime( tPollTime.wValue );
+  
+    // now process each entry in the buffer
+    for( wBufIdx = 2; wBufIdx < wLength; wBufIdx++ )
     {
-      // get a pointer to the control/def structures
-      ptDef = ( PSYSMONENTDEF )&atSysMonDefs[ eEntry ];
-      ptCtl = &atCtls[ eEntry ];
-      
-      // set the enable to true
-      ptCtl->bEnabled = TRUE;
-      
-      // get the ENTTYPE
-      eEntType = PGM_RDBYTE( ptDef->eType );
-      
-      // compute the size
-      switch( eEntType )
+      // check for a valid enumeration
+      if (( eEntry = *( pnRcvBuffer + wBufIdx )) < SYSMON_ENUM_MAX )
       {
-        case SYSMON_ENTTYPE_U8 :
-        case SYSMON_ENTTYPE_S8 :
-        case SYSMON_ENTTYPE_OPT_U8 :
-        case SYSMON_ENTTYPE_OPT_S8 :
-          wSize += 1;
-          break;
+        // get a pointer to the control/def structures
+        ptDef = ( PSYSMONENTDEF )&atSysMonDefs[ eEntry ];
+        ptCtl = &atCtls[ eEntry ];
+      
+        // set the enable to true
+        ptCtl->bEnabled = TRUE;
+      
+        // get the ENTTYPE
+        eEntType = PGM_RDBYTE( ptDef->eType );
+      
+        // compute the size
+        switch( eEntType )
+        {
+          case SYSMON_ENTTYPE_U8 :
+          case SYSMON_ENTTYPE_S8 :
+          case SYSMON_ENTTYPE_OPT_U8 :
+          case SYSMON_ENTTYPE_OPT_S8 :
+            wSize += 1;
+            break;
           
-        case SYSMON_ENTTYPE_U16 :
-        case SYSMON_ENTTYPE_S16 :
-        case SYSMON_ENTTYPE_OPT_U16 :
-        case SYSMON_ENTTYPE_OPT_S16 :
-          wSize += 2;
-          break;
+          case SYSMON_ENTTYPE_U16 :
+          case SYSMON_ENTTYPE_S16 :
+          case SYSMON_ENTTYPE_OPT_U16 :
+          case SYSMON_ENTTYPE_OPT_S16 :
+            wSize += 2;
+            break;
           
-        case SYSMON_ENTTYPE_U32 :
-        case SYSMON_ENTTYPE_S32 :
-        case SYSMON_ENTTYPE_FLOAT :
-        case SYSMON_ENTTYPE_OPT_U32 :
-        case SYSMON_ENTTYPE_OPT_S32 :
-        case SYSMON_ENTTYPE_OPT_FLOAT :
-          wSize += 4;
-          break;
+          case SYSMON_ENTTYPE_U32 :
+          case SYSMON_ENTTYPE_S32 :
+          case SYSMON_ENTTYPE_FLOAT :
+          case SYSMON_ENTTYPE_OPT_U32 :
+          case SYSMON_ENTTYPE_OPT_S32 :
+          case SYSMON_ENTTYPE_OPT_FLOAT :
+            wSize += 4;
+            break;
           
-        default :
-          break;
+          default :
+            break;
+        }
+      }
+      else
+      {
+        // set the error and break
+        eError = SYSMON_ERRS_ILLENUM;
+        break;
       }
     }
-    else
+
+    // now determine if there is enough time to transmit this frame
+    if ( wSize >= ( SYSTEMMONITOR_TRANSMIT_BYTE_RATE / 10 ))
     {
-      // set the error and break
-      eError = SYSMON_ERRS_ILLENUM;
-      break;
+      // flag the error
+      eError = SYSMON_ERRS_FRAMEOVF;
+    
+      // clear the enables
+      memset( atCtls, 0, ( SYSMONCTL_SIZE * SYSMON_ENUM_MAX ));
     }
   }
-  
-  // now determine if there is enough time to transmit this frame
-  if ( wSize >= ( SYSTEMMONITOR_TRANSMIT_BYTE_RATE / 10 ))
+  else
   {
-    // flag the error
-    eError = SYSMON_ERRS_FRAMEOVF;
-    
-    // clear the enables
-    memset( atCtls, 0, ( SYSMONCTL_SIZE * SYSMON_ENUM_MAX ));
+    // set the error
+    eError = SYSMON_ERRS_ILLTIME;
   }
   
   // return the error

@@ -25,14 +25,15 @@
 #define _CONFIGMANAGER_CFG_H
 
 // system includes ------------------------------------------------------------
-#include "SystemDefines/SystemDefines_prm.h"
 
 // local includes -------------------------------------------------------------
 #include "ConfigManager/ConfigManager_def.h"
 
 // library includes -----------------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-#include "TaskManager/TaskManager.h"
+  #include "TaskManager/TaskManager.h"
+#elif ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+  #include "TaskMinimal/TaskMinimal.h"
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 // Macros and Defines ---------------------------------------------------------
@@ -53,8 +54,15 @@ extern  const CODE CONFIGMGRBLKDEF atConfigDefs[ ];
 
 // global function prototypes --------------------------------------------------
 extern  void  ConfigManager_LocalInitialize( void );
+extern  U8    ConfigManager_GetVerMajor( void );
+extern  U8    ConfigManager_GetVerMinor( void );
+extern  BOOL  ConfigManager_RdWord( U16 wAddress, PU16 wValue );
+extern  BOOL  ConfigManager_RdBlock( U16 wAddress, U16 wLength, PU8 pnData );
+extern  BOOL  ConfigManager_WrWord( U16 wAddress, U16 wValue );
+extern  BOOL  ConfigManager_WrBlock( U16 wAddress, U16 wLength, PU8 pnData );
+
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-extern  BOOL  ConfigManager_ProcessUpdate( TASKARG xArg );
+  extern  BOOL  ConfigManager_ProcessUpdate( TASKARG xArg );
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 /**@} EOF COnfigManager_cfg.h */

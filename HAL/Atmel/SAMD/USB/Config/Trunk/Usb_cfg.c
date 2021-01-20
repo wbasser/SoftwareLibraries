@@ -1,9 +1,9 @@
 /******************************************************************************
  * @file Usb_cfg.c
  *
- * @brief USB configuration implementation 
+ * @brief USB configuration implementation
  *
- * This file provides the implementation for the USB configuration
+ * This file provides the configuration implementation
  *
  * @copyright Copyright (c) 2012 Cyber Intergration
  * This document contains proprietary data and information of Cyber Integration 
@@ -17,7 +17,7 @@
  * $Rev: $
  * 
  *
- * \addtogroup Usb
+ * \addtogroup Usb_cfg
  * @{
  *****************************************************************************/
 
@@ -27,7 +27,6 @@
 #include "Usb/Usb_cfg.h"
 
 // library includes -----------------------------------------------------------
-#include "USBHandler/USBHandler.h"
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -44,57 +43,44 @@
 // constant parameter initializations -----------------------------------------
 
 /******************************************************************************
- * @function Usb_HandleSetup
+ * @function Usb_HandleStandardRequest
  *
- * @brief handle the setup callback
+ * @brief handle a standard request
  *
- * This function provides the callback to handle the setup
+ * This function will call the desired standard request handler
+ *
+ * @param[in]   pnBuffer    pointer to the data buffer
  *
  *****************************************************************************/
-void Usb_HandleSetup( void )
+void Usb_HandleStandardRequest( PU8 pnBuffer )
 {
-  // call the USB handler setup
-  USBHandler_ProcessSetupRequest( );
 }
 
 /******************************************************************************
- * @function Usb_HandleControlOutCallback
+ * @function Usb_ProcessRecvCallback
  *
- * @brief handle the control out complele callback
+ * @brief process the receive callback
  *
- * This function provides the callback to handle control out completion
+ * This function will process the receive callback
+ *
+ * @param[in]   nEp   endoint that requires servicing
  *
  *****************************************************************************/
-void Usb_HandleControlOutCallback( void )
+void Usb_ProcessRecvCallback( U8 nEp )
 {
-  // call the USB handler control out process
-  USBHandler_ProcessControlOut( );
 }
 
 /******************************************************************************
- * @function Usb_HandleCcontrolInCallback
+ * @function Usb_ProcessSendCallback
  *
- * @brief handle the control in completion 
+ * @brief process the send callback
  *
- * This function provides the callback to handle control in completion
+ * This function will process the send callback
  *
- *****************************************************************************/
-void Usb_HandleCcontrolInCallback( void )
-{
-  // call the USB handler control in process
-  USBHandler_ProcessControlIn( );
-}
- 
-
-/******************************************************************************
- * @function Usb_HandleEndpointsCallback
- *
- * @brief handle the endpoint completion 
- *
- * This function provides the callback to handle control in completion
+ * @param[in]   nEp   endoint that requires servicing
  *
  *****************************************************************************/
-void Usb_HandleEndpointsCallback( void )
+void Usb_ProcessSendCallback( U8 nEp )
 {
 }
 

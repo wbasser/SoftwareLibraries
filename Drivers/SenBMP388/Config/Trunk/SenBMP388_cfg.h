@@ -39,7 +39,7 @@
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 /// define the number of events
 #define SENBMP388_NUM_EVENTS                          ( 2 )
-#define SENBMP388_DATAREADY_TASKENUM,                 ( TASKMANAGER_SCHD_ILLEGAL )
+#define SENBMP388_DATAREADY_TASKENUM                  ( TASK_SCHD_ILLEGAL )
 #define SENBMP388_DATAREADY_EVENT                     ( 0xDEED )
 #endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 
@@ -52,11 +52,12 @@ extern  const CODE SENBMP388CONFIG  g_tSenBMP388Config;
 
 // global function prototypes --------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-extern  BOOL  SenBMP388_ProcessCallback ( TASKARG xArg );
+extern  BOOL  SenBMP388_ProcessCallback( TASKARG xArg );
 #endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 extern  void  SenBMP388_ProcessIrqCallback( U8 Irq, BOOL bState );
-extern  BOOL  SenBMP388_I2cRead( U8 nBaseReg, PU8 pnData, U8 nLength );
-extern  BOOL  SenBMP388_I2cWrite( U8 nBaseReg, PU8 pnData, U8 nLength );
+extern  BOOL  SenBMP388_Read( U8 nBaseReg, PU8 pnData, U8 nLength );
+extern  BOOL  SenBMP388_Write( U8 nBaseReg, PU8 pnData );
+extern  void  SenBMP388_DelayMsec( U16 wDelay );
 
 /**@} EOF SenBMP388_cfg.h */
 

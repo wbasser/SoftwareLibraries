@@ -93,7 +93,7 @@ void Timers_Initialize( void )
   for ( eTimer = 0; eTimer < TIMER_ENUM_MAX; eTimer++ )
   {
     // get the definition/register pointer
-    ptDef = ( PTIMERDEF )&atTimerDefs[ eTimer ];
+    ptDef = ( PTIMERDEF )&g_atTimerDefs[ eTimer ];
 
     // set the physical to level translation
     atPhyMaps[ ptDef->eChannel ].eTimer = eTimer;
@@ -215,7 +215,8 @@ void Timers_Initialize( void )
             ConfigureTcWave( ptDef );
             break;
 
-          case TIMER_TCMODE_PWM :
+          case TIMER_TCMODE_NPWM :
+          case TIMER_TCMODE_MPWM:
             // configure the PWM output
             ConfigureTcPwm( ptDef );
             break;
@@ -260,7 +261,7 @@ void Timers_Close( void )
   for ( eTimer = 0; eTimer < TIMER_ENUM_MAX; eTimer++ )
   {
     // get the definition/register pointer
-    ptDef = ( PTIMERDEF )&atTimerDefs[ eTimer ];
+    ptDef = ( PTIMERDEF )&g_atTimerDefs[ eTimer ];
 
     // get the channel
     GetTimerChannel( ptDef->eChannel, &tLclCtl );
@@ -330,7 +331,7 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
   if ( eTimerSel < TIMER_ENUM_MAX )
   {
     // get the pointer to the contro;
-    ptDef = ( PTIMERDEF )&atTimerDefs[ eTimerSel ];
+    ptDef = ( PTIMERDEF )&g_atTimerDefs[ eTimerSel ];
 
     // get the channel
     eChannel = ptDef->eChannel;
@@ -345,6 +346,11 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
     switch( eAction )
     {
       case TIMER_IOCTL_CHANGEDEF :
+        break;
+
+      case TIMER_IOCTL_GETCLKFRQ :
+        // return the value
+        *(( PU32 )pvParam ) = uDivider;
         break;
         
       case TIMER_IOCTL_STOPSTART :
@@ -398,11 +404,11 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
         break;
         
       case TIMER_IOCTL_SETPERIOD :
+        // get the value from the pvoid parameter
+        uParam = PARAMU16( pvParam );
+
         if ( ptDef->eChannel < TIMER_CHAN_3 )
         {
-          // get the value from the pvoid parameter
-          uParam = PARAMU16( pvParam );
-
           // determine the waveform mode
           switch( ptDef->tModes.eTcc )
           {
@@ -442,6 +448,27 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
             case TIMER_TCMODE_WAVMF :
               break;
 
+            case TIMER_TCMODE_MPWM :
+              // if times in usec
+              if ( ptDef->tFlags.bTimesInUsec )
+              {
+                // convwerrt the divider into Nsecs
+                uDivider = 1000000000ul / uDivider;
+
+                // now compute the reload values for period and channels
+                uTemp = ( uParam  * 1000 ) / uDivider; 
+              }
+              else
+              {
+                // compute the period
+                uTemp = ( uDivider / uParam );
+              }
+
+              // write it/wait
+              tCtl.tBasePtrs.ptTc->COUNT16.CC[ 0 ].reg = uTemp;
+              while( tCtl.tBasePtrs.ptTc->COUNT16.STATUS.bit.SYNCBUSY );
+              break;
+
             default :
               break;
           }
@@ -455,12 +482,12 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
         break;
         
       case TIMER_IOCTL_SETCOMPAREPCT :
-        // get a pointer to the parameter
-        ptParam = ( PTIMERIOCTLPARAM )pvParam;
-
         // check for which timer
         if ( ptDef->eChannel < TIMER_CHAN_3 )
         {
+          // get a pointer to the parameter
+          ptParam = ( PTIMERIOCTLPARAM )pvParam;
+
           // determine the waveform mode
           switch( ptDef->tModes.eTcc )
           {
@@ -477,6 +504,9 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
         }
         else
         {
+          // get the value from the pvoid parameter
+          uParam = PARAMU16( pvParam );
+          
           // compute the divider
           uDivider = 65535;
           fPercent = ( FLOAT )( ptParam->uValue / 1000.0 );
@@ -493,6 +523,83 @@ TIMERERR Timers_Ioctl( TIMERENUM eTimerSel, TIMERIOCTL eAction, PVOID pvParam )
         
       case TIMER_IOCTL_GETPRESCALEDIV :
        *(( PU32 )pvParam ) = awTimerPrescales[ ptDef->ePrescale ];
+        break;
+        
+      case TIMER_IOCTL_SETPPERIOD50 :
+        if ( ptDef->eChannel < TIMER_CHAN_3 )
+        {
+          // get a pointer to the parameter
+          ptParam = ( PTIMERIOCTLPARAM )pvParam;
+
+          // determine the waveform mode
+          switch( ptDef->tModes.eTcc )
+          {
+            case TIMER_TCCMODE_PWMSING :
+            // if times in usec
+            if ( ptDef->tFlags.bTimesInUsec )
+            {
+              // convwerrt the divider into Nsecs
+              uDivider = 1000000000ul / uDivider;
+
+              // now compute the reload values for period and channels
+              uTemp = ( ptParam->uValue  * 1000 ) / uDivider;
+            }
+            else
+            {
+              // compute the period
+              uTemp = ( uDivider / ptParam->uValue );
+            }
+
+            // write it
+            tCtl.tBasePtrs.ptTcc->CTRLA.bit.ENABLE = 0;
+            tCtl.tBasePtrs.ptTcc->PER.reg = uTemp;
+            tCtl.tBasePtrs.ptTcc->CC[ ptParam->eCmpCapChan ].reg = uTemp >> 1;
+            tCtl.tBasePtrs.ptTcc->CTRLA.bit.ENABLE = 1;
+            while( tCtl.tBasePtrs.ptTcc->SYNCBUSY.bit.PER );
+            break;
+
+            default :
+            break;
+          }
+        }
+        else
+        {
+          // get the value from the pvoid parameter
+          uParam = PARAMU16( pvParam );
+
+          // determine the waveform mode
+          switch( ptDef->tModes.eTc )
+          {
+            case TIMER_TCMODE_MPWM :
+              // if times in usec
+              if ( ptDef->tFlags.bTimesInUsec )
+              {
+                // convwerrt the divider into Nsecs
+                uDivider = 1000000000ul / uDivider;
+
+                // now compute the reload values for period and channels
+                uTemp = ( uParam  * 1000 ) / uDivider; 
+              }
+              else
+              {
+                // compute the period
+                uTemp = ( uDivider / uParam );
+              }
+
+              // write it/wait
+              tCtl.tBasePtrs.ptTc->COUNT16.CC[ 0 ].reg = uTemp;
+              tCtl.tBasePtrs.ptTc->COUNT16.CC[ 1 ].reg = uTemp >> 1;
+              while( tCtl.tBasePtrs.ptTc->COUNT16.STATUS.bit.SYNCBUSY );
+              break;
+
+            default :
+              break;
+          }
+        }
+        break;
+
+      case TIMER_IOCTL_GETTIMEBASE :
+       *(( PU32 )pvParam ) = uDivider;
         break;
 
       default :
@@ -660,7 +767,7 @@ static void CommonTccInterruptHandler( TIMERENUM eTimer, Tcc* ptTcc )
   ptTcc->INTFLAG.reg = TCC_INTFLAG_MASK;
 
   // get pointer to the definition/control structures
-  ptDef = ( PTIMERDEF )&atTimerDefs[ eTimer ];
+  ptDef = ( PTIMERDEF )&g_atTimerDefs[ eTimer ];
 
   // get the callback
   pvCallback = ptDef->pvCallback;
@@ -709,7 +816,7 @@ static void CommonTcInterruptHandler( TIMERENUM eTimer, Tc* ptTc )
   ptTc->COUNT16.INTFLAG.reg = TC_INTFLAG_MASK;
 
   // get pointer to the definition/control structures
-  ptDef = ( PTIMERDEF )&atTimerDefs[ eTimer ];
+  ptDef = ( PTIMERDEF )&g_atTimerDefs[ eTimer ];
 
   // get the callback
   pvCallback = ptDef->pvCallback;
@@ -746,7 +853,8 @@ static void CommonTcInterruptHandler( TIMERENUM eTimer, Tc* ptTc )
     {
       case TIMER_TCMODE_WAVNF :
       case TIMER_TCMODE_WAVMF :
-      case TIMER_TCMODE_PWM :
+      case TIMER_TCMODE_NPWM :
+      case TIMER_TCMODE_MPWM :
         // set the event/channel/value
         eEvent = ( ptDef->eDirection == TIMER_DIRECTION_UP ) ? TIMER_CBEVENT_CMPUP : TIMER_CBEVENT_CMPDN;
         break;
@@ -777,7 +885,8 @@ static void CommonTcInterruptHandler( TIMERENUM eTimer, Tc* ptTc )
     {
       case TIMER_TCMODE_WAVNF :
       case TIMER_TCMODE_WAVMF :
-      case TIMER_TCMODE_PWM :
+      case TIMER_TCMODE_NPWM :
+      case TIMER_TCMODE_MPWM :
         // set the event/channel/value
         eEvent = ( ptDef->eDirection == TIMER_DIRECTION_UP ) ? TIMER_CBEVENT_CMPUP : TIMER_CBEVENT_CMPDN;
         break;
@@ -1174,16 +1283,16 @@ static void ConfigureTcWave( PTIMERDEF ptDef )
     tLclCtl.tBasePtrs.ptTc->COUNT16.INTENSET.bit.OVF = ptDef->tFlags.bOvfIrqEnable;
     tLclCtl.tBasePtrs.ptTc->COUNT16.INTENSET.bit.MC0 = ptDef->abChanOpsEnables[ TIMER_CMPCAP_CHAN0 ];
     tLclCtl.tBasePtrs.ptTc->COUNT16.INTENSET.bit.MC1 = ptDef->abChanOpsEnables[ TIMER_CMPCAP_CHAN1 ];
+
+    // enable the interrupt
+    NVIC_EnableIRQ( TCC0_IRQn + ptDef->eChannel );
     
     // check for a high priority
     if ( ptDef->tFlags.bHighPriority )
     {
       // set it to a higher priority
-      NVIC_SetPriority( TCC0_IRQn + ptDef->eChannel, 1 );
+      NVIC_SetPriority( TCC0_IRQn + ptDef->eChannel, 0 );
     }
-
-    // enable the interrupt
-    NVIC_EnableIRQ( TCC0_IRQn + ptDef->eChannel );
   }
   
   // now enable the control register
@@ -1264,15 +1373,15 @@ static void ConfigureTcPwm( PTIMERDEF ptDef )
     tLclCtl.tBasePtrs.ptTc->COUNT16.INTENSET.bit.MC0 = ptDef->abChanOpsEnables[ TIMER_CMPCAP_CHAN0 ];
     tLclCtl.tBasePtrs.ptTc->COUNT16.INTENSET.bit.MC1 = ptDef->abChanOpsEnables[ TIMER_CMPCAP_CHAN1 ];
     
+    // enable the interrupt
+    NVIC_EnableIRQ( TCC0_IRQn + ptDef->eChannel );
+
     // check for a high priority
     if ( ptDef->tFlags.bHighPriority )
     {
       // set it to a higher priority
-      NVIC_SetPriority( TCC0_IRQn + ptDef->eChannel, 1 );
+      NVIC_SetPriority( TCC0_IRQn + ptDef->eChannel, 0 );
     }
-
-    // enable the interrupt
-    NVIC_EnableIRQ( TCC0_IRQn + ptDef->eChannel );
   }
   
   // now enable the control register

@@ -6,7 +6,7 @@
  * This file provides the implementation for the Bosch Sensortec BME280
  * temperature/humitdity/pressure sensor.
  *
- * @copyright Copyright (c) 2017 Cyber Intergration
+ * @copyright Copyright (c) 2017 Guardhat
  * This document contains proprietary data and information of Cyber Integration 
  * LLC. It is the exclusive property of Cyber Integration, LLC and will not be 
  * disclosed in any form to any party without prior written permission of 
@@ -28,13 +28,9 @@
 #include "SenBME280/SenBME280.h"
 
 // library includes -----------------------------------------------------------
-#include "I2c/I2c.h"
 #include "SystemTick/SystemTick.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the base address
-#define SENBME280_DEV_ADDR            ( 0x76 )
-
 /// define the chip ID value
 #define SENBME280_CHIP_ID             ( 0x60 )
 
@@ -213,8 +209,6 @@ static  FLOAT   CompensateHumidity( S32 uRawHumid );
 static  void    ParseHumidityCalibration( U8 *tHumidCalib );
 static  BOOL    ReadCalibrationData( void );
 static  BOOL    SetSensorControl( CTLMEASMODE eMode );
-static  BOOL    WriteRegister( U8 nRegister, U8 nData );
-static  BOOL    ReadRegisters( U8 nRegister, PU8 pnData, U8 nLength );
 
 // constant parameter initializations -----------------------------------------
 
@@ -237,9 +231,6 @@ void SenBME280_Initialize( void )
   nRetryCount = 5;
   bSensorOk = FALSE;
   
-  // call the local initialization
-  SenBME280_LocalInitialize( );
-  
   // retry loop
   do 
   {
@@ -247,7 +238,7 @@ void SenBME280_Initialize( void )
     SystemTick_DelayMsec( 3 );
 
     // fill out the transfer control to read the chip ID
-    if ( !ReadRegisters( REG_CHIPID, &nChipId, 1 ))
+    if ( !SenBME280_ReadRegisters( REG_CHIPID, &nChipId, 1 ))
     {
       // check to see if we have a valid chip ID
       if ( SENBME280_CHIP_ID == nChipId )
@@ -291,28 +282,37 @@ void SenBME280_Initialize( void )
  * @return      TRUE flush event
  *
  *****************************************************************************/
-BOOL SenBME280_ProcessScan( TASKARG xArg )
+void SenBME280_ProcessScan( void )
 {
   MEASUREMENTS  tMeasurements;
   S32           lMeasValue;
   
   // set up for the read
-  if( !ReadRegisters( REG_MEAS_BASE, ( PU8 )&tMeasurements, MEASUREMENTS_SIZE ))
+  if( !SenBME280_ReadRegisters( REG_MEAS_BASE, ( PU8 )&tMeasurements, MEASUREMENTS_SIZE ))
   {
     // perform compensation
     lMeasValue = ( ((U32) tMeasurements.nTempMsb) << 12 );
     lMeasValue |= ( ((U32) tMeasurements.nTempLsb) << 4 );
     lMeasValue |= ( ((U32) tMeasurements.nTempXlsb) >> 4 );
     alRawValues[ SENBME280_MEASTYPE_TEMP ] = lMeasValue;
+    #if ( SENBME280_COMPENSATE_AT_MEASURE == TRUE )
+      afActualValues[ SENBME280_MEASTYPE_TEMP ] = CompensateTemperature( alRawValues[ SENBME280_MEASTYPE_TEMP ] );
+    #endif // SENBME280_COMPENSATE_AT_MEASURE
       
     lMeasValue = ( ((U32) tMeasurements.nPressMsb) << 12 );
     lMeasValue |= ( ((U32) tMeasurements.nPressLsb) << 4 );
     lMeasValue |= ( ((U32) tMeasurements.nPressXlsb) >> 4 );
     alRawValues[ SENBME280_MEASTYPE_PRES ] = lMeasValue;
+    #if ( SENBME280_COMPENSATE_AT_MEASURE == TRUE )
+      afActualValues[ SENBME280_MEASTYPE_PRES ] = CompensatePressure( alRawValues[ SENBME280_MEASTYPE_PRES ] );
+    #endif // SENBME280_COMPENSATE_AT_MEASURE
       
     lMeasValue = ( ((U32) tMeasurements.nHumidMsb) << 8 );
     lMeasValue |= ( tMeasurements.nHumidLsb );
     alRawValues[ SENBME280_MEASTYPE_HUMD ] = lMeasValue;
+    #if ( SENBME280_COMPENSATE_AT_MEASURE == TRUE )
+      afActualValues[ SENBME280_MEASTYPE_HUMD ] = CompensateHumidity( alRawValues[ SENBME280_MEASTYPE_HUMD ] );
+    #endif // SENBME280_COMPENSATE_AT_MEASURE
   }
   else
   {
@@ -323,9 +323,6 @@ BOOL SenBME280_ProcessScan( TASKARG xArg )
     memset( alRawValues, 0, sizeof( alRawValues ));
     memset( afActualValues, 0, sizeof( afActualValues ));
   }
-
-  // always return true to flush event
-  return( TRUE );
 }
 
 /******************************************************************************
@@ -428,17 +425,23 @@ BOOL SenBME280_GetMeasurement( SENBME280MEASTYPE eMeasType, PFLOAT pfValue )
     switch( eMeasType )
     {
       case SENBME280_MEASTYPE_TEMP :
-        afActualValues[ SENBME280_MEASTYPE_TEMP ] = CompensateTemperature( alRawValues[ SENBME280_MEASTYPE_TEMP ] );
+        #if ( SENBME280_COMPENSATE_AT_MEASURE == FALSE )
+          afActualValues[ SENBME280_MEASTYPE_TEMP ] = CompensateTemperature( alRawValues[ SENBME280_MEASTYPE_TEMP ] );
+        #endif // SENBME280_COMPENSATE_AT_MEASURE
         *( pfValue ) = afActualValues[ SENBME280_MEASTYPE_TEMP ];
         break;
     
       case SENBME280_MEASTYPE_HUMD :
-        afActualValues[ SENBME280_MEASTYPE_HUMD ] = CompensateHumidity( alRawValues[ SENBME280_MEASTYPE_HUMD ] );
+        #if ( SENBME280_COMPENSATE_AT_MEASURE == FALSE )
+          afActualValues[ SENBME280_MEASTYPE_HUMD ] = CompensateHumidity( alRawValues[ SENBME280_MEASTYPE_HUMD ] );
+        #endif // SENBME280_COMPENSATE_AT_MEASURE
         *( pfValue ) = afActualValues[ SENBME280_MEASTYPE_HUMD ];
         break;
     
       case SENBME280_MEASTYPE_PRES :
-        afActualValues[ SENBME280_MEASTYPE_PRES ] = CompensatePressure( alRawValues[ SENBME280_MEASTYPE_PRES ] );
+        #if ( SENBME280_COMPENSATE_AT_MEASURE == FALSE )
+          afActualValues[ SENBME280_MEASTYPE_PRES ] = CompensatePressure( alRawValues[ SENBME280_MEASTYPE_PRES ] );
+        #endif // SENBME280_COMPENSATE_AT_MEASURE
         *( pfValue ) = afActualValues[ SENBME280_MEASTYPE_PRES ];
         break;
     
@@ -565,21 +568,21 @@ static FLOAT CompensatePressure( S32 uRawPress )
   U32   uTemp5, uPressure;
   
   // perform the compensation
-  lTemp1 = ((( S32 )tCalibrationData.uCalcFine ) >> 1 ) - ( S32 )64000;
-  lTemp2 = (( lTemp1 >> 2 ) * ( lTemp1 >> 2 )) >> 11;
-  lTemp2 *= (( S32 )tCalibrationData.tTempPres.wP6 );
-  lTemp2 = lTemp2 + (( lTemp1 * (( S32 )tCalibrationData.tTempPres.wP5 )) << 1 );
-  lTemp2 = ( lTemp2 >> 2 ) + ((( S32 )tCalibrationData.tTempPres.wP4 ) << 16 );
-  lTemp3 = ( tCalibrationData.tTempPres.wP3 * ((( lTemp1 >> 2 ) * ( lTemp1 >> 2 )) >> 13 )) >> 3;
-  lTemp4 = ((( S32 )tCalibrationData.tTempPres.wP2 ) * lTemp1 ) >> 1;
-  lTemp1 = ( lTemp3 + lTemp4 ) >> 18;
-  lTemp1 = (( 32768 + lTemp1 ) * (( S32 )tCalibrationData.tTempPres.wP1 )) >> 15;
+  lTemp1 = ((( S32 )tCalibrationData.uCalcFine ) / 2 ) - ( S32 )64000;
+  lTemp2 = ((( lTemp1 / 4 ) * ( lTemp1 / 4 )) / 2048 ) * (( S32 )tCalibrationData.tTempPres.wP6 );
+  lTemp2 = lTemp2 + (( lTemp1 * (( S32 )tCalibrationData.tTempPres.wP5 )) * 2 );
+  lTemp2 = ( lTemp2 / 4 ) + ((( S32 )tCalibrationData.tTempPres.wP4 ) * 65536);
+  lTemp3 = ( tCalibrationData.tTempPres.wP3 * ((( lTemp1 / 4 ) * ( lTemp1 / 4 )) / 8192 )) / 8;
+  lTemp4 = ((( S32 )tCalibrationData.tTempPres.wP2 ) * lTemp1 ) / 2;
+  lTemp1 = ( lTemp3 + lTemp4 ) / 262144;
+  lTemp1 = ((( 32768 + lTemp1 )) * (( S32 )tCalibrationData.tTempPres.wP1 )) / 32768;
 
-    // check for division by zero
+  //// check for division by zero
   if ( lTemp1 != 0 )
   {
-    uTemp5 = ( U32 )(( S32 )1048576 ) - uRawPress;
-    uPressure = ((( U32 )((( S32 )1048576 ) - uRawPress ) - ( lTemp2 >> 12 ))) * 3125;
+    uTemp5 = ( U32 )(( U32 )1048576 ) - uRawPress;
+    uPressure = (( U32 )( uTemp5 - ( U32 )( lTemp2 / 4096 ))) * 3125;
+
     if ( uPressure < 0x80000000 )
     {
       uPressure = ( uPressure << 1 ) / (( U32 )lTemp1 );
@@ -589,10 +592,10 @@ static FLOAT CompensatePressure( S32 uRawPress )
       uPressure = ( uPressure / ( U32 )lTemp1 ) * 2;
     }
 
-    // apply the rest of the compensation
-    lTemp1 = ((( S32 )tCalibrationData.tTempPres.wP9 ) * (( S32 )((( uPressure >> 3 ) * ( uPressure >> 3 )) >> 13 ))) >> 12;
-    lTemp2 = ((( S32 )( uPressure >> 2 )) * (( S32 )tCalibrationData.tTempPres.wP8 )) >> 13;
-    uPressure = ( U32 )(( S32 )uPressure + (( lTemp1 + lTemp2 + tCalibrationData.tTempPres.wP7 ) >> 4 ));
+    //// apply the rest of the compensation
+    lTemp1 = ((( S32 )tCalibrationData.tTempPres.wP9 ) * (( S32 )((( uPressure / 8 ) * ( uPressure / 8 )) / 8192 ))) / 4096;
+    lTemp2 = ((( S32 )( uPressure / 4 )) * (( S32 )tCalibrationData.tTempPres.wP8 )) / 8192;
+    uPressure = ( U32 )(( S32 )uPressure + (( lTemp1 + lTemp2 + tCalibrationData.tTempPres.wP7 ) / 16 ));
 
     // check for range
     if ( uPressure < PRESS_MIN_VALUE )
@@ -709,10 +712,10 @@ static BOOL ReadCalibrationData( void )
   U8        tTempHumidCalib[7] = {0};
   
   // setup temperature calibration data read
-  if ( !ReadRegisters( REG_TEMPPRES_CALIB, ( PU8 )&tCalibrationData.tTempPres, TEMPPRESCALIB_SIZE ))
+  if ( !SenBME280_ReadRegisters( REG_TEMPPRES_CALIB, ( PU8 )&tCalibrationData.tTempPres, TEMPPRESCALIB_SIZE ))
   {
     // setup humidity calibration data read
-    if ( !ReadRegisters( REG_TEMPHUMID_CALIB, tTempHumidCalib, 7))
+    if ( !SenBME280_ReadRegisters( REG_TEMPHUMID_CALIB, tTempHumidCalib, 7))
     {
       // parse humidity calibration
       ParseHumidityCalibration(tTempHumidCalib);
@@ -745,12 +748,12 @@ static BOOL SetSensorControl( CTLMEASMODE eMode )
 
   // Config is only writable in sleep mode, so first ensure that
   tRegisters.nByte = 0x00;
-  if (!WriteRegister(REG_CTLMEAS, tRegisters.nByte))
+  if (!SenBME280_WriteRegister(REG_CTLMEAS, tRegisters.nByte))
   {
     // set up humidity
     tRegisters.tCtlHumid.nHumidOS = CTLMEAS_OSR_1X;
     tRegisters.nByte = tRegisters.tCtlHumid.nHumidOS;
-    if ( !WriteRegister( REG_CTLHUMID, tRegisters.nByte ))
+    if ( !SenBME280_WriteRegister( REG_CTLHUMID, tRegisters.nByte ))
     {
       // set up configuration
       tRegisters.tConfig.bSpi3WEnable = FALSE;
@@ -759,7 +762,7 @@ static BOOL SetSensorControl( CTLMEASMODE eMode )
       tRegisters.nByte = tRegisters.tConfig.bSpi3WEnable |
                          (tRegisters.tConfig.nFiltLen << 2) |
                          (tRegisters.tConfig.nStandby << 5);
-      if ( !WriteRegister( REG_CONFIG, tRegisters.nByte ))
+      if ( !SenBME280_WriteRegister( REG_CONFIG, tRegisters.nByte ))
       {
         // set up measurement control
         tRegisters.tCtlMeas.nMode = eMode;
@@ -768,7 +771,7 @@ static BOOL SetSensorControl( CTLMEASMODE eMode )
         tRegisters.nByte = tRegisters.tCtlMeas.nMode |
                            (tRegisters.tCtlMeas.nPresOS << 2) |
                            (tRegisters.tCtlMeas.nTempOS << 5);
-        if ( !WriteRegister( REG_CTLMEAS, tRegisters.nByte ))
+        if ( !SenBME280_WriteRegister( REG_CTLMEAS, tRegisters.nByte ))
         {
           // set okay status
           bResult = FALSE;
@@ -779,77 +782,6 @@ static BOOL SetSensorControl( CTLMEASMODE eMode )
   
   // return the status
   return( bResult );
-}
-
-/******************************************************************************
- * @function WriteRegister
- *
- * @brief write a register
- *
- * This function will write the passed value to the selected register
- *
- * @param[in]   nRegister       register to write
- * @param[in]   nData           data to write
- *
- * @return      FALSE if no errors, TRUE otherwise
- *
- *****************************************************************************/
-static BOOL WriteRegister( U8 nRegister, U8 nData )
-{
-  BOOL      bErrDet;
-  I2CERR    eI2cErr;
-  I2CXFRCTL tXfrCtl;  
-
-  // set up for write
-  tXfrCtl.nDevAddr = SENBME280_DEV_ADDR;
-  tXfrCtl.tAddress.anValue[ LE_U32_LSB_IDX ] = nRegister;
-  tXfrCtl.nAddrLen = 1;
-  tXfrCtl.pnData = &nData;
-  tXfrCtl.wDataLen = sizeof( U8 );
-  tXfrCtl.uTimeout = 100;
-  eI2cErr = I2c_Write( SENBME280_I2C_ENUM, &tXfrCtl );
-  
-  // set the error
-  bErrDet = ( eI2cErr == I2C_ERR_NONE ) ? FALSE : TRUE;
-  
-  // return the status
-  return( bErrDet );
-}
-
-/******************************************************************************
- * @function ReadRegisters
- *
- * @brief read a registers
- *
- * This function will read the passed value to the selected register
- *
- * @param[in]   nRegisters       register to write
- * @param[in]   pnData           data to write
- *
- * @return      FALSE if no errors, TRUE otherwise
- *
- *****************************************************************************/
-static BOOL ReadRegisters( U8 nRegister, PU8 pnData, U8 nLength )
-{
-  BOOL      bErrDet;
-  I2CERR    eI2cErr;
-  I2CXFRCTL tXfrCtl;  
-
-  // set up for read
-  tXfrCtl.nDevAddr = SENBME280_DEV_ADDR;
-  tXfrCtl.tAddress.uValue = 0;
-  tXfrCtl.tAddress.anValue[ LE_U32_LSB_IDX ] = nRegister;
-  tXfrCtl.nAddrLen = 1;
-  tXfrCtl.pnData = pnData;
-  tXfrCtl.wDataLen = nLength;
-  tXfrCtl.uTimeout = 500;
-  eI2cErr = I2c_Read( SENBME280_I2C_ENUM, &tXfrCtl );
-
-  // set the error  
-  bErrDet = ( eI2cErr == I2C_ERR_NONE ) ? FALSE : TRUE;
-  
-  // return the status
-  return( bErrDet );
 }
 
 /**@} EOF SenBME280.c */

@@ -43,6 +43,7 @@ QueueHandle_t g_xSystemControlManagerQueue;
 #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
 // local parameter declarations -----------------------------------------------
+static  BOOL  bForceManufacturing;
 
 // local function prototypes --------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
@@ -104,6 +105,9 @@ void SystemControlManager_LocalInitialize( void )
   xTaskCreate( SystemControlTask, "SystemControl", configMINIMAL_STACK_SIZE, NULL, SYSCTRL_TASK_PRIORITY, NULL );
   g_xSystemControlManagerQueue = xQueueCreate( SYSCTRL_QUEUE_SIZE, sizeof( STATEEXECENGARG ));
   #endif // SYSTEMDEFINE_OS_SELECTION
+
+  // clear the force manufacturing
+  bForceManufacturing = FALSE;
 }
 
 /******************************************************************************
@@ -155,7 +159,7 @@ static void LclInitEntry( void )
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   xQueueSendToBack( g_xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
   #else
-  TaskManager_PostEvent( TASK_SCHD_ENUM_SYSCTL, xStateArg );
+  TaskManager_PostEvent( SYSTEMCONTROLMANAGER_TASK_ENUM, xStateArg );
   #endif // SYSTEMDEFINE_OS_SELECTION
 }
 
@@ -170,7 +174,6 @@ static void LclInitEntry( void )
 static void LclConfigEntry( void )
 {
   STATEEXECENGARG xStateArg;
-
  
   // set the event
   xStateArg = SYSCTRLMNGR_EVENT_CONFIGDONE;
@@ -179,7 +182,7 @@ static void LclConfigEntry( void )
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   xQueueSendToBack( g_xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
   #else
-  TaskManager_PostEvent( TASK_SCHD_ENUM_SYSCTL, xStateArg );
+  TaskManager_PostEvent( SYSTEMCONTROLMANAGER_TASK_ENUM, xStateArg );
   #endif // SYSTEMDEFINE_OS_SELECTION
 }
 
@@ -196,13 +199,13 @@ static void LclPowRcvEntry( void )
   STATEEXECENGARG xStateArg;
 
    // set the event
-  xStateArg = ( bForceManufacturing ) ? SYSCTRLMNGR_LCLMODE_MANUFACTURING : SYSCTRLMNGR_LCLMODE_IDLE;
+  xStateArg = ( bForceManufacturing ) ? SYSCTRLMNGR_EVENT_GOMANUFACTURING : SYSCTRLMNGR_EVENT_GOIDLE;
   
   // move to idle
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   xQueueSendToBack( xSystemControlManagerQueue, ( PVOID )&xStateArg, portMAX_DELAY );
   #else
-  TaskManager_PostEvent( TASK_SCHD_ENUM_SYSCTL, xStateArg );
+  TaskManager_PostEvent( SYSTEMCONTROLMANAGER_TASK_ENUM, xStateArg );
   #endif // SYSTEMDEFINE_OS_SELECTION
 }
 
@@ -271,7 +274,5 @@ static void SystemControlTask( PVOID pvParameters )
   }
 }
 #endif  // SYSTEMDEFINE_OS_SELECTION
-
-/**@} EOF LedManager_cfg.c */
 
 /**@} EOF SystemControlManager_cfg.c */

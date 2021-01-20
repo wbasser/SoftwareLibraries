@@ -35,7 +35,7 @@
 // library includes -----------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
-extern  const DACDEF       tDacDef;
+extern  const DACDEF       g_tDacDef;
 
 /**@} EOF Dac_cfg.h */
 

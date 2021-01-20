@@ -54,7 +54,8 @@ typedef enum _RCVSTATE
   RCV_STATE_DSTA,         ///<  2 - destination address state
   RCV_STATE_SRCA,         ///<  3 - source address state
   RCV_STATE_CMND,         ///<  4 - command byte state
-  RCV_STATE_OPTN,         ///<  5 - option byte state
+  RCV_STATE_OPT1,         ///<  5 - option1 byte state
+  RCV_STATE_OPT2,         ///<  5 - option2 byte state
   RCV_STATE_SEQN,         ///<  6 - sequence number
   RCV_STATE_HDR2,         ///<  7 - header char 2 state
   RCV_STATE_CTRL,         ///<  8 - control byte state
@@ -103,7 +104,8 @@ typedef struct _LCLBUFCTL
   U16             wIndex;       ///< current index into the buffer
   U16UN           tCheck;       ///< check mode
   U8              nCommand;     ///< command
-  U8              nOption;      ///< option
+  U8              nOption1;     ///< option1
+  U8              nOption2;     ///< option2
   U8              nSrcDstAddr;  ///< the src addr on incoming and dst addr on outgoing
   U8              nSequence;    ///< sequence number
   BOOL            bDataBlock;   ///< data block present
@@ -166,14 +168,14 @@ static  U8    RcvStateSrcaExc( STATEEXECENGARG xArg );
 // RCV_STATE_CMND functions
 static  U8    RcvStateCmndExc( STATEEXECENGARG xArg );
 
-// RCV_STATE_OPTN functions
-static  U8    RcvStateOptnExc( STATEEXECENGARG xArg );
+// RCV_STATE_OPT1 functions
+static  U8    RcvStateOpt1Exc( STATEEXECENGARG xArg );
+
+// RCV_STATE_OPT2 functions
+static  U8    RcvStateOpt2Exc( STATEEXECENGARG xArg );
 
 // RCV_STATE_SEQN functions
 static  U8    RcvStateSeqnExc( STATEEXECENGARG xArg );
-
-// RCV_STATE_HDR2 function
-static  U8    RcvStateHdr2Exc( STATEEXECENGARG xArg );
 
 // RCV_STATE_CTRL functions
 static  U8    RcvStateCtrlExc( STATEEXECENGARG xArg );
@@ -218,7 +220,8 @@ static  const CODE STATEEXECENGTABLE  atRcvStates[ RCV_STATE_MAX ] =
  STATEXECENGETABLE_ENTRY( RCV_STATE_DSTA, NULL,            RcvStateDstaExc, NULL,            NULL                ),
  STATEXECENGETABLE_ENTRY( RCV_STATE_SRCA, NULL,            RcvStateSrcaExc, NULL,            atAnyStateEvents    ),
  STATEXECENGETABLE_ENTRY( RCV_STATE_CMND, NULL,            RcvStateCmndExc, NULL,            atAnyStateEvents    ),
- STATEXECENGETABLE_ENTRY( RCV_STATE_OPTN, NULL,            RcvStateOptnExc, NULL,            atAnyStateEvents    ),
+ STATEXECENGETABLE_ENTRY( RCV_STATE_OPT1, NULL,            RcvStateOpt1Exc, NULL,            atAnyStateEvents    ),
+ STATEXECENGETABLE_ENTRY( RCV_STATE_OPT2, NULL,            RcvStateOpt2Exc, NULL,            atAnyStateEvents    ),
  STATEXECENGETABLE_ENTRY( RCV_STATE_SEQN, NULL,            RcvStateSeqnExc, NULL,            atAnyStateEvents    ),
  STATEXECENGETABLE_ENTRY( RCV_STATE_HDR2, NULL,            NULL,            NULL,            atAnyStateEvents    ),
  STATEXECENGETABLE_ENTRY( RCV_STATE_CTRL, NULL,            RcvStateCtrlExc, NULL,            atRcvCtrlEvents     ),
@@ -302,7 +305,7 @@ void BinaryCommandHandler_Initialize( void )
  * @return      appropriate protocol status/error
  *
  *****************************************************************************/
-BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdEnum, U8 nOption, U8 nDstAddr, S16 sSpecialCmd )
+BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdEnum, U8 nOption1, U8 nOption2, U8 nDstAddr, S16 sSpecialCmd )
 {
   BINCMDSTS               eStatus = BINCMD_STS_IDLE;
   BINCMDMSTENTRY const *  ptCmdTbl;
@@ -353,7 +356,7 @@ BINCMDSTS BinaryCommandHandler_SendMstMessage( BINCMDENUM eProtEnum, U8 nMstCmdE
           // now check for continued processing
           if ( eStatus == BINCMD_STS_IDLE )
           {
-            BinaryCommandHandler_BeginMessage( eProtEnum, nCommand, nOption );
+            BinaryCommandHandler_BeginMessage( eProtEnum, nCommand, nOption1, nOption2 );
 
             // process the callback
             ProcessMasterCallback( eProtEnum, MAST_EVENT_SNDMSG );
@@ -489,7 +492,7 @@ BINCMDSTS BinaryCommandHandler_ProcessChar( BINCMDENUM eProtEnum, U8 nRcvChar, U
         #endif  // INCMDHAND_ENABLE_MASTERMODE
         {
           // send error/set status
-          BinaryCommandHandler_BeginMessage( eProtEnum, CH_NAK, ptLclCtl->eLclSts );
+          BinaryCommandHandler_BeginMessage( eProtEnum, 0, CH_NAK, ptLclCtl->eLclSts );
           BinaryCommandHandler_SendMessage( eProtEnum );
         }
         eStatus = BINCMD_STS_CRCERR;
@@ -595,12 +598,13 @@ BINCMDSTS BinaryCommandHandler_ResetXmtLength( BINCMDENUM eProtEnum )
  *
  * @param[in]   eProtEnum   protocol enumeration
  * @param[in]   nCommand    command 
- * @param[in]   nOption     option
+ * @param[in]   nOption1    option1
+ * @param[in]   nOption2    option2
  *
  * @return      appropriate protocol status/error
  *
  *****************************************************************************/
-BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, U8 nOption )
+BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, U8 nOption1, U8 nOption2 )
 {
   BINCMDSTS       eStatus = BINCMD_STS_ILLPROTENUM;
   PLCLBUFCTL      ptBufCtl;
@@ -649,7 +653,8 @@ BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, 
     
     // send the command/option bytes
     StuffXmtData( ptBufCtl, nCommand, TRUE );
-    StuffXmtData( ptBufCtl, nOption, TRUE );
+    StuffXmtData( ptBufCtl, nOption1, TRUE );
+    StuffXmtData( ptBufCtl, nOption2, TRUE );
 
     // check for sequence numbers
     if ( PGM_RDBYTE( ptLclDef->bSequenceEnable ))
@@ -667,7 +672,7 @@ BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, 
 }
 
 /******************************************************************************
- * @function BinaryCommandHandler_SetOption
+ * @function BinaryCommandHandler_SetOption1
  *
  * @brief set the option bye
  *
@@ -679,7 +684,7 @@ BINCMDSTS BinaryCommandHandler_BeginMessage( BINCMDENUM eProtEnum, U8 nCommand, 
  * @return      appropriate protocol status/error
  *
  *****************************************************************************/
-BINCMDSTS BinaryCommandHandler_SetOption( BINCMDENUM eProtEnum, U8 nOption )
+BINCMDSTS BinaryCommandHandler_SetOption1( BINCMDENUM eProtEnum, U8 nOption )
 {
   BINCMDSTS eStatus = BINCMD_STS_ILLPROTENUM;
   
@@ -694,12 +699,56 @@ BINCMDSTS BinaryCommandHandler_SetOption( BINCMDENUM eProtEnum, U8 nOption )
     if ( PGM_RDBYTE( ptLclDef->bDualBufferMode ) == TRUE )
     {
       // set the option byte in transmit buffer
-      ptLclCtl->tXmtBuffer.nOption = nOption;
+      ptLclCtl->tXmtBuffer.nOption1 = nOption;
     }
     else
     {
       // set the option byte in the receive buffer
-      ptLclCtl->tRcvBuffer.nOption = nOption;
+      ptLclCtl->tRcvBuffer.nOption1 = nOption;
+    }
+    
+    // set status to idle
+    eStatus = BINCMD_STS_IDLE;
+  }
+
+  // return the status
+  return( eStatus );
+}
+
+/******************************************************************************
+ * @function BinaryCommandHandler_SetOption2
+ *
+ * @brief set the option bye
+ *
+ * This function will set the option byte in the transmit buffer
+ *
+ * @param[in]   eProtEnum   protocol enumeration
+ * @param[in]   nOption     option byte
+ *
+ * @return      appropriate protocol status/error
+ *
+ *****************************************************************************/
+BINCMDSTS BinaryCommandHandler_SetOption2( BINCMDENUM eProtEnum, U8 nOption )
+{
+  BINCMDSTS eStatus = BINCMD_STS_ILLPROTENUM;
+  
+  // check for a valid protocol
+  if ( eProtEnum < BINCMD_ENUM_MAX )
+  {
+    // get the pointers to the control/definition structures
+    ptLclCtl = &atCtrls[ eProtEnum ];  
+    ptLclDef = ( PBINCMDDEF )&g_atBinCmdDefs[ eProtEnum ];
+    
+    // check for dual buffer
+    if ( PGM_RDBYTE( ptLclDef->bDualBufferMode ) == TRUE )
+    {
+      // set the option byte in transmit buffer
+      ptLclCtl->tXmtBuffer.nOption2 = nOption;
+    }
+    else
+    {
+      // set the option byte in the receive buffer
+      ptLclCtl->tRcvBuffer.nOption2 = nOption;
     }
     
     // set status to idle
@@ -847,7 +896,7 @@ BINCMDSTS BinaryCommandHandler_GetCommand( BINCMDENUM eProtEnum, PU8 pnCommand )
 }
 
 /******************************************************************************
- * @function BinaryCommandHandler_GetOption
+ * @function BinaryCommandHandler_GetOption1
  *
  * @brief get the option byte
  *
@@ -859,7 +908,7 @@ BINCMDSTS BinaryCommandHandler_GetCommand( BINCMDENUM eProtEnum, PU8 pnCommand )
  * @return      appropriate protocol status/error
  *
  *****************************************************************************/
-BINCMDSTS BinaryCommandHandler_GetOption( BINCMDENUM eProtEnum, PU8 pnOption )
+BINCMDSTS BinaryCommandHandler_GetOption1( BINCMDENUM eProtEnum, PU8 pnOption )
 {
   BINCMDSTS eStatus = BINCMD_STS_ILLPROTENUM;
   
@@ -870,7 +919,41 @@ BINCMDSTS BinaryCommandHandler_GetOption( BINCMDENUM eProtEnum, PU8 pnOption )
     ptLclCtl = &atCtrls[ eProtEnum ];  
     
     // get the option byte in the receive buffer
-    *pnOption = ptLclCtl->tRcvBuffer.nOption;
+    *pnOption = ptLclCtl->tRcvBuffer.nOption1;
+    
+    // set status to idle
+    eStatus = BINCMD_STS_IDLE;
+  }
+
+  // return the status
+  return( eStatus );
+}
+
+/******************************************************************************
+ * @function BinaryCommandHandler_GetOption2
+ *
+ * @brief get the option byte
+ *
+ * This function will return the current option byte
+ *
+ * @param[in]   eProtEnum   protocol enumeration
+ * @param[io]   pnCommand   pointer to store the command byte in
+ *
+ * @return      appropriate protocol status/error
+ *
+ *****************************************************************************/
+BINCMDSTS BinaryCommandHandler_GetOption2( BINCMDENUM eProtEnum, PU8 pnOption )
+{
+  BINCMDSTS eStatus = BINCMD_STS_ILLPROTENUM;
+  
+  // check for a valid protocol
+  if ( eProtEnum < BINCMD_ENUM_MAX )
+  {
+    // get the pointers to the control/definition structures
+    ptLclCtl = &atCtrls[ eProtEnum ];  
+    
+    // get the option byte in the receive buffer
+    *pnOption = ptLclCtl->tRcvBuffer.nOption2;
     
     // set status to idle
     eStatus = BINCMD_STS_IDLE;
@@ -1536,18 +1619,35 @@ static U8 RcvStateCmndExc( STATEEXECENGARG xArg )
 {
   // store the command/goto to RCV_STATE_OPTN
   ptLclCtl->tRcvBuffer.nCommand = xArg;
-  return( RCV_STATE_OPTN );
+  return( RCV_STATE_OPT1 );
 }
 
 /******************************************************************************
- * RCV_STATE_OPTN functions
+ * RCV_STATE_OPT1 functions
  *****************************************************************************/
-static U8 RcvStateOptnExc( STATEEXECENGARG xArg )
+static U8 RcvStateOpt1Exc( STATEEXECENGARG xArg )
 {
   U8  nNextState;
   
   // store the option/determine next state
-  ptLclCtl->tRcvBuffer.nOption = xArg;
+  ptLclCtl->tRcvBuffer.nOption1 = xArg;
+  
+  // set the next state
+  nNextState = RCV_STATE_OPT2;
+  
+  // return next state
+  return( nNextState );
+}
+
+/******************************************************************************
+ * RCV_STATE_OPT2 functions
+ *****************************************************************************/
+static U8 RcvStateOpt2Exc( STATEEXECENGARG xArg )
+{
+  U8  nNextState;
+  
+  // store the option/determine next state
+  ptLclCtl->tRcvBuffer.nOption2 = xArg;
   
   // set the next state
   nNextState = ( PGM_RDBYTE( ptLclDef->bSequenceEnable ) == TRUE ) ? RCV_STATE_SEQN : RCV_STATE_HDR2;
@@ -1564,15 +1664,6 @@ static U8 RcvStateSeqnExc( STATEEXECENGARG xArg )
   // store the sequence/goto header 2
   ptLclCtl->tRcvBuffer.nSequence = xArg;
   return( RCV_STATE_HDR2 );
-}
-
-/******************************************************************************
- * RCV_STATE_HDR2 function
- *****************************************************************************/
-static U8 RcvStateHdr2Exc( STATEEXECENGARG xArg )
-{
-  // if we have reached here there is a protocol error, go back to idle
-  return( RCV_STATE_IDLE );
 }
 
 /******************************************************************************
@@ -1605,14 +1696,22 @@ static U8 RcvStateCtrlExc( STATEEXECENGARG xArg )
         break;
         
       case RCV_STATE_CMND :
-        // store the command/goto to RCV_STATE_OPTN
+        // store the command/goto to RCV_STATE_OPT1
         ptLclCtl->tRcvBuffer.nCommand = CH_DLE;
-        nNextState = RCV_STATE_OPTN;
+        nNextState = RCV_STATE_OPT1;
         break;
         
-      case RCV_STATE_OPTN :
+      case RCV_STATE_OPT1 :
         // store the option/determine next state
-        ptLclCtl->tRcvBuffer.nOption = CH_DLE;
+        ptLclCtl->tRcvBuffer.nOption2 = CH_DLE;
+      
+        // set the next state
+        nNextState = RCV_STATE_OPT2;
+        break;
+      
+      case RCV_STATE_OPT2 :
+        // store the option/determine next state
+        ptLclCtl->tRcvBuffer.nOption2 = CH_DLE;
         
         // set the next state
         nNextState = ( PGM_RDBYTE( ptLclDef->bSequenceEnable ) == TRUE ) ? RCV_STATE_SEQN : RCV_STATE_HDR2;
@@ -1922,7 +2021,7 @@ static BINCMDSTS ProcessRcvdMsg( BINCMDENUM eProtEnum, U8 nCompareValue )
   }
   
   // begin the message
-  BinaryCommandHandler_BeginMessage( eProtEnum, CH_ACK, 0 );
+  BinaryCommandHandler_BeginMessage( eProtEnum, ptLclCtl->tRcvBuffer.nCommand, CH_ACK, ptLclCtl->tXmtBuffer.nOption2 );
         
   // parse the command table
   eParseStatus = ParseCommand( eProtEnum, wRcvLength, nCompareValue );
@@ -1937,13 +2036,13 @@ static BINCMDSTS ProcessRcvdMsg( BINCMDENUM eProtEnum, U8 nCompareValue )
       break;
           
     case BINPARSE_STS_SND_NAK :
-      BinaryCommandHandler_BeginMessage( eProtEnum, CH_NAK,  ptLclCtl->tXmtBuffer.nOption );
+      BinaryCommandHandler_BeginMessage( eProtEnum, ptLclCtl->tRcvBuffer.nCommand, CH_NAK, ptLclCtl->tXmtBuffer.nOption2 );
       BinaryCommandHandler_SendMessage( eProtEnum );
       eStatus = BINCMD_STS_MSGRCVD_ERR;
       break;
           
     case BINPARSE_STS_SND_RESP_OPTION :
-      BinaryCommandHandler_BeginMessage( eProtEnum, CH_ACK, ptLclCtl->tXmtBuffer.nOption );
+      BinaryCommandHandler_BeginMessage( eProtEnum, ptLclCtl->tRcvBuffer.nCommand, CH_ACK, ptLclCtl->tXmtBuffer.nOption2 );
       BinaryCommandHandler_SendMessage( eProtEnum );
       eStatus = BINCMD_STS_MSGRCVD_PROC;
       break;
@@ -1954,7 +2053,7 @@ static BINCMDSTS ProcessRcvdMsg( BINCMDENUM eProtEnum, U8 nCompareValue )
     case BINPARSE_STS_ERR_ILLVAL :
     case BINPARSE_STS_ERR_ILLHAND :
     case BINPARSE_STS_ERR_ILLMODE :
-      BinaryCommandHandler_BeginMessage( eProtEnum, CH_NAK, eParseStatus );
+      BinaryCommandHandler_BeginMessage( eProtEnum, ptLclCtl->tRcvBuffer.nCommand, CH_NAK, eParseStatus );
       BinaryCommandHandler_SendMessage( eProtEnum );
       eStatus = BINCMD_STS_MSGRCVD_ERR;
       break;
@@ -1964,7 +2063,7 @@ static BINCMDSTS ProcessRcvdMsg( BINCMDENUM eProtEnum, U8 nCompareValue )
       break;
 
     default :
-      BinaryCommandHandler_BeginMessage( eProtEnum, CH_NAK, 0xFF );
+      BinaryCommandHandler_BeginMessage( eProtEnum, ptLclCtl->tRcvBuffer.nCommand, CH_NAK, 0xFF );
       BinaryCommandHandler_SendMessage( eProtEnum );
       eStatus = BINCMD_STS_MSGRCVD_ERR;
       break;

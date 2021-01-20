@@ -29,6 +29,7 @@
 #include "Event/Event.h"
 
 // library includes -----------------------------------------------------------
+#include "Clock/Clock.h"
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -45,20 +46,25 @@
 // constant parameter initializations -----------------------------------------
 
 /******************************************************************************
- * @function Event_Initialize
+ * @function Event_Create
  *
  * @brief initialize the event generators
  *
  * This function will process all defined event generators
  *
+ * @param[in]   eChannel			event channel
+ * @param[in]   eGenerator		event generator
+ * @param[in]   eEdge					event edge
+ * @param[in]   eUserMux			event user mux
+ *
  *****************************************************************************/
-void Event_Initialize( void )
+void Event_Create( EVENTCHAN eChannel, EVENTGEN eGenerator, EVENTEDGE eEdge, EVENTUSERMUX eUserMux )
 {
-  EVENTENUM           eEvent;
-  PEVENTDEF           ptDef; 
   EVSYS_CHANNEL_Type  tChan;
-  EVSYS_USER_Type     tUser;
   U8                  nTemp;
+
+  // enable the clock
+
 
   // reset the system
   EVSYS->CTRL.bit.SWRST = ON;
@@ -66,39 +72,30 @@ void Event_Initialize( void )
   // set the clock to always on
   EVSYS->CTRL.bit.GCLKREQ = ON;
 
-  // for each defined event generator
-  for ( eEvent = 0; eEvent < EVENT_ENUM_MAX; eEvent++ )
-  {
-    // get a pointer to the definition
-    ptDef = ( PEVENTDEF )&atEventDefs[ eEvent ];
-
-    // set up the channel
-    tChan.reg = EVSYS_CHANNEL_CHANNEL( ptDef->eChannel );
-    tChan.reg |= EVSYS_CHANNEL_EDGSEL( ptDef->eEdge );
-    tChan.reg |= EVSYS_CHANNEL_EVGEN( ptDef->eGenerator );
+	// set up the channel
+	tChan.reg = EVSYS_CHANNEL_CHANNEL( eChannel );
+	tChan.reg |= EVSYS_CHANNEL_EDGSEL( eEdge );
+	tChan.reg |= EVSYS_CHANNEL_EVGEN( eGenerator );
     
-    // determine the ASYNC/RESYNC based on usermux
-    switch( ptDef->eUserMux )
-    {
-      case EVENT_USERMUX_DMAC_CH0 :
-      case EVENT_USERMUX_DMAC_CH1 :
-      case EVENT_USERMUX_DMAC_CH2 :
-      case EVENT_USERMUX_DMAC_CH3 :
-        nTemp = EVSYS_CHANNEL_PATH_RESYNCHRONIZED_Val;
-        break;
+	// determine the ASYNC/RESYNC based on usermux
+	switch( eUserMux )
+	{
+		case EVENT_USERMUX_DMAC_CH0 :
+		case EVENT_USERMUX_DMAC_CH1 :
+		case EVENT_USERMUX_DMAC_CH2 :
+		case EVENT_USERMUX_DMAC_CH3 :
+			nTemp = EVSYS_CHANNEL_PATH_RESYNCHRONIZED_Val;
+			break;
 
-      default :
-        nTemp = EVSYS_CHANNEL_PATH_ASYNCHRONOUS_Val;
-        break;
-    }
-    tChan.reg |= EVSYS_CHANNEL_PATH( nTemp );
-    EVSYS->CHANNEL.reg = tChan.reg;   
+		default :
+			nTemp = EVSYS_CHANNEL_PATH_ASYNCHRONOUS_Val;
+			break;
+	}
+	tChan.reg |= EVSYS_CHANNEL_PATH( nTemp );
+	EVSYS->CHANNEL.reg = tChan.reg;   
 
-    // set up the user mux
-    tUser.reg = EVSYS_USER_USER( ptDef->eUserMux );
-    tUser.reg |= EVSYS_USER_CHANNEL( ptDef->eChannel + 1 );
-    EVSYS->USER.reg = tUser.reg;
-  }
+	// set up the user mux
+	EVSYS->USER.reg = EVSYS_USER_USER( eUserMux ) | EVSYS_USER_CHANNEL( eChannel + 1 );
 }
 
 /******************************************************************************

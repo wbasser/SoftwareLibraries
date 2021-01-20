@@ -113,6 +113,21 @@ void Clock_Initialize( CLOCKSRC eClkSrc, U8 nFlashWaitStates, CLOCKMAINDIV eCpuD
 }
 
 /******************************************************************************
+ * @function Clock_Close
+ *
+ * @brief clock close
+ *
+ * This function will close the clock
+ *
+ *****************************************************************************/
+void Clock_Close( void )
+{
+  // perform a software reset
+  GCLK->CTRL.reg = GCLK_CTRL_SWRST;
+  while( GCLK->CTRL.reg & GCLK_CTRL_SWRST );
+}
+
+/******************************************************************************
  * @function Clock_GetFreq
  *
  * @brief get the current clock frequency
@@ -144,18 +159,18 @@ U32 Clock_GetGenClock( CLOCKGENID eGenId )
 {
   U32               uClockFreq;
   GCLK_GENDIV_Type  tGenDiv;
-  GCLK_GENCTRL_TYPE tGenCtrl;
+  GCLK_GENCTRL_Type tGenCtrl;
   
   // get the divider
-  GCLK->GENDIV.bit.ID = GCLK_GENDIV_ID( eGenId );
+  *(( PU8 )&GCLK->GENDIV.reg ) = eGenId;
   tGenDiv.reg = GCLK->GENDIV.reg;
   
   // get the control
-  GCLK->GENCTRL.bit.ID = GCLK_GENCTRL_ID( eGenId );
-  tGenCtrl.reg = GLCK->GENCTRL.reg;
+  *(( PU8 )&GCLK->GENCTRL.reg ) = eGenId;
+  tGenCtrl.reg = GCLK->GENCTRL.reg;
   
   // get the source
-  switch( tGenDiv.bit.SRC )
+  switch( tGenCtrl.bit.SRC )
   {
     case CLOCK_SRC_XOSC :
       break;
@@ -189,10 +204,41 @@ U32 Clock_GetGenClock( CLOCKGENID eGenId )
   }
   
   // now apply the divider
-  uClockFreq /= tGenDiv.bit.DIV;
+  if ( tGenDiv.bit.DIV != 0 )
+  {
+    uClockFreq /= tGenDiv.bit.DIV;
+  }
   
   // return the clock frequency
   return( uClockFreq );
+}
+
+/******************************************************************************
+ * @function Clock_GetPeriphClock
+ *
+ * @brief get the current peripheral clock frequency
+ *
+ * This function will return the current peripheral clock frequency
+ *
+ * @parma[in]     eMuxId            multiplexer ID
+ *
+ * @return     the frequency of the main clock
+ *
+ *****************************************************************************/
+U32 Clock_GetPeriphClock( CLOCKMUXID eMuxId )
+{
+  U32               uFreq = 0;
+  GCLK_CLKCTRL_Type tCtl;
+
+  // get the multiplexer
+  *(( PU8 )&GCLK->CLKCTRL.reg ) = eMuxId;
+  tCtl.reg = GCLK->CLKCTRL.reg;
+
+  // get the gen clock frequency
+  uFreq = Clock_GetGenClock( tCtl.bit.GEN );
+
+  // return the frequency
+  return( uFreq );
 }
 
 /******************************************************************************
@@ -217,6 +263,7 @@ void Clock_PeriphEnable( CLOCKMUXID eMuxId, CLOCKGENID eGenId )
   tCtl.bit.GEN = eGenId;
   tCtl.bit.WRTLOCK = FALSE;
   GCLK->CLKCTRL.reg = tCtl.reg;
+  while( GCLK->STATUS.bit.SYNCBUSY );
 }
 
 /******************************************************************************

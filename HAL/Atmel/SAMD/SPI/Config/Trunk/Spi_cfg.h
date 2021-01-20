@@ -37,7 +37,7 @@
 #define SPI_CHAN0_IN_USE      ( 0 )
 #define SPI_CHAN1_IN_USE      ( 0 )
 #define SPI_CHAN2_IN_USE      ( 0 )
-#define SPI_CHAN3_IN_USE      ( 1 )
+#define SPI_CHAN3_IN_USE      ( 0 )
 #define SPI_CHAN4_IN_USE      ( 0 )
 #define SPI_CHAN5_IN_USE      ( 0 )
 
@@ -55,7 +55,7 @@ typedef enum  _SPIDEVENUM
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern  const SPIDEF atSpiDefs[ ];
+extern  const SPIDEF g_atSpiDefs[ ];
 
 /**@} EOF Spi_cfg.h */
 

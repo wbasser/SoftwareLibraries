@@ -589,6 +589,7 @@ BOOL WifiAWM006Handler_GetConnectionStatus( void )
   // return the connection status
   return( bConnected );
 }
+
 /******************************************************************************
  * @function WifiAMW006Handler_OpenSocket
  *

@@ -1,9 +1,9 @@
 /******************************************************************************
  * @file USBCDCHandler_cfg.c
  *
- * @brief USB CDC Hnadler configuration implementation
+ * @brief USB-CDC handler configuration implementation
  *
- * This file provides the implementation for the USB CDC handler
+ * This file provides the configuration implementation for the USB-CDC handler
  *
  * @copyright Copyright (c) 2012 Cyber Intergration
  * This document contains proprietary data and information of Cyber Integration 
@@ -17,7 +17,7 @@
  * $Rev: $
  * 
  *
- * \addtogroup USBCDCHandler
+ * \addtogroup USBCBCHandler
  * @{
  *****************************************************************************/
 
@@ -31,6 +31,14 @@
 // Macros and Defines ---------------------------------------------------------
 
 // enumerations ---------------------------------------------------------------
+/// enumerate the DCD interface descriptors
+typedef enum _INTFDESCENUM
+{
+  INTFDESC_ENUM_CDCCCI = 0,
+  INTFDESC_ENUM_CDCDCI,
+} INTFDESCENUM;
+
+/// enumerate the standard request types
 
 // structures -----------------------------------------------------------------
 
@@ -41,148 +49,158 @@
 // local function prototypes --------------------------------------------------
 
 // constant parameter initializations -----------------------------------------
-ALIGNED4  const U8  g_anUSBCDCDevDescriptor[ ] =
+const ALIGNED4 USBDEVDESCRIPTOR g_tUsbDevDescriptor =
 {
-	0x12,   // bLength
-	0x01,   // bDescriptorType
-	0x10,   // bcdUSBL
-	0x01,   //
-	0xEF,   // bDeviceClass:    CDC class code
-	0x02,   // bDeviceSubclass: CDC class sub code
-	0x01,   // bDeviceProtocol: CDC Device protocol
-	0x40,   // bMaxPacketSize0
-	0xEB,   // idVendorL
-	0x03,   //
-	0x00,   // idProductL
-	0x22,   //
-	0x10,   // bcdDeviceL
-	0x01,   //
-	0x00,   // iManufacturer    // 0x01
-	0x00,   // iProduct
-	0x00,   // SerialNumber
-	0x01    // bNumConfigs
+  .tHeader                =
+  {
+    .nLength              = USBDEVDESCRIPTOR_SIZE,
+    .nDescriptorType      = USB_DESCTYPES_DEVICE,
+  },
+  .wBcdUSB                = USB_VERSION_BCD( 1, 1, 0 ),
+  .nDeviceClass           = USB_CDCDESCCSCP_CDCCLASS,
+  .nDeviceSubClass        = USB_CDCDESCCSCP_NOSPECIFICSUBCLASS,
+  .nDeviceProtocol        = USB_CDCDESCCSCP_NOSPECIFICPROTOCOL,
+  .nMaxPacketSize         = USB_ENDPOINT_SIZE,
+  .wVendor                = 0x03EB,
+  .wProduct               = 0x2044,
+  .wBcdDevice             = USB_VERSION_BCD( 0, 0, 1 ),
+  .nManufacturer          = 0,
+  .nProduct               = 0,
+  .nSerialNumber          = 0,
+  .nNumConfigurations     = 1,
 };
 
-ALIGNED4  const U8  g_anUSBCDCCfgDescriptor[ ] =
+const ALIGNED4 USBCONFIGURATION g_tUsbConfiguration =
 {
-	// Configuration 1 descriptor
-	0x09,   // CbLength
-	0x02,   // CbDescriptorType
-	0x43,   // CwTotalLength 2 EP + Control
-	0x00,
-	0x02,   // CbNumInterfaces
-	0x01,   // CbConfigurationValue
-	0x00,   // CiConfiguration
-	0xC0,   // CbmAttributes 0xA0
-	0x00,   // CMaxPower
+  // configuration descriptor
+  .tCfgDescriptor         =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBINTERFACEDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_CONFIGURATION,
+    },
+    .wTotalLength         = USBCONFIGURATION_SIZE,
+    .nNumInterfaces       = 2,
+    .nConfigurationValue  = 1,
+    .nConfiguration       = 0,
+    .nAttributes          = 0xA0,
+    .nMaxPower            = USB_CONFIG_POWER_MA( 250 ),
+  },
 
-	// Communication Class Interface Descriptor Requirement
-	0x09,   // bLength
-	0x04,   // bDescriptorType
-	0x00,   // bInterfaceNumber
-	0x00,   // bAlternateSetting
-	0x01,   // bNumEndpoints
-	0x02,   // bInterfaceClass
-	0x02,   // bInterfaceSubclass
-	0x00,   // bInterfaceProtocol
-	0x00,   // iInterface
 
-	// Header Functional Descriptor
-	0x05,   // bFunction Length
-	0x24,   // bDescriptor type: CS_INTERFACE
-	0x00,   // bDescriptor subtype: Header Func Desc
-	0x10,   // bcdCDC:1.1
-	0x01,
+  // Interface descriptor
+  .tCdcCCIInterface       =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBINTERFACEDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_INTERFACE,
+    },
+    .nInterfaceNumber     = INTFDESC_ENUM_CDCCCI,
+    .nAlternateSetting    = 0,
+    .nNumEndpoints        = 1,
+    .nInterfaceClass      = USB_CDCDESCCSCP_CDCCLASS,
+    .nInterfaceSubClass   = USB_CDCDESCCSCP_ACMSUBCLASS,
+    .nInterfaceProtocol   = USB_CDCDESCCSCP_ATCOMMANDPROTOCOL,
+    .nInterface           = 0,
+  },
+  
+  // function header
+  .tCdcFuncHeader         =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBHDRFUNCDESCIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_CSINTERFACE,
+    },
+    .nDescriptorSubType   = USB_CDCDSUBTYPES_CSINTF_HEADER,
+    .wBcdCDC              = USB_VERSION_BCD( 1, 1, 0 ),
+  },
 
-	// ACM Functional Descriptor
-	0x04,   // bFunctionLength
-	0x24,   // bDescriptor Type: CS_INTERFACE
-	0x02,   // bDescriptor Subtype: ACM Func Desc
-	0x00,   // bmCapabilities
+  // function ACM
+  .tCdcFuncAcm            =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBACMDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_CSINTERFACE,
+    },
+    .nDescriptorSubType   = USB_CDCDSUBTYPES_CSINTF_ACM,
+    .nCapabilities        = 0x06,
+  },
 
-	// Union Functional Descriptor
-	0x05,   // bFunctionLength
-	0x24,   // bDescriptorType: CS_INTERFACE
-	0x06,   // bDescriptor Subtype: Union Func Desc
-	0x00,   // bMasterInterface: Communication Class Interface
-	0x01,   // bSlaveInterface0: Data Class Interface
+  // function union
+  .tCdcFuncUnion          =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBUNIONFUNCDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_CSINTERFACE,
+    },
+    .nDescriptorSubType   = USB_CDCDSUBTYPES_CSINTF_UNION,
+    .nMasterInterface     = INTFDESC_ENUM_CDCCCI, 
+    .nSlaveInterface      = INTFDESC_ENUM_CDCDCI,
+  },
 
-	// Call Management Functional Descriptor
-	0x05,   // bFunctionLength
-	0x24,   // bDescriptor Type: CS_INTERFACE
-	0x01,   // bDescriptor Subtype: Call Management Func Desc
-	0x00,   // bmCapabilities: D1 + D0
-	0x01,   // bDataInterface: Data Class Interface 1
+  // control endpoint
+  .tCdcControlEndpoint    =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBENDPOINTDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_ENDPOINT,
+    },
+    .nEndpointAddress     = USB_ENDPOINT_COMM | USB_DIR_IN,
+    .nAttributes          = USB_EPTYPE_INTERRUPT,
+    .wMaxPacketSize       = USB_ENDPOINT_SIZE,
+    .nInterval            = 0xFF,
+  },
 
-	// Endpoint 1 descriptor
-	0x07,   // bLength
-	0x05,   // bDescriptorType
-	0x83,   // bEndpointAddress, Endpoint 03 - IN
-	0x03,   // bmAttributes      INT
-	0x08,   // wMaxPacketSize
-	0x00,
-	0xFF,   // bInterval
+  // CDC Data Interface
+  .tCdcDCIInterface       =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBINTERFACEDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_INTERFACE,
+    },
+    .nInterfaceNumber     = INTFDESC_ENUM_CDCDCI,
+    .nAlternateSetting    = 0,
+    .nNumEndpoints        = 2,
+    .nInterfaceClass      = USB_CDCDESCCSCP_CDCDATACLASS,
+    .nInterfaceSubClass   = USB_CDCDESCCSCP_NODATASUBCLASS,
+    .nInterfaceProtocol   = USB_CDCDESCCSCP_NODATAPROTOCOL,
+    .nInterface           = 0,
+  },
 
-	// Data Class Interface Descriptor Requirement
-	0x09,   // bLength
-	0x04,   // bDescriptorType
-	0x01,   // bInterfaceNumber
-	0x00,   // bAlternateSetting
-	0x02,   // bNumEndpoints
-	0x0A,   // bInterfaceClass
-	0x00,   // bInterfaceSubclass
-	0x00,   // bInterfaceProtocol
-	0x00,   // iInterface
+  // data in endpoint CDCTX
+  .tCdcDataInEndpoint     =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBENDPOINTDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_ENDPOINT,
+    },
+    .nEndpointAddress     = USB_ENDPOINT_IN | USB_DIR_IN,
+    .nAttributes          = USB_EPTYPE_BULK,
+    .wMaxPacketSize       = USB_ENDPOINT_SIZE,
+    .nInterval            = 0,
+  },
 
-	// Endpoint 1 descriptor
-	0x07,   // bLength
-	0x05,   // bDescriptorType
-  0x81,   // bEndpointAddress, Endpoint 01 - IN
-	0x02,   // bmAttributes      BULK
-	USB_ENDPOINT_SIZE,   // wMaxPacketSize
-	0x00,
-	0x00,   // bInterval
-
-	// Endpoint 2 descriptor
-	0x07,   // bLength
-	0x05,   // bDescriptorType
-	0x02,   // bEndpointAddress, Endpoint 02 - OUT
-	0x02,   // bmAttributes      BULK
-	USB_ENDPOINT_SIZE,   // wMaxPacketSize
-	0x00,
-	0x00    // bInterval
+  // data out endpoint CDCRX
+  .tCdcDataOutEndpoint    =
+  {
+    .tHeader              =
+    {
+      .nLength            = USBENDPOINTDESCRIPTOR_SIZE,
+      .nDescriptorType    = USB_DESCTYPES_ENDPOINT,
+    },
+    .nEndpointAddress     = USB_ENDPOINT_OUT,
+    .nAttributes          = USB_EPTYPE_BULK,
+    .wMaxPacketSize       = USB_ENDPOINT_SIZE,
+    .nInterval            = 0,
+  },
 };
 
-/******************************************************************************
- * @function USBCDCHandler_GetDevDescSize
- *
- * @brief get the device descriptor size
- *
- * This function returns the size of the device descriptor
- *
- * @return      size of the device descriptor
- *
- *****************************************************************************/
-U16 USBCDCHandler_GetDevDescSize( void )
-{
-  // return the size
-  return( sizeof( g_anUSBCDCDevDescriptor )); 
-}
-
-/******************************************************************************
- * @function USBCDCHandler_GetCfgDescSize
- *
- * @brief get the config descriptor size
- *
- * This function returns the size of the config descriptor
- *
- * @return      sze of the config descriptor
- *
- *****************************************************************************/
-U16 USBCDCHandler_GetCfgDescSize( void )
-{
-  // return the size
-  return( sizeof( g_anUSBCDCCfgDescriptor )); 
-}
-
-/**@} EOF USBCDCHandler.c */
+/**@} EOF USBCDCHandler_cfg.c */

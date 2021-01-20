@@ -53,34 +53,34 @@ static  U16   wCurIndex;
 static  U16   wMaxNumEntries;
 static  U16   wCurNumEntries;
 #if ( LOGHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-static  PC8   pcLclBuf;
+  static  PC8   pcLclBuf;
 #endif // LOGHANDLER_ENABLE_DEBUGCOMMANDS
 
 // local function prototypes --------------------------------------------------
 #if ( LOGHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-static  ASCCMDSTS CmdDmpLog( U8 nCmdEnum );
-static  ASCCMDSTS CmdRstLog( U8 nCmdEnum );
+  static  ASCCMDSTS CmdDmpLog( U8 nCmdEnum );
+  static  ASCCMDSTS CmdRstLog( U8 nCmdEnum );
 #endif // LOGHANDLER_ENABLE_DEBUGCOMMANDS
 
 // constant parameter initializations -----------------------------------------
 #if ( LOGHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-/// declare the command strings
-static  const CODE C8 szDmpLog[ ]   = { "DLOG" };
-static  const CODE C8 szRstLog[ ]   = { "RLOG" };
+  /// declare the command strings
+  static  const CODE C8 szDmpLog[ ]   = { "DLOG" };
+  static  const CODE C8 szRstLog[ ]   = { "RLOG" };
 
-/// define the string constants
-static  const CODE C8 szNewLine[ ]  = { "\n\r>" };
-static  const CODE C8 szDispFmt[ ]  = { "Time:%08lX%08lX, Type:%02X, Arg1:%08lX, Arg2:%08lX, Desc:%s\n\r" };
+  /// define the string constants
+  static  const CODE C8 szNewLine[ ]  = { "\n\r>" };
+  static  const CODE C8 szDispFmt[ ]  = { "Time:%08lX%08lX, Type:%02X, Arg1:%08lX, Arg2:%08lX, Desc:%s\n\r" };
 
-/// instantiate the command table
-const CODE ASCCMDENTRY atLogHandlerCmdHandlerTable[ ] =
-{
-  ASCCMD_ENTRY( szDmpLog, 4, 1, ASCFLAG_COMPARE_NONE, 0, CmdDmpLog ),
-  ASCCMD_ENTRY( szRstLog, 4, 0, ASCFLAG_COMPARE_NONE, 0, CmdRstLog ),
+  /// instantiate the command table
+  const CODE ASCCMDENTRY g_atLogHandlerCmdHandlerTable[ ] =
+  {
+    ASCCMD_ENTRY( szDmpLog, 4, 1, ASCFLAG_COMPARE_NONE, 0, CmdDmpLog ),
+    ASCCMD_ENTRY( szRstLog, 4, 0, ASCFLAG_COMPARE_NONE, 0, CmdRstLog ),
 
-  // the entry below must be here
-  ASCCMD_ENDTBL( )
-};
+    // the entry below must be here
+    ASCCMD_ENDTBL( )
+  };
 
 #endif // LOGHANDLER_ENABLE_DEBUGCOMMANDS
 
@@ -398,104 +398,104 @@ void LogHandler_ClearAllEntries( void )
 }
 
 #if ( LOGHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-/******************************************************************************
- * @function CmdDmpLog
- *
- * @brief dump the event log
- *
- * This function dumps the event log 
- *
- * @return  A
- *****************************************************************************/
-static ASCCMDSTS CmdDmpLog( U8 nCmdEnum )
-{
-  U16     wCount;
-  LOGPOS  eFirstPos, eNextPos;
-  PC8     pcDescription;
-  LOGTYPE eType;
-  U32     uArg1, uArg2;
-  U64UN   tTime;
-  U32UN   tTemp;
+  /******************************************************************************
+   * @function CmdDmpLog
+   *
+   * @brief dump the event log
+   *
+   * This function dumps the event log 
+   *
+   * @return  A
+   *****************************************************************************/
+  static ASCCMDSTS CmdDmpLog( U8 nCmdEnum )
+  {
+    U16     wCount;
+    LOGPOS  eFirstPos, eNextPos;
+    PC8     pcDescription;
+    LOGTYPE eType;
+    U32     uArg1, uArg2;
+    U64UN   tTime;
+    U32UN   tTemp;
 
-  // fetch rhw buffer/get the argument
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcLclBuf );
-  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
+    // fetch rhw buffer/get the argument
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcLclBuf );
+    AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
   
-  // set the default next position
-  eNextPos = LOG_POS_NEXT;
+    // set the default next position
+    eNextPos = LOG_POS_NEXT;
     
-  // determine the mode
-  switch( tTemp.anValue[ LE_U32_LSB_IDX ])
-  {
-    case LOG_DISPMODE_NEWEST_ONLY :
-      eFirstPos = LOG_POS_NEWEST;
-      wCount = 1;
-      break;
+    // determine the mode
+    switch( tTemp.anValue[ LE_U32_LSB_IDX ])
+    {
+      case LOG_DISPMODE_NEWEST_ONLY :
+        eFirstPos = LOG_POS_NEWEST;
+        wCount = 1;
+        break;
 
-    case LOG_DISPMODE_NEWEST_LAST16 :
-      eFirstPos = LOG_POS_NEWEST;
-      eNextPos = LOG_POS_PREV;
-      wCount = MIN( wCurNumEntries, 16 );
-      break;
+      case LOG_DISPMODE_NEWEST_LAST16 :
+        eFirstPos = LOG_POS_NEWEST;
+        eNextPos = LOG_POS_PREV;
+        wCount = MIN( wCurNumEntries, 16 );
+        break;
 
-    case LOG_DISPMODE_OLDEST_ONLY :
-      eFirstPos = LOG_POS_OLDEST;
-      wCount = 1;
-      break;
+      case LOG_DISPMODE_OLDEST_ONLY :
+        eFirstPos = LOG_POS_OLDEST;
+        wCount = 1;
+        break;
 
-    case LOG_DISPMODE_OLDEST_NEXT16 :
-      eFirstPos = LOG_POS_OLDEST;
-      eNextPos = LOG_POS_NEXT;
-      wCount = MIN( wCurNumEntries, 16 );
-      break;
+      case LOG_DISPMODE_OLDEST_NEXT16 :
+        eFirstPos = LOG_POS_OLDEST;
+        eNextPos = LOG_POS_NEXT;
+        wCount = MIN( wCurNumEntries, 16 );
+        break;
 
-    default :
-    case LOG_DISPMODE_ALL :
-      eFirstPos = LOG_POS_OLDEST;
-      eNextPos = LOG_POS_NEXT;
-      wCount = wCurNumEntries;
-      break;
+      default :
+      case LOG_DISPMODE_ALL :
+        eFirstPos = LOG_POS_OLDEST;
+        eNextPos = LOG_POS_NEXT;
+        wCount = wCurNumEntries;
+        break;
+    }
+
+    // loop
+    while( wCount-- != 0 )
+    {
+      // get the entry/description
+      LogHandler_GetEntry( eFirstPos, &eType, &uArg1, &uArg2, &tTime.hValue );
+      pcDescription = LogHandler_GetDescription( eType );
+
+      // now display it
+      SPRINTF_P( pcLclBuf, ( char const *)szDispFmt, ( unsigned long )tTime.auValue[ LE_U64_MSU_IDX ], ( unsigned long )tTime.auValue[ LE_U64_LSU_IDX ], eType, ( unsigned long )uArg1, ( unsigned long )uArg2, pcDescription );
+      AsciiCommandHandler_OutputBuffer( nCmdEnum );
+
+      // adjust the position
+      eFirstPos = eNextPos;
+    }
+
+    // new line
+    AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szNewLine );
+
+    // return no error
+    return( ASCCMD_STS_NONE );	
   }
 
-  // loop
-  while( wCount-- != 0 )
+  /******************************************************************************
+   * @function CmdRstLog
+   *
+   * @brief reset the event log
+   *
+   * This function resets the event log 
+   *
+   * @return  A
+   *****************************************************************************/
+  static ASCCMDSTS CmdRstLog( U8 nCmdEnum )
   {
-    // get the entry/description
-    LogHandler_GetEntry( eFirstPos, &eType, &uArg1, &uArg2, &tTime.hValue );
-    pcDescription = LogHandler_GetDescription( eType );
-
-    // now display it
-    SPRINTF_P( pcLclBuf, ( char const *)szDispFmt, ( unsigned long )tTime.auValue[ LE_U64_MSU_IDX ], ( unsigned long )tTime.auValue[ LE_U64_LSU_IDX ], eType, ( unsigned long )uArg1, ( unsigned long )uArg2, pcDescription );
-    AsciiCommandHandler_OutputBuffer( nCmdEnum );
-
-    // adjust the position
-    eFirstPos = eNextPos;
-  }
-
-  // new line
-  AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szNewLine );
-
-  // return no error
-  return( ASCCMD_STS_NONE );	
-}
-
-/******************************************************************************
- * @function CmdRstLog
- *
- * @brief reset the event log
- *
- * This function resets the event log 
- *
- * @return  A
- *****************************************************************************/
-static ASCCMDSTS CmdRstLog( U8 nCmdEnum )
-{
-  // dump the debug data
-  LogHandler_ClearAllEntries( );
+    // dump the debug data
+    LogHandler_ClearAllEntries( );
     
-  // return no error
-  return( ASCCMD_STS_NONE );	
-}
+    // return no error
+    return( ASCCMD_STS_NONE );	
+  }
 #endif // LOGHANDLER_ENABLE_DEBUGCOMMANDS
 
 /**@} EOF LogHandler.c */

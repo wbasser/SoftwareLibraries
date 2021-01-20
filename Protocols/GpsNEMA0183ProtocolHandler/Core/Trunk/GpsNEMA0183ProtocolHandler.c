@@ -32,30 +32,30 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the start character
-#define CH_GPS_START              ( '$' )
+#define CH_GPS_START                            ( '$' )
 
 /// define the delimiter
-#define CH_GPS_DELIM              ( ',' )
+#define CH_GPS_DELIM                            ( ',' )
 
 /// define the data terminator
-#define CH_GPS_TERM               ( '*' )
+#define CH_GPS_TERM                             ( '*' )
 
 /// define the end of line
-#define CH_GPS_EOL                ( '\n' )
+#define CH_GPS_EOL                              ( '\n' )
 
 /// define the maximum command length
-#define CMD_MAX_LENGTH            ( 8 )
+#define CMD_MAX_LENGTH                          ( 8 )
 
 /// define the maximum argument length
-#define ARG_MAX_LENGTH            ( 16 )
+#define ARG_MAX_LENGTH                          ( 16 )
 
 /// define the maximum number of arguments
-#define CMD_NUM_ARGS              ( 128 )
+#define CMD_NUM_ARGS                            ( 128 )
 
 /// define the maximum number of satellites/messages
-#define NUM_SATS_PER_MESSAGE      ( 12 )
-#define NUM_SAT_MESSAGES          ( 3 )
-#define MAX_NUM_SATELLITES        ( NUM_SATS_PER_MESSAGE * NUM_SAT_MESSAGES )
+#define NUM_SATS_PER_MESSAGE                    ( 12 )
+#define NUM_SAT_MESSAGES                        ( 3 )
+#define MAX_NUM_SATELLITES                      ( NUM_SATS_PER_MESSAGE * NUM_SAT_MESSAGES )
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the protocol states
@@ -74,7 +74,7 @@ typedef struct _GPSARG
 {
   C8    acArgument[ ARG_MAX_LENGTH ];
 } GPSARG, *PGPSARG;
-#define GPSARG_SIZE            sizeof( GPSARG )
+#define GPSARG_SIZE                             sizeof( GPSARG )
 
 /// define the command table
 typedef struct _GPSCMDTBL
@@ -83,7 +83,7 @@ typedef struct _GPSCMDTBL
   U8        nCompareLen;              ///< compare length
   void      ( *pvFunction )( void );  ///< command function 
 } GPSCMDTBL, *PGPSCMDTBL;
-#define GPSCMDTBL_SIZE          sizeof( GPSCMDTBL )
+#define GPSCMDTBL_SIZE                          sizeof( GPSCMDTBL )
 
 // global parameter declarations ----------------------------------------------
 
@@ -125,22 +125,22 @@ static  void  GpsStateChekExt( void );
 static  const CODE C8 szTalker[ ] = GPSNEMA0183PROTOCOL_TALKER_IDENTIFIER;
 
 /// define the sentence identifiers
-static  const CODE C8 szCmdGGA[ ]  = { "GGA" };
-static  const CODE C8 szCmdGLL[ ]  = { "GLL" };
-static  const CODE C8 szCmdGSA[ ]  = { "GSA" };
-static  const CODE C8 szCmdGSV[ ]  = { "GSV" };
-static  const CODE C8 szCmdRMC[ ]  = { "RMC" };
-static  const CODE C8 szCmdVTG[ ]  = { "VTG" };
+static  const CODE C8 szCmdGGA[ ]  = { "NGGA" };
+static  const CODE C8 szCmdGLL[ ]  = { "NGLL" };
+static  const CODE C8 szCmdGSA[ ]  = { "NGSA" };
+static  const CODE C8 szCmdGSV[ ]  = { "LGSV" };
+static  const CODE C8 szCmdRMC[ ]  = { "NRMC" };
+static  const CODE C8 szCmdVTG[ ]  = { "NVTG" };
 
 /// define the command table
 static  const CODE GPSCMDTBL  atCmdTable[ ] =
 {
-  { ( PC8 )&szCmdGGA, 3, CmdGGA },
-  { ( PC8 )&szCmdGLL, 3, CmdGLL },
-  { ( PC8 )&szCmdGSA, 3, CmdGSA },
-  { ( PC8 )&szCmdGSV, 3, CmdGSV },
-  { ( PC8 )&szCmdRMC, 3, CmdRMC },
-  { ( PC8 )&szCmdVTG, 3, CmdVTG },
+  { ( PC8 )&szCmdGGA, 4, CmdGGA },
+  { ( PC8 )&szCmdGLL, 4, CmdGLL },
+  { ( PC8 )&szCmdGSA, 4, CmdGSA },
+  { ( PC8 )&szCmdGSV, 4, CmdGSV },
+  { ( PC8 )&szCmdRMC, 4, CmdRMC },
+  { ( PC8 )&szCmdVTG, 4, CmdVTG },
   { NULL,             0, NULL   }
 };
 
@@ -367,9 +367,7 @@ U8 GpsNEMA0183ProtocolHandler_GetFixStatus( void )
  *
  * This function will process the character 
  *
- * @param[in]   xArg      task argument
- *
- * @return      TRUE to flush event
+ * @param[in]   nChar   received chracter to process
  *
  *****************************************************************************/
 void GpsNEMA0183ProtocolHandler_ProcessChar( U8 nChar )

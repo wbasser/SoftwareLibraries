@@ -216,7 +216,7 @@ void EVENT_USB_Device_ControlRequest( void )
  * @return      the size of the requested descriptor
  *
  *****************************************************************************/
-U16 CALLBACK_USB_GetDescriptor( const U16 wValue, const U8 wIndex, const void** const ppvDescriptorAddress )
+U16 CALLBACK_USB_GetDescriptor( const U16 wValue, const U16 wIndex, const void** const ppvDescriptorAddress )
 {
 	const U8    nDescriptorType   = ( wValue >> 8 );
 	const U8    nDescriptorNumber = ( wValue & 0xFF );

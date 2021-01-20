@@ -40,7 +40,7 @@ typedef enum _TIMERENUM
 } TIMERENUM;
 
 // global parameter declarations -----------------------------------------------
-extern  const TIMERDEF   atTimerDefs[ ];
+extern  const TIMERDEF   g_atTimerDefs[ ];
 
 /**@} EOF Timers_cfg.h */
 

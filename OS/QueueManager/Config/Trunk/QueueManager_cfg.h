@@ -53,7 +53,7 @@ typedef enum _QUEUENUM
 // structures -----------------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE QUEUEDEF  atQueueDefs[ ];
+extern  const CODE QUEUEDEF  g_atQueueDefs[ ];
 
 // global function prototypes --------------------------------------------------
 

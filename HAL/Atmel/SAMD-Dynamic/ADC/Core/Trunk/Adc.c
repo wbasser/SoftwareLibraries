@@ -24,9 +24,11 @@
  *****************************************************************************/
 
 // system includes ------------------------------------------------------------
+#include "SystemConfig/SystemConfig_prm.h"
 
 // local includes -------------------------------------------------------------
 #include "ADC/Adc.h"
+#include "ADC/Adc_prm.h"
 
 // library includes -----------------------------------------------------------
 #include "Clock/Clock.h"
@@ -73,11 +75,14 @@ static  void      SetCommonParameters( PADCCHANDEF ptChanDef, PADCCTL ptAdcCtl )
  *****************************************************************************/
 void Adc_Initialize( void )
 {
+  U32 uTemp;
+
   // turn on the peripheral
   PowerManager_DisableEnablePeriphC( PM_APBCMASK_ADC, ON );
 
   // turn on the clock
-  Clock_PeriphEnable( CLOCK_MUXID_ADC, CLOCK_GENID_0 );
+  Clock_SetGenClock( ADC_CLKGEN_SELECT, CLOCK_SRC_OSC8M, 4, CLOCK_DIVSEL_NUMERIC );
+  Clock_PeriphEnable( CLOCK_MUXID_ADC, ADC_CLKGEN_SELECT );
 
   // reset the ADC
   ADC->CTRLA.bit.SWRST = TRUE;
@@ -89,6 +94,21 @@ void Adc_Initialize( void )
 
   // enable the interrupts
   NVIC_EnableIRQ( ADC_IRQn );
+
+  // check to see if 1V bandgap should be enabled
+  #if ( ADC_BANDGAP1V_ENABLE == ON )
+    SYSCTRL->VREF.reg |= SYSCTRL_VREF_BGOUTEN;
+  #endif
+
+  // check to see if external reference
+  #if ( ADC_EXTREF_ENABLE == ON )
+    // configure the GPIO pins
+    Gpio_Configure( ADC_EXTREF_PORT_DEF, ADC_EXTREF_PIN_DEF, GPIO_MODE_INPUT, OFF, GPIO_FUNCMUX_B, OFF );
+  #endif
+
+  // read the non-volatile linearity/biascal values
+  uTemp = ADC_CALIB_BIAS_CAL(( *( PU32 )ADC_FUSES_BIASCAL_ADDR >> ADC_FUSES_BIASCAL_Pos )) | ADC_CALIB_LINEARITY_CAL(( *( PU64 )ADC_FUSES_LINEARITY_0_ADDR >> ADC_FUSES_LINEARITY_0_Pos ));
+  ADC->CALIB.reg = uTemp;
 }
 
 /******************************************************************************
@@ -120,6 +140,9 @@ PADCHANDLE Adc_Create( PADCCHANDEF ptChanDef )
     {
       // set the handle
       pvAdcHandle = ( PADCHANDLE )ptAdcNew;
+
+      // configure the GPIO pins
+      Gpio_Configure( ptChanDef->eDevPort, ptChanDef->nAinPin, GPIO_MODE_INPUT, OFF, GPIO_FUNCMUX_B, OFF );
 
       // setup common parameters
       SetCommonParameters( ptChanDef, ptAdcNew );

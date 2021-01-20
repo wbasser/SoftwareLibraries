@@ -28,38 +28,8 @@
 // local includes -------------------------------------------------------------
 
 // library includes -----------------------------------------------------------
-#include "GPIO/Gpio.h"
-#include "TaskManager/TaskManager.h"
-#include "QueueManager/QueueManager.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the number of sync bits
-#define MANCHESTERCODEC_NUM_SYNC_BITS         ( 1 )
-
-/// define the number of stop bits
-#define MANCHESTERCODEC_NUM_STOP_BITS         ( 2 )
-
-/// define the transmit bit GPIO value
-#define MANCHESTERCODEC_XMTBIT_GPIO_ENUM      ( GPIO_PIN_ENUM_ILLEGAL )
-
-/// define the manchester baud rate
-#define MANCHESTER_BAUD_RATE                  ( 1200 )
-
-/// define the manchester half bit time
-#define MANCHESTER_HALF_BIT_FREQ              ( MANCHESTER_BAUD_RATE * 2 )
-
-/// define the manchester input capture queue
-#define MANCHESTER_INPCAP_QUEUE_ENUM          ( QUEUE_ENUM_ILLEGAL )
-
-/// define the manchester process event task
-#define MANCHESTER_PROCESS_EVENT_TASK         ( TASK_SCHD_ILLEGAL )
-
-/// define the manchester bit tolerance in percent
-#define MANCHESTER_BITTOL_PERCENT             ( 20 )
-
-/// define the invert enable
-#define MANCHESTERCODEC_INVERT_ENABLE         ( 0 )
-
 /// define the debug enable
 #define MANCHESTERCODEC_RCVDBG_ENABLE         ( 0 )
 

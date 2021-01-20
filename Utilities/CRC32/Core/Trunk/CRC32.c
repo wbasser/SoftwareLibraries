@@ -80,14 +80,14 @@ U32 CRC32_GetInitialValue( void )
  * @return      new calculated CRC
  *
  *****************************************************************************/
-U32	CRC32_CalculateByte( U32 uOldCrc, U8 nData )
+U32	CRC32_CalculateByte( U32 uCrc, U8 nData )
 {
   // add the data
-	uOldCrc = ( uOldCrc >> 4 ) ^ PGM_RDDWRD( auCrcTbl[ ( uOldCrc & 0x0000000F ) ^ ( nData & 0x0F ) ] );
-	uOldCrc = ( uOldCrc >> 4 ) ^ PGM_RDDWRD( auCrcTbl[ ( uOldCrc & 0x0000000F ) ^ ( nData >> 4 ) ] );
+  uCrc = PGM_RDDWRD( auCrcTbl[(( uCrc ^ nData ) & 0x0000000F )]) ^ ( uCrc >> 4 );
+  uCrc = PGM_RDDWRD( auCrcTbl[(( uCrc ^ ( nData >> 4 )) & 0x0000000F )]) ^ ( uCrc >> 4 );
 	
 	// return the crc
-	return ( ~uOldCrc );
+	return ( uCrc );
 }
 
 /******************************************************************************
@@ -98,25 +98,30 @@ U32	CRC32_CalculateByte( U32 uOldCrc, U8 nData )
  * This function will calculate a CRC for a block of data
  *
  * @param[in]   pnData    pointer to the data
- * @param[in]   wLength   number of bytes to add
+ * @param[in]   uLength   number of bytes to add
  *
  * @return      new calculated CRC
  *
  *****************************************************************************/
-U32	CRC32_CalculateBlock( PU8 pnData, U16 wLength )
+U32	CRC32_CalculateBlock( PU8 pnData, U32 uLength )
 {
-  U16 wIdx;
+  U32 uIdx;
   U32 uCrc;
+  U8  nData;
   
   // set the CRC to it's initial value
   uCrc = CRC_INITIAL;
   
   // for each byte calculate the CRC
-  for( wIdx = 0; wIdx < wLength; wIdx++ )
+  for( uIdx = 0; uIdx < uLength; uIdx++ )
   {
-    uCrc = CRC32_CalculateByte( uCrc, *( pnData + wLength ));
-  }
-	
+    nData = *( pnData );
+
+    // add the data
+    uCrc = PGM_RDDWRD( auCrcTbl[(( uCrc ^ nData ) & 0x0000000F )]) ^ ( uCrc >> 4 );
+    uCrc = PGM_RDDWRD( auCrcTbl[(( uCrc ^ ( nData >> 4 )) & 0x0000000F )]) ^ ( uCrc >> 4 );
+	}
+
 	// return the crc
 	return ( ~uCrc );
 }

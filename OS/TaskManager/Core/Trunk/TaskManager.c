@@ -150,7 +150,7 @@ void TaskManager_Initialize( void )
   {
     // get a pointer to the task control/definition
     ptTickCtl = &atTickCtls[ nIdx ];
-    ptTickDef = ( PTASKTICKDEF )&atTaskTickDefs[ nIdx ];
+    ptTickDef = ( PTASKTICKDEF )&g_atTaskTickDefs[ nIdx ];
     
     // set the initial values
     ptTickCtl->uDelayTime	= PGM_RDDWRD( ptTickDef->uDelayTime ) / uExecutionRate;
@@ -275,7 +275,7 @@ void TaskManager_TickProcess( void )
   for ( nIdx = 0; nIdx < TASK_TICK_MAX; nIdx++ )
   {
     // get the pointers
-    ptTickCtl = ( PTICKTASKCTL )&g_atTickCtls[ nIdx ];
+    ptTickCtl = ( PTICKTASKCTL )&atTickCtls[ nIdx ];
     ptTickDef = ( PTASKTICKDEF )&g_atTaskTickDefs[ nIdx ];
 
     // check for enabled
@@ -720,16 +720,31 @@ BOOL TaskManager_StopTimer( TASKSCHDENUMS eTask )
  *
  * This function will check for both normal and priority tasks pending 
  *
+ * @param[in]   eTask   task enumeration
+ *
  * @return      TRUE if tasks pending, FALSE if not
  *
  *****************************************************************************/
-BOOL TaskManager_CheckTasksPending( void )
+BOOL TaskManager_CheckTasksPending( TASKSCHDENUMS eTask )
 {
-  BOOL bPending;
+  BOOL          bPending;
+  PSCHDTASKCTL  ptSchdCtl;
   
-  // check the event counts
-  bPending = (( wPriEventCount == 0 ) && ( wNrmEventCount == 0 )) ? TRUE : FALSE;
-  
+  // test for a valid task
+  if ( eTask < TASK_SCHD_MAX )
+  {
+    // get a pointer to the event control
+    ptSchdCtl = ( PSCHDTASKCTL )&atSchdCtls[ eTask ];
+    
+    // set the result
+    bPending = (( ptSchdCtl->nPriEvnCount == 0 ) && ( ptSchdCtl->xEvnCount )) ? TRUE : FALSE;
+  }
+  else
+  {
+    // check the event counts
+    bPending = (( wPriEventCount == 0 ) && ( wNrmEventCount == 0 )) ? TRUE : FALSE;
+  }
+
   // return the pending status
   return( bPending );
 }

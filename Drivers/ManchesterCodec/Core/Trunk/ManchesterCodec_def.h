@@ -26,25 +26,26 @@
 #define _MANCHESTERCODEC_DEF_H
 
 // system includes ------------------------------------------------------------
+#include "Types/Types.h"
 
 // local includes -------------------------------------------------------------
+#include "ManchesterCodec/ManchesterCodec_cfg.h"
 
 // library includes -----------------------------------------------------------
-#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the transmit/recieve done events
-#if ( TASK_TSKARG_SIZE_BYTES == 1 )
+#if ( MANCHESTERCODEC_ARG_SIZE_BYTES == 1 )
   #define MANCHESTERCODEC_XMIT_DONE       ( 0xCC )
   #define MANCHESTERCODEC_RECV_EDGE       ( 0XCD )
   #define MANCHESTERCODEC_RECV_DONE       ( 0xCE )
   #define MANCHESTERCODEC_RECV_EROR       ( 0xCF )
-#elif ( TASK_TSKARG_SIZE_BYTES == 2 )
+#elif ( MANCHESTERCODEC_ARG_SIZE_BYTES == 2 )
   #define MANCHESTERCODEC_XMIT_DONE       ( 0xCCCC )
   #define MANCHESTERCODEC_RECV_EDGE       ( 0XCDCD )
   #define MANCHESTERCODEC_RECV_DONE       ( 0xCECE )
   #define MANCHESTERCODEC_RECV_EROR       ( 0xCFCF )
-#elif ( TASK_TSKARG_SIZE_BYTES == 4 )
+#elif ( MANCHESTERCODEC_ARG_SIZE_BYTES == 4 )
   #define MANCHESTERCODEC_XMIT_DONE       ( 0xCCCCCCCC )
   #define MANCHESTERCODEC_RECV_EDGE       ( 0XCDCDCDCD )
   #define MANCHESTERCODEC_RECV_DONE       ( 0xCECECECE )
@@ -54,7 +55,7 @@
   #define MANCHESTERCODEC_RECV_EDGE       ( 0XCD )
   #define MANCHESTERCODEC_RECV_DONE       ( 0xCE )
   #define MANCHESTERCODEC_RECV_EROR       ( 0xCF )
-#endif // TASK_TASKARG_SIZE_BYTES
+#endif // MANCHESTERCODEC_ARG_SIZE_BYTES
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the rising/falling edge events
@@ -65,12 +66,16 @@ typedef enum _MANCHESTERCODECEDGE
 } MANCHESTERCODECEDGE;
 
 // structures -----------------------------------------------------------------
-typedef struct _MANCHESTERCODECDATA
+/// define the initialization structure
+typedef struct _MANCHESTERCODECDEF
 {
-  MANCHESTERCODECEDGE eEdge;     ///< edge
-  U16                 wValue;    ///< captured value
-} MANCHESTERCCODECDATA, *PMANCHESTERCODECDATA;
-#define MANCHESTERCODECDATA_SIZE   sizeof( MANCHESTERCCODECDATA )
+  U8    nNumSyncBits;                     ///< number of sync bits
+  U8    nNumStopBits;                     ///< number of stop bits
+  U8    nBitTolerancePct;                 ///< bit tolerance percent
+  U16   wBaudRate;                        ///< baud rate
+  BOOL  bRisingEdgeEnable;                ///< rising edge enable
+} MANCHESTERCODECDEF, *PMANCHESTERCODECDEF;
+#define MANCHESTERCODECDEF_SIZE                 sizeof( MANCHESTERCODECDEF )
 
 /**@} EOF ManchesterCodec_def.h */
 

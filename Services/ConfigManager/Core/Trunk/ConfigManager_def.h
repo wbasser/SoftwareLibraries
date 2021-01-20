@@ -25,6 +25,7 @@
 #define _CONFIGMANAGER_DEF_H
 
 // system includes ------------------------------------------------------------
+#include "Types/Types.h"
 
 // library includes -----------------------------------------------------------
 
@@ -32,23 +33,23 @@
 #include "ConfigManager/ConfigManager_prm.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the macro for creating config block entries
-#ifdef __ATMEL_AVR__
-#define CONFIGMGRBLKDEF( size, getdefault, getactual, eepromaddr ) \
+/// define the macro for creating config block entries - fixed size
+#define CONFIGMGRFIXBLKDEF( size, getdefault, getactual ) \
   { \
-    .wSize = size, \
-    .pvGetDefault= ( PVGETPOINTER )getdefault, \
-    .pvGetActual = ( PVGETPOINTER )getactual, \
-    .pwEepromAddr = eepromaddr, \
-  }
-#else
-#define CONFIGMGRBLKDEF( size, getdefault, getactual ) \
-  { \
+    .bFixedSize = TRUE, \
     .wSize = size, \
     .pvGetDefault= ( PVGETPOINTER )getdefault, \
     .pvGetActual = ( PVGETPOINTER )getactual, \
   }
-#endif //__ATMEL_AVR__
+  
+/// define the macro for creating config block entries - dynamic size
+#define CONFIGMGRVARBLKDEF( getsize, getdefault, getactual ) \
+  { \
+    .bFixedSize = FALSE, \
+    .pvGetSize = ( PVGETSIZE )getsize, \
+    .pvGetDefault= ( PVGETPOINTER )getdefault, \
+    .pvGetActual = ( PVGETPOINTER )getactual, \
+  }
   
 // enumerations ---------------------------------------------------------------
 /// enumerate the configuration source
@@ -63,15 +64,17 @@ typedef enum _CONFIGSOURCE
 /// define the function pointer to get a pointer to default/data tables
 typedef PU8 ( *PVGETPOINTER )( void );
 
+/// define the function pointer to get the config size
+typedef U16 ( *PVGETSIZE )( void );
+
 /// define the structure for defining a config block control structure
 typedef struct _CONFIGMGRDBLKEF
 {
+  BOOL          bFixedSize;         ///< fixed config size
   U16           wSize;              ///< size of the config block
+  PVGETSIZE     pvGetSize;          ///< get a size
   PVGETPOINTER  pvGetDefault;       ///< get a pointer to the defaults
   PVGETPOINTER  pvGetActual;        ///< get a pointer to the actual table
-  #ifdef __ATMEL_AVR__
-  PU16          pwEepromAddr;        ///< pointer to the EEPROM storage
-  #endif //__ATMEL_AVR__
 } CONFIGMGRBLKDEF, *PCONFIGMGRBLKDEF;
 #define CONFIGMGRBLKDEF_SIZE     sizeof( CONFIGMGRBLKDEF )
 

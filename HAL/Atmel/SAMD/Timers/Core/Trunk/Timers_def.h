@@ -57,10 +57,10 @@
   }
 
 /// define the helper macro for PWM
-#define TIMER_TCPWMFDEF( chan, invert0, invert1, initon, standby, ovfenable, matchirqenable0, matchirqenable1, ovfirqenable, direction, prescale, priority, callback ) \
+#define TIMER_TCMPWMFDEF( chan, invert0, invert1, initon, standby, ovfenable, matchirqenable0, matchirqenable1, ovfirqenable, direction, prescale, priority, callback ) \
   { \
     .eChannel = chan, \
-    .tModes.eTc = TIMER_TCMODE_PWM, \
+    .tModes.eTc = TIMER_TCMODE_MPWM, \
     .abInvertOutputs[ TIMER_CMPCAP_CHAN0 ] = invert0, \
     .abInvertOutputs[ TIMER_CMPCAP_CHAN1 ] = invert1,\
     .abChanIrqEnables[ TIMER_CMPCAP_CHAN0 ] = matchirqenable0, \
@@ -266,7 +266,8 @@ typedef enum _TIMERTCMODE
 {
   TIMER_TCMODE_WAVNF = 0,       ///< wave output, normal frequency
   TIMER_TCMODE_WAVMF,           ///< wave output, match frequency
-  TIMER_TCMODE_PWM,             ///< PWM
+  TIMER_TCMODE_NPWM,            ///< NPWM - MAX = top
+  TIMER_TCMODE_MPWM,            ///< MPWM - MAX = CC0
   TIMER_TCMODE_CAPTURE,         ///< capture
   TIMER_TCMODE_CAPPPW,          ///< capture PPW
   TIMER_TCMODE_CAPPWP,          ///< capture PWP

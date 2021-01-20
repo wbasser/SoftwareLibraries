@@ -31,6 +31,9 @@
 #include "RedirectionManager/RedirectionManager_cfg.h"
 
 // library includes -----------------------------------------------------------
+#if ( REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+  #include "AsciiCommandHandler/AsciiCommandHandler.h"
+#endif  // REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -39,6 +42,9 @@
 // structures -----------------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
+#if ( REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+  extern  const CODE ASCCMDENTRY g_atRedirectionManagerDbgCmdTable[ ];
+#endif  // REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------
 extern  void  RedirectionManager_Initialize( void );

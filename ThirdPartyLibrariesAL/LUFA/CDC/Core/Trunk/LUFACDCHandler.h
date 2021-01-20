@@ -43,7 +43,7 @@ extern  void  EVENT_USB_Device_Connect( void );
 extern  void  EVENT_USB_Device_Disconnect( void );
 extern  void  EVENT_USB_Device_ConfigurationChanged( void );
 extern  void  EVENT_USB_Device_ControlRequest( void );
-extern  U16   CALLBACK_USB_GetDescriptor(const U16 wValue, const U8 wIndex, const void** const DescriptorAddress) ATTR_WARN_UNUSED_RESULT ATTR_NON_NULL_PTR_ARG( 3 );
+extern  U16   CALLBACK_USB_GetDescriptor(const U16 wValue, const U16 wIndex, const void** const DescriptorAddress) ATTR_WARN_UNUSED_RESULT ATTR_NON_NULL_PTR_ARG( 3 );
 
 /**@} EOF LUFACDCHandler.h */
 

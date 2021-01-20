@@ -65,18 +65,40 @@ typedef enum  _CLOCKMUXID
   CLOCK_MUXID_EVSYSCH3,         /// event system channel 3
   CLOCK_MUXID_EVSYSCH4,         /// event system channel 4
   CLOCK_MUXID_EVSYSCH5,         /// event system channel 5
+  #ifndef _SAMD11_
+    CLOCK_MUXID_EVSYSCH6,         /// event system channel 6
+    CLOCK_MUXID_EVSYSCH7,         /// event system channel 7
+    CLOCK_MUXID_EVSYSCH8,         /// event system channel 8
+    CLOCK_MUXID_EVSYSCH9,         /// event system channel 9
+    CLOCK_MUXID_EVSYSCH10,        /// event system channel 10
+    CLOCK_MUXID_EVSYSCH11,        /// event system channel 11
+  #endif
   CLOCK_MUXID_SERCOM_SLOW,      /// SERCOMx slow
   CLOCK_MUXID_SERCOM_0,         /// SERCOM 0 
   CLOCK_MUXID_SERCOM_1,         /// SERCOM 1 
   CLOCK_MUXID_SERCOM_2,         /// SERCOM 2 
-  CLOCK_MUXID_SERCOM_3,         /// SERCOM 3
-  CLOCK_MUXID_TCC0,             /// TCC 0
-  CLOCK_MUXID_TC1TC2,           /// TC 1 and T2
+  #ifndef _SAMD11_
+    CLOCK_MUXID_SERCOM_3,         /// SERCOM 3 
+    CLOCK_MUXID_SERCOM_4,         /// SERCOM 4 
+    CLOCK_MUXID_SERCOM_5,         /// SERCOM 5 
+    CLOCK_MUXID_TCC01,            /// TCC 0 and 1
+    CLOCK_MUXID_TCC2TC3,          /// TCC 2 and TC3
+    CLOCK_MUXID_TC45,             /// TC 4 and 5
+    CLOCK_MUXID_TC67,             /// TC 6 and 7
+  #else
+    CLOCK_MUXID_TCC0,             /// TCC0
+    CLOCK_MUXID_TC12,             /// TC1/TC2
+  #endif
   CLOCK_MUXID_ADC,              /// ADC
   CLOCK_MUXID_ACDIG,            /// AC - DIG
   CLOCK_MUXID_ACANA,            /// AC - ANA
   CLOCK_MUXID_DAC,              /// DAC
   CLOCK_MUXID_PTC,              /// PTC
+  #ifndef _SAMD11_
+    CLOCK_MUXID_IS20,             /// I2S 0
+    CLOCK_MUXID_IS21,             /// I2S 1
+  #endif
+  CLOCK_MUXID_EOT = 255
 } CLOCKMUXID;
 
 /// enumerate the clock gnerator id
@@ -118,8 +140,10 @@ typedef enum  _CLOCKSRC
 
 // global function prototypes --------------------------------------------------
 extern  void  Clock_Initialize( CLOCKSRC eClkSrc, U8 nFlashStates, CLOCKMAINDIV eCpuDiv, CLOCKMAINDIV eApbADiv, CLOCKMAINDIV eApbBDiv );
+extern  void  Clock_Close( void );
 extern  U32   Clock_GetSysFreq( void );
 extern  U32   Clock_GetGenClock( CLOCKGENID eGenId );
+extern  U32   Clock_GetPeriphClock( CLOCKMUXID eMuxId );
 extern  void  Clock_PeriphEnable( CLOCKMUXID eMuxId, CLOCKGENID eGenId ); 
 extern  void  Clock_SetGenClock( CLOCKGENID eGenId, CLOCKSRC eClockSrc, U16 wDivisor, CLOCKDIVSEL eDivSel );
 

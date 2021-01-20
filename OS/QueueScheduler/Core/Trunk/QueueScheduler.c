@@ -38,11 +38,11 @@
 
 /// define the queue event shift value
 #if ( TASKSCHEDULER_EVENT_SIZE_BYTES == 1 )
-#define QUEUE_EVENT_SHIFT               ( 2 )
+  #define QUEUE_EVENT_SHIFT               ( 2 )
 #elif ( TASKSCHEDULER_EVENT_SIZE_BYTES == 2 )
-#define QUEUE_EVENT_SHIFT               ( 8 )
+  #define QUEUE_EVENT_SHIFT               ( 8 )
 #elif ( TASKSCHEDULER_EVENT_SIZE_BYTES == 4 )
-#define QUEUE_EVENT_SHIFT               ( 16 )
+  #define QUEUE_EVENT_SHIFT               ( 16 )
 #endif
 
 /// define a macro to generate a QUEUEGETEMPTY event
@@ -51,15 +51,15 @@
 
 /// define a macro to generate a QUEUEGET event
 #define QUEUEGET_EVENT( queueenum ) \
-(( QUEUE_EVENT_GET << QUEUE_EVENT_SHIFT ) | queueenum )
+  (( QUEUE_EVENT_GET << QUEUE_EVENT_SHIFT ) | queueenum )
 
 /// define a macro to generate a QUEUEPUT event
 #define QUEUEPUT_EVENT( queueenum ) \
-(( QUEUE_EVENT_PUT << QUEUE_EVENT_SHIFT ) | queueenum )
+  (( QUEUE_EVENT_PUT << QUEUE_EVENT_SHIFT ) | queueenum )
 
 /// define a macro to generate a QUEUEPUTFULL event
 #define QUEUEPUTFULL_EVENT( queueenum ) \
-(( QUEUE_EVENT_PUTFULL << QUEUE_EVENT_SHIFT ) | queueenum )
+  (( QUEUE_EVENT_PUTFULL << QUEUE_EVENT_SHIFT ) | queueenum )
 
 // enumerations ---------------------------------------------------------------
 
@@ -83,7 +83,7 @@ typedef struct _QUEUECTL
   struct _QUEUECTL*   	ptSignature;   	///< my signature
   struct _QUEUECTL*   	ptNextQueue;   	///< pointer to the next structure
 	PTASKSCHEDULERHANDLE 	ptTask;					///< task handler
-	QUEUEEVNFLAGS					tEvenfFlags;		///< event flags
+	QUEUEEVNFLAGS					tEventFlags;		///< event flags
 	U8										nNumEntries;		///< entry size
 	U16										wEntrySize;			///< entry size
   U8										nRdIdx;					///< queue read index
@@ -98,7 +98,7 @@ typedef struct _QUEUECTL
 static  PQUEUECTL    	ptFirstQueue;      ///< pointer to the first queue control structure
 
 // local function prototypes --------------------------------------------------
-static	void	PostEvent( PQUEUECTL ptQueue );
+static	void	PostEvent( PQUEUECTL ptQueue, BOOL bForceGet );
 
 // constant parameter initializations -----------------------------------------
 
@@ -134,32 +134,29 @@ void QueueScheduler_Initialize( void )
  * @return			returns the pointer to the queue or null if no room
  *
  *****************************************************************************/
-PQUEUESCHEDULERHANDLE	QueueScheduler_Create( PTASKSCHEDULERHANDLE ptTask, U8 nNumEntries, U16 wEntrySize, BOOL bEmptyEnb, BOOL bPutEnb, BOOL bGetEnb, BOOL bFullEnb );
+PQUEUESCHEDULERHANDLE	QueueScheduler_Create( PTASKSCHEDULERHANDLE ptTask, U8 nNumEntries, U16 wEntrySize, BOOL bEmptyEnb, BOOL bPutEnb, BOOL bGetEnb, BOOL bFullEnb )
 {
-  PTASKCTL  ptNewQueue, ptCurQueue, ptLstQueue;
+  PQUEUECTL  ptNewQueue, ptCurQueue, ptLstQueue;
   
   // allocate space for new task
   if (( ptNewQueue = malloc( QUEUECTL_SIZE )) != NULL )
   {
     // now allocate space for the number of entries
-    if (( ptNewQueue->pnStorage = ( U8 )malloc( nNumEntries * wEntrySize )) != NULL )
+    if (( ptNewQueue->pnStorage = ( PU8 )malloc( nNumEntries * wEntrySize )) != NULL )
     {
 			// now initialize the control structure
-			ptNewQueue->ptSignature		= ptNewQueue;
-			ptNewQueue->ptNextQueue   = NULL;
-			ptTask										= ptTask;
-			ptNewQueue->tEvenfFlags								=
-			{
-				.bEmpty 								= bEmptyEnb;
-				.bPut										= bPutEnb;
-				.bGet										= bGetEbn;
-				.bFull									= bFullEnb;
-			};
-			ptNewQueue->nNumEntries		= nNumEntries;
-			ptNewQueue->wEntrySize		= wEntrySize;
-			ptNewQueue->nRdIdx				= 0;
-			ptNewQueue->nWrIdx				= 0;
-			ptNewQueue->nCount				= 0;
+			ptNewQueue->ptSignature               = ptNewQueue;
+			ptNewQueue->ptNextQueue               = NULL;
+			ptNewQueue->ptTask                    = ptTask;
+			ptNewQueue->tEventFlags.tBits.bEmpty  = bEmptyEnb;
+			ptNewQueue->tEventFlags.tBits.bPut		= bPutEnb;
+			ptNewQueue->tEventFlags.tBits.bGet		= bGetEnb;
+			ptNewQueue->tEventFlags.tBits.bFull		= bFullEnb;
+			ptNewQueue->nNumEntries               = nNumEntries;
+			ptNewQueue->wEntrySize                = wEntrySize;
+			ptNewQueue->nRdIdx                    = 0;
+			ptNewQueue->nWrIdx                    = 0;
+			ptNewQueue->nCount                    = 0;
 			
 			// now insert in list
 			if ( ptFirstQueue == NULL )
@@ -171,7 +168,7 @@ PQUEUESCHEDULERHANDLE	QueueScheduler_Create( PTASKSCHEDULERHANDLE ptTask, U8 nNu
 			else
 			{
 				// search for the entry point
-				for ( ptCurQueue = ptFirstQueue, ptLstQueue = NULL; ptCurQueue != NUL; ptLstQueue = ptCurQueue, ptCurQueue = ptCurQueue->ptNextQueue );
+				for ( ptCurQueue = ptFirstQueue, ptLstQueue = NULL; ptCurQueue != NULL; ptLstQueue = ptCurQueue, ptCurQueue = ptCurQueue->ptNextQueue );
 
 				// check for null
 				if ( ptCurQueue == NULL )
@@ -195,20 +192,19 @@ PQUEUESCHEDULERHANDLE	QueueScheduler_Create( PTASKSCHEDULERHANDLE ptTask, U8 nNu
 }
 
 /******************************************************************************
- * @function QueueScheduler_PutHead
+ * @function QueueScheduler_Get
  *
- * @brief puts a value onto the head of the quueue
+ * @brief gets an entry from the queue
  *
- * This function checks for empty space if available, puts the event at the head
- * of the queue.  It will also post an appropriate event to the desired task
+ * This function will get a entry from the queue if one is available
  *
  * @param[in]   ptQueue  	pointer to the queue
- * @param[in]   pnEntry 	the pointer to the queue entry
+ * @param[io]   pnEntry the pointer to store the queue entry in
  *
  * @return      a QUEUESTATUS value based on results
  *
  *****************************************************************************/
-QUEUESTATUS QueueScheduler_PutHead( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
+QUEUESTATUS QueueScheduler_Get( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
 {
   QUEUESTATUS   eError = QUEUE_STATUS_NONE;
   PQUEUECTL     ptSelQueue;
@@ -217,50 +213,45 @@ QUEUESTATUS QueueScheduler_PutHead( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
   ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
   
   // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
+  if ( ptSelQueue == ptSelQueue->ptSignature )
   {
-		// check for room
-		if ( ptSelQueue->nCount < ptSelQueue->wNumEntries )
-		{
-			// disable interrupts
-			Interrupt_Disable( );
-			
-      // adjust the read pointer
-      if ( ptSelQeueue->nRdIdx == 0 )
+    // is there anything in the queue
+    if ( ptSelQueue->nCount != 0 )
+    {
+      // disable interrupts
+      Interrupt_Disable( );
+      
+      // now copy the entry to the pointer
+      memcpy( pnEntry, ( ptSelQueue->pnStorage + ( ptSelQueue->nRdIdx * ptSelQueue->wEntrySize )), ptSelQueue->wEntrySize );
+      
+      // adjust the read index
+      ptSelQueue->nRdIdx++;
+      if ( ptSelQueue->nRdIdx >= ptSelQueue->nNumEntries )
       {
-        // reset the index to the end
-        ptSelQeueue->nRdIdx = nSize - 1;
+        // reset back to zero
+        ptSelQueue->nRdIdx = 0;
       }
-      else
-      {
-        // increment the read index
-        ptSelQeueue->nRdIdx++;
-      }
-			
-			// now copy the data to the queue
-			memcpy( ptSelQueue->pnStorage + ( ptSelQueue->nRdIdx * pnSelQueue->pwEntrySize ), pnEntry, ptSelQueue->pwEntrySize );
-			
-			// increment the count
-			ptSelQeueue->nCount++;
-			
-			// re-enable interrupts
-			Interrupt_Enable( );
+      
+      // decrement  the count
+      ptSelQueue->nCount--;
+      
+      // re-enable interrupts
+      Interrupt_Enable( );
 			
 			// now post event
-			PostEvent( ptSelQueue, FALSE );
-		}
-		else
-		{
-      // return the queue full error
-      eError = QUEUE_STATUS_QUEFUL;
-		}
+			PostEvent( ptSelQueue, TRUE );
+    }
+    else
+    {
+      // return the queue empty error
+      eError = QUEUE_STATUS_QUEEMP;
+    }
   }
   else
   {
     // return the error
     eError = QUEUE_STATUS_ILLQUE;
   }
-  
   
   // return the status
   return( eError );
@@ -289,27 +280,27 @@ QUEUESTATUS QueueScheduler_PutTail( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
   ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
   
   // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
+  if ( ptSelQueue == ptSelQueue->ptSignature )
   {
 		// check for room
-		if ( ptSelQueue->nCount < ptSelQueue->wNumEntries )
+		if ( ptSelQueue->nCount < ptSelQueue->nNumEntries )
 		{
 			// disable interrupts
 			Interrupt_Disable( );
 			
 			// now copy the data to the queue
-			memcpy( ptSelQueue->pnStorage + ( ptSelQueue->nWrIdx * pnSelQueue->pwEntrySize ), pnEntry, ptSelQueue->pwEntrySize );
+			memcpy( ptSelQueue->pnStorage + ( ptSelQueue->nWrIdx * ptSelQueue->wEntrySize ), pnEntry, ptSelQueue->wEntrySize );
 			
       // adjust the write index
 			ptSelQueue->nWrIdx++;
-      if ( ptSelQeueue->nWrIdx >= ptSelQueue->nNumEntries )
+      if ( ptSelQueue->nWrIdx >= ptSelQueue->nNumEntries )
       {
         // reset the index to the end
-        ptSelQeueue->nWrIdx = 0;
+        ptSelQueue->nWrIdx = 0;
       }
 			
 			// increment the count
-			ptSelQeueue->nCount++;
+			ptSelQueue->nCount++;
 			
 			// re-enable interrupts
 			Interrupt_Enable( );
@@ -333,312 +324,330 @@ QUEUESTATUS QueueScheduler_PutTail( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
   return( eError );
 }
 
-/******************************************************************************
- * @function QueueScheduler_Get
- *
- * @brief gets an entry from the queue
- *
- * This function will get a entry from the queue if one is available
- *
- * @param[in]   ptQueue  	pointer to the queue
- * @param[io]   pnEntry the pointer to store the queue entry in
- *
- * @return      a QUEUESTATUS value based on results
- *
- *****************************************************************************/
-QUEUESTATUS QueueScheduler_Get( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
-{
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL     ptSelQueue;
-  
-  // map the pointer
-  ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
-  
-  // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
+#if ( QUEUESCHEDULER_INCLUDE_PUTHEAD == TRUE )
+  /******************************************************************************
+   * @function QueueScheduler_PutHead
+   *
+   * @brief puts a value onto the head of the quueue
+   *
+   * This function checks for empty space if available, puts the event at the head
+   * of the queue.  It will also post an appropriate event to the desired task
+   *
+   * @param[in]   ptQueue  	pointer to the queue
+   * @param[in]   pnEntry 	the pointer to the queue entry
+   *
+   * @return      a QUEUESTATUS value based on results
+   *
+   *****************************************************************************/
+  QUEUESTATUS QueueScheduler_PutHead( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
   {
-    // is there anything in the queue
-    if ( ptSelQueue->nCount != 0 )
+    QUEUESTATUS   eError = QUEUE_STATUS_NONE;
+    PQUEUECTL     ptSelQueue;
+  
+    // map the pointer
+    ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
+  
+    // first validate that the task is valid
+    if ( ptSelQueue == ptSelQueue->ptSignature )
     {
-      // disable interrupts
-      Interrupt_Disable( );
-      
-      // now copy the entry to the pointer
-      memcpy( pnEntry, ( ptSelQueue->pnStorage + ( ptSelQueue->nRdIdx * ptSelQueue->nEntrySize ))), ptSelQueue->nEntrySize );
-      
-      // adjust the read index
-      ptSelQueue->nRdIdx++;
-      if ( ptSelQueue->nRdIdx >= ptSelQueue->wNumEntries )
+      // check for room
+      if ( ptSelQueue->nCount < ptSelQueue->nNumEntries )
       {
-        // reset back to zero
-        ptSelQueue->nRdIdx = 0;
-      }
-      
-      // decrement  the count
-      ptSelQueue->nCount--;
-      
-      // re-enable interrupts
-      Interrupt_Enable( );
+        // disable interrupts
+        Interrupt_Disable( );
 			
-			// now post event
-			PostEvent( ptSelQueue, TRUE );
-    }
-    else
-    {
-      // return the queue empty error
-      eError = QUEUE_STATUS_QUEEMP;
-    }
-  }
-  else
-  {
-    // return the error
-    eError = QUEUE_STATUS_ILLQUE;
-  }
-  
-  // return the status
-  return( eError );
-}
-
-/******************************************************************************
- * @function QueueScheduler_Peek
- *
- * @brief gets an entry from the queue
- *
- * This function will get a entry from the queue if one is available but not 
- * remove from the queue
- *
- * @param[in]   ptQueue  	pointer to the queue
- * @param[io]   pnEntry the pointer to store the queue entry in
- *
- * @return      a QUEUESTATUS value based on results
- *
- *****************************************************************************/
-QUEUESTATUS QueueScheduler_Peek( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
-{
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL     ptSelQueue;
-  
-  // map the pointer
-  ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
-  
-  // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
-  {
-    // is there anything in the queue
-    if ( ptSelQueue->nCount != 0 )
-    {
-      // disable interrupts
-      Interrupt_Disable( );
-      
-      // now copy the entry to the pointer
-      memcpy( pnEntry, ( ptSelQueue->pnStorage + ( ptSelQueue->nRdIdx * ptSelQueue->nEntrySize ))), ptSelQueue->nEntrySize );
-      
-      // re-enable interrupts
-      Interrupt_Enable( );
-    }
-    else
-    {
-      // return the queue empty error
-      eError = QUEUE_STATUS_QUEEMP;
-    }
-  }
-  else
-  {
-    // return the error
-    eError = QUEUE_STATUS_ILLQUE;
-  }
-  
-  // return the status
-  return( eError );
-}
-
-/******************************************************************************
- * @function QueueScheduler_Pop
- *
- * @brief removes an entry from the queue
- *
- * This function will pop an entry from the queue if one is there
- *
- * @param[in]   ptQueue  	pointer to the queue
- *
- * @return      a QUEUESTATUS value based on results
- *
- *****************************************************************************/
-QUEUESTATUS QueueScheduler_Pop( PQUEUESCHEDULERHANDLE ptQueue )
-{
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL     ptSelQueue;
-  
-  // map the pointer
-  ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
-  
-  // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
-  {
-    // is there anything in the queue
-    if ( ptSelQueue->nCount != 0 )
-    {
-      // disable interrupts
-      Interrupt_Disable( );
-      
-      // adjust the read index
-      ptSelQueue->nRdIdx++;
-      if ( ptSelQueue->nRdIdx >= ptSelQueue->wNumEntries )
+        // adjust the read pointer
+        if ( ptSelQueue->nRdIdx == 0 )
+        {
+          // reset the index to the end
+          ptSelQueue->nRdIdx = ptSelQueue->nNumEntries - 1;
+        }
+        else
+        {
+          // increment the read index
+          ptSelQueue->nRdIdx++;
+        }
+			
+        // now copy the data to the queue
+        memcpy( ptSelQueue->pnStorage + ( ptSelQueue->nRdIdx * ptSelQueue->wEntrySize ), pnEntry, ptSelQueue->wEntrySize );
+			
+        // increment the count
+        ptSelQueue->nCount++;
+			
+        // re-enable interrupts
+        Interrupt_Enable( );
+			
+        // now post event
+        PostEvent( ptSelQueue, FALSE );
+      }
+      else
       {
-        // reset back to zero
-        ptSelQueue->nRdIdx = 0;
+        // return the queue full error
+        eError = QUEUE_STATUS_QUEFUL;
       }
-      
-      // decrement  the count
-      ptSelQueue->nCount--;
-      
-      // re-enable interrupts
-      Interrupt_Enable( );
-			
-			// now post event
-			PostEvent( ptSelQueue, TRUE );
     }
     else
     {
-      // return the queue empty error
-      eError = QUEUE_STATUS_QUEEMP;
+      // return the error
+      eError = QUEUE_STATUS_ILLQUE;
     }
-  }
-  else
-  {
-    // return the error
-    eError = QUEUE_STATUS_ILLQUE;
-  }
   
-  // return the status
-  return( eError );
-}
+  
+    // return the status
+    return( eError );
+  }
+#endif
 
-/******************************************************************************
- * @function QueueScheduler_Flush
- *
- * @brief flush all entries
- *
- * This function will flush all entries in the given queue and clear the indices
- *
- * @param[in]   ptQueue  	pointer to the queue
- *
- * @return      a QUEUESTATUS value based on results
- *
- *****************************************************************************/
-QUEUESTATUS QueueScheduler_Flush( PQUEUESCHEDULERHANDLE ptQueue )
-{
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL     ptSelQueue;
-  
-  // map the pointer
-  ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
-  
-  // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
+#if ( QUEUESCHEDULER_INCLUDE_PEEK == TRUE )
+  /******************************************************************************
+   * @function QueueScheduler_Peek
+   *
+   * @brief gets an entry from the queue
+   *
+   * This function will get a entry from the queue if one is available but not 
+   * remove from the queue
+   *
+   * @param[in]   ptQueue  	pointer to the queue
+   * @param[io]   pnEntry the pointer to store the queue entry in
+   *
+   * @return      a QUEUESTATUS value based on results
+   *
+   *****************************************************************************/
+  QUEUESTATUS QueueScheduler_Peek( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry )
   {
-    // disable interrupts
-    Interrupt_Disable( );
-    
-    // clear the indices
-    ptSelQeueue->nWrIdx = 0;
-    ptSelQeueue->nRdIdx = 0;
-    ptSelQeueue->nCount = 0;
-    
-    // re-enable interrupts
-    Interrupt_Enable( );
-  }
-  else
-  {
-    // return the error
-    eError = QUEUE_STATUS_ILLQUE;
-  }
+    QUEUESTATUS   eError = QUEUE_STATUS_NONE;
+    PQUEUECTL     ptSelQueue;
   
-  // return the status
-  return( eError );
-}
-
-/******************************************************************************
- * @function QueueScheduler_GetRemaining
- *
- * @brief get the number of entries in the queue
- *
- * This function will return the number of entries still in the queue
- *
- * @param[in]   ptQueue  	pointer to the queue
- * @param[io]   pnRemaining the pointer to store the number of entries remaining
- *
- * @return      a QUEUESTATUS value based on results
- *
- *****************************************************************************/
-QUEUESTATUS QueueScheduler_GetRemaining( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnRemaining )
-{
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL     ptSelQueue;
+    // map the pointer
+    ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
   
-  // map the pointer
-  ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
-  
-  // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
-  {
-    // set the remiaining equal to the count
-    *( pnRemaining ) = ptSelQueue->nCount;
-  }
-  else
-  {
-    // return the error
-    eError = QUEUE_STATUS_ILLQUE;
-  }
-  
-  // return the status
-  return( eError );
-}
-
-/******************************************************************************
- * @function QueueScheduler_GetStatus
- *
- * @brief get the queue status
- *
- * This function will return the current status as to full/empty/illegal
- *
- * @param[in]   ptQueue  	pointer to the queue
- *
- * @return      a QUEUESTATUS value based on results
- *
- *****************************************************************************/
-QUEUESTATUS QueueScheduler_GetStatus( PQUEUESCHEDULERHANDLE ptQueue )
-{
-  QUEUESTATUS   eError = QUEUE_STATUS_NONE;
-  PQUEUECTL     ptSelQueue;
-  
-  // map the pointer
-  ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
-  
-  // first validate that the task is valid
-  if ( ptSelQeueue == ptSelQueue->ptSignature )
-  {
-    // is the queue empty
-    if ( ptSelQeueue->nCount == 0 )
+    // first validate that the task is valid
+    if ( ptSelQueue == ptSelQueue->ptSignature )
     {
-      // set the queue empty status
-      eError = QUEUE_STATUS_QUEEMP;
+      // is there anything in the queue
+      if ( ptSelQueue->nCount != 0 )
+      {
+        // disable interrupts
+        Interrupt_Disable( );
+      
+        // now copy the entry to the pointer
+        memcpy( pnEntry, ( ptSelQueue->pnStorage + ( ptSelQueue->nRdIdx * ptSelQueue->wEntrySize )), ptSelQueue->wEntrySize );
+      
+        // re-enable interrupts
+        Interrupt_Enable( );
+      }
+      else
+      {
+        // return the queue empty error
+        eError = QUEUE_STATUS_QUEEMP;
+      }
     }
-    else if ( ptSelQeueue->nCount == ptSelQeueue->wNumEntries )
+    else
     {
-      // set the full error
-      eError = QUEUE_STATUS_QUEFUL;
+      // return the error
+      eError = QUEUE_STATUS_ILLQUE;
     }
-  }
-  else
-  {
-    // return the error
-    eError = QUEUE_STATUS_ILLQUE;
-  }
   
-  // return the status
-  return( eError );
-}
+    // return the status
+    return( eError );
+  }
+#endif
+
+#if ( QUEUESCHEDULER_INCLUDE_POP == TRUE )
+  /******************************************************************************
+   * @function QueueScheduler_Pop
+   *
+   * @brief removes an entry from the queue
+   *
+   * This function will pop an entry from the queue if one is there
+   *
+   * @param[in]   ptQueue  	pointer to the queue
+   *
+   * @return      a QUEUESTATUS value based on results
+   *
+   *****************************************************************************/
+  QUEUESTATUS QueueScheduler_Pop( PQUEUESCHEDULERHANDLE ptQueue )
+  {
+    QUEUESTATUS   eError = QUEUE_STATUS_NONE;
+    PQUEUECTL     ptSelQueue;
+  
+    // map the pointer
+    ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
+  
+    // first validate that the task is valid
+    if ( ptSelQueue == ptSelQueue->ptSignature )
+    {
+      // is there anything in the queue
+      if ( ptSelQueue->nCount != 0 )
+      {
+        // disable interrupts
+        Interrupt_Disable( );
+      
+        // adjust the read index
+        ptSelQueue->nRdIdx++;
+        if ( ptSelQueue->nRdIdx >= ptSelQueue->nNumEntries )
+        {
+          // reset back to zero
+          ptSelQueue->nRdIdx = 0;
+        }
+      
+        // decrement  the count
+        ptSelQueue->nCount--;
+      
+        // re-enable interrupts
+        Interrupt_Enable( );
+			
+        // now post event
+        PostEvent( ptSelQueue, TRUE );
+      }
+      else
+      {
+        // return the queue empty error
+        eError = QUEUE_STATUS_QUEEMP;
+      }
+    }
+    else
+    {
+      // return the error
+      eError = QUEUE_STATUS_ILLQUE;
+    }
+  
+    // return the status
+    return( eError );
+  }
+#endif
+
+#if ( QUEUESCHEDULER_INCLUDE_FLUSH == TRUE )
+  /******************************************************************************
+   * @function QueueScheduler_Flush
+   *
+   * @brief flush all entries
+   *
+   * This function will flush all entries in the given queue and clear the indices
+   *
+   * @param[in]   ptQueue  	pointer to the queue
+   *
+   * @return      a QUEUESTATUS value based on results
+   *
+   *****************************************************************************/
+  QUEUESTATUS QueueScheduler_Flush( PQUEUESCHEDULERHANDLE ptQueue )
+  {
+    QUEUESTATUS   eError = QUEUE_STATUS_NONE;
+    PQUEUECTL     ptSelQueue;
+  
+    // map the pointer
+    ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
+  
+    // first validate that the task is valid
+    if ( ptSelQueue == ptSelQueue->ptSignature )
+    {
+      // disable interrupts
+      Interrupt_Disable( );
+    
+      // clear the indices
+      ptSelQueue->nWrIdx = 0;
+      ptSelQueue->nRdIdx = 0;
+      ptSelQueue->nCount = 0;
+    
+      // re-enable interrupts
+      Interrupt_Enable( );
+    }
+    else
+    {
+      // return the error
+      eError = QUEUE_STATUS_ILLQUE;
+    }
+  
+    // return the status
+    return( eError );
+  }
+#endif
+
+#if ( QUEUESCHEDULER_INCLUDE_GETREMAINING == TRUE )
+  /******************************************************************************
+   * @function QueueScheduler_GetRemaining
+   *
+   * @brief get the number of entries in the queue
+   *
+   * This function will return the number of entries still in the queue
+   *
+   * @param[in]   ptQueue  	pointer to the queue
+   * @param[io]   pnRemaining the pointer to store the number of entries remaining
+   *
+   * @return      a QUEUESTATUS value based on results
+   *
+   *****************************************************************************/
+  QUEUESTATUS QueueScheduler_GetRemaining( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnRemaining )
+  {
+    QUEUESTATUS   eError = QUEUE_STATUS_NONE;
+    PQUEUECTL     ptSelQueue;
+  
+    // map the pointer
+    ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
+  
+    // first validate that the task is valid
+    if ( ptSelQueue == ptSelQueue->ptSignature )
+    {
+      // set the remiaining equal to the count
+      *( pnRemaining ) = ptSelQueue->nCount;
+    }
+    else
+    {
+      // return the error
+      eError = QUEUE_STATUS_ILLQUE;
+    }
+  
+    // return the status
+    return( eError );
+  }
+#endif
+
+#if ( QUEUESCHEDULER_INCLUDE_GETSTATUS == TRUE )
+  /******************************************************************************
+   * @function QueueScheduler_GetStatus
+   *
+   * @brief get the queue status
+   *
+   * This function will return the current status as to full/empty/illegal
+   *
+   * @param[in]   ptQueue  	pointer to the queue
+   *
+   * @return      a QUEUESTATUS value based on results
+   *
+   *****************************************************************************/
+  QUEUESTATUS QueueScheduler_GetStatus( PQUEUESCHEDULERHANDLE ptQueue )
+  {
+    QUEUESTATUS   eError = QUEUE_STATUS_NONE;
+    PQUEUECTL     ptSelQueue;
+  
+    // map the pointer
+    ptSelQueue = MAP_HANDLE_TO_POINTER( ptQueue );
+  
+    // first validate that the task is valid
+    if ( ptSelQueue == ptSelQueue->ptSignature )
+    {
+      // is the queue empty
+      if ( ptSelQueue->nCount == 0 )
+      {
+        // set the queue empty status
+        eError = QUEUE_STATUS_QUEEMP;
+      }
+      else if ( ptSelQueue->nCount == ptSelQueue->nNumEntries )
+      {
+        // set the full error
+        eError = QUEUE_STATUS_QUEFUL;
+      }
+    }
+    else
+    {
+      // return the error
+      eError = QUEUE_STATUS_ILLQUE;
+    }
+  
+    // return the status
+    return( eError );
+  }
+#endif
 
 /******************************************************************************
  * @function PostEvent
@@ -659,7 +668,7 @@ static void	PostEvent( PQUEUECTL ptQueue, BOOL bForceGet )
 	if ( bForceGet )
 	{
 		// is it enabled
-		if ( ptQueue->tEventFlag.tBits.bGet )
+		if ( ptQueue->tEventFlags.tBits.bGet )
 		{
 			// set the event
 			nEvent = QUEUE_EVENT_GET;

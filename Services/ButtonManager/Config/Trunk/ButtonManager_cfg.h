@@ -60,10 +60,10 @@ extern  const CODE BTNMNGRCFG tBtnMgrCfg;
 extern  const CODE BTNMNGRDEF atBtnMgrDefs[ ];
 
 // global function prototypes --------------------------------------------------
-extern  BOOL  ButtonManager_GetKeyStatus( U8 nKeyEnum );
 extern  void  ButtonManager_LocalInitialize( void );
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 extern  BOOL  ButtonManager_ProcessTask( TASKARG xArg );
+extern  BOOL  ButtonManager_GetKeyStatus( U8 nKeyEnum );
 #endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 
 /**@} EOF ButtonManager_cfg.h */

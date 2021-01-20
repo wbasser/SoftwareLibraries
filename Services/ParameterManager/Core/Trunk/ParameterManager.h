@@ -30,29 +30,26 @@
 
 // library includes -----------------------------------------------------------
 #if ( PARAM_ENABLE_DEBUG_COMMANDS == 1 )
-#include "AsciiCommandHandler/AsciiCommandHandler.h"
+  #include "AsciiCommandHandler/AsciiCommandHandler.h"
 #endif  // PARAM_ENABLE_DEBUG_COMMANDS
 
 // global parameter declarations -----------------------------------------------
 #if ( PARAM_ENABLE_DEBUG_COMMANDS == 1 )
-extern  const CODE ASCCMDENTRY atParamManagerCmdHandlerTable[ ];
+  extern  const CODE ASCCMDENTRY g_atParamManagerCmdHandlerTable[ ];
 #endif  // PARAM_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------
-extern	void	    ParameterManager_Initialize( void );
+extern	void	    ParameterManager_Initialize( BOOL bForceReset );
 extern	void 	    ParameterManager_SetDefaults( void );
 extern  void      ParameterManager_SetDefaultsRange( PARAMSELENUM eBegParam, PARAMSELENUM eEndParam );
 extern	PARAMERRS	ParameterManager_GetValue( PARAMSELENUM eParam, PPARAMARG pxValue );
-extern	PARAMERRS	ParameterManager_PutValue( PARAMSELENUM eParam, PARAMARG xValue );
+extern	PARAMERRS	ParameterManager_PutValue( PARAMSELENUM eParam, PARAMARG xValue, BOOL bBypassLock );
 extern	PARAMERRS	ParameterManager_GetLimits( PARAMSELENUM eParam, PPARAMARG pxMinValue, PPARAMARG pxMaxValue );
 #if ( PARAM_USE_NAMES == 1 )
-extern	PARAMERRS	ParameterMangaer_GetName( U8 nParameterMangaer_Num, PFC8 pszName );
+  extern	PARAMERRS	ParameterMangaer_GetName( U8 nParameterMangaer_Num, PFC8 pszName );
 #endif
 extern  PARAMERRS ParameterManager_GetDefaultValue( PARAMSELENUM eParm, PPARAMARG pxDfltValue );
 extern  BOOL      ParameterManager_GetDefaultStatus( void );
-#if ( PARAM_ENABLE_DEBUG_COMMANDS == 1 )
-#include "AsciiCommandHandler/AsciiCommandHandler.h"
-#endif  // PARAM_ENABLE_DEBUG_COMMANDS
 
 /**@} EOF ParameterManager.h */
 

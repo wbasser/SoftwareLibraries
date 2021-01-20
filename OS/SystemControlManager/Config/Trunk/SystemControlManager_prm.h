@@ -31,6 +31,9 @@
 /// define the debug command enable macro
 #define SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS           ( 1 )
 
+/// define the system control manager task enumeration
+#define SYSTEMCONTROLMANAGER_TASK_ENUM                      ( TASK_SCHD_ILLEGAL )
+
 /**@} EOF SystemControlManager_prm.h */
 
 #endif  // _SYSTEMCONTROLMANAGER_PRM_H

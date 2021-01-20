@@ -34,10 +34,13 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the task manager enum for the transmit task
-#define SYSTEMMONITOR_TRANSMIT_TASK_ENUM      ( TASK_MGR_ILLEGAL )
+#define SYSTEMMONITOR_TRANSMIT_TASK_ENUM      ( TASK_SCHD_ENUM_ILLEGAL )
 
 /// define the baud rate for the monitor
 #define SYSTEMMONITOR_TRANSMIT_BYTE_RATE      ( 230000 )
+
+/// define the minimum poll time
+#define SYSTEMMONITOR_MINIMUM_POLL_TIME_MSEC  ( 250 )
 
 /**@} EOF SystemMonitor_prm.h */
 

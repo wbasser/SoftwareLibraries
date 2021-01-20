@@ -38,7 +38,7 @@
 #include "FreeRTOS/FreeRTOSInclude.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the priorities for the LED manager
+/// define the priorities for the SystemMonitor manager
 #define SYSTEMMONITOR_SCAN_TASK_PRIORITY      ( tskIDLE_PRIORITY + 3 )
 #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
@@ -49,6 +49,11 @@
 // local function delarations -------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
 static void ScanTask( PVOID pvParameters );
+#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
+
+// local parameter declarations ----------------------------------------------
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+static U16 wPollTimeMsecs;
 #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 
 // global parameter declarations ----------------------------------------------
@@ -83,8 +88,40 @@ void SystemMonitor_LocalInitialize( void )
 {
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
   // create the animation task
-  xTaskCreate( ScanTask, "SensorScan", configMINIMAL_STACK_SIZE, NULL, LED_ANIMATE_TASK_PRIORITY, NULL );
+  xTaskCreate( ScanTask, "SensorScan", configMINIMAL_STACK_SIZE, NULL, SYSTEMMONITOR_SCAN_TASK_PRIORITY, NULL );
   #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
+}
+
+/******************************************************************************
+ * @function SystemMonitor_EnableDisableTask
+ *
+ * @brief enable/disable task
+ *
+ * This function will enable and disable the task
+ *
+ * @param[in]   bState      desired state
+ *
+ *****************************************************************************/
+void SystemMonitor_EnableDisableTask( BOOL bState )
+{
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+    TaskManager_EnableDisable( SYSTEMMONITOR_TRANSMIT_TASK_ENUM, bState );
+  #endif
+}
+
+/******************************************************************************
+ * @function SystemMonitor_LocalInitialize
+ *
+ * @brief sensor manager initialization
+ *
+ * This function will initialize the sensor manager
+ *
+ *****************************************************************************/
+void SystemMonitor_SetScanTaskTime( U16 wTaskTime )
+{
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+    TaskManager_StartTimer( SYSTEMMONITOR_TRANSMIT_TASK_ENUM, wTaskTime );
+  #endif
 }
 
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )

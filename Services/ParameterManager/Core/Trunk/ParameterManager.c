@@ -26,27 +26,21 @@
 
 // library includes -----------------------------------------------------------
 #if ( PARAM_USE_CRC == 1 )
-#include "CRC16/Crc16.h"
+  #include "CRC16/Crc16.h"
 #endif // PARAM_USE_CRC
-#ifndef __ATMEL_AVR__
-#include "EepromHandler/EepromHandler.h"
-#endif // __ATMEL_AVR__
-#include "ManufInfo/ManufInfo.h"
 
 // Macros and Defines ---------------------------------------------------------
-#ifndef __ATMEL_AVR__
-  /// define the address of the CRC
-  #define PARAMETER_CHECK_ADDR        ( EEPROMHANDLER_PRMBLOCK_BASE_ADDR )
+/// define the address of the CRC
+#define PARAMETER_CHECK_ADDR        ( PARAM_BASE_ADDRESS )
 
-  /// define the address of the version block
-  #define PARAMETER_VERS_ADDR         ( PARAMETER_CHECK_ADDR + sizeof( U16 ))
+/// define the address of the version block
+#define PARAMETER_VERS_ADDR         ( PARAMETER_CHECK_ADDR + sizeof( U16 ))
 
-  /// define the address of the config block
-  #define PARAMETER_DATA_ADDR         ( PARAMETER_VERS_ADDR + sizeof( U16 ))
+/// define the address of the config block
+#define PARAMETER_DATA_ADDR         ( PARAMETER_VERS_ADDR + sizeof( U16 ))
 
-  /// define the address computation macro
-  #define	PARAMADDR( eParam )		      ( PARAMETER_DATA_ADDR  + ( eParam * sizeof( PARAMARG )))
-#endif // __ATMEL_AVR__
+/// define the address computation macro
+#define	PARAMADDR( eParam )		      ( PARAMETER_DATA_ADDR  + ( eParam * sizeof( PARAMARG )))
 
 // enumerations ---------------------------------------------------------------
 
@@ -57,11 +51,6 @@
 // local parameter declarations -----------------------------------------------
 static  BOOL    bDefaultParameters;
 static  BOOL    bErrorDetected;
-#ifdef __ATMEL_AVR__
-static  EEPROM  PARAMARG  axParameters[ PARAMSEL_MAX_NUM ];
-static  EEPROM  U16       wParameterCheck;
-static  EEPROM  U16       wVersion;
-#endif // __ATMEL_AVR__
 
 // local function prototypes --------------------------------------------------
 static  U16   ComputeParamCheck( BOOL bUpdateFlag );
@@ -69,36 +58,36 @@ static  void  SetDefaults( PARAMSELENUM eBegParam, PARAMSELENUM eEndParam );
 
 /// command handlers
 #if ( PARAM_ENABLE_DEBUG_COMMANDS == 1 )
-static  ASCCMDSTS CmdQryPrm( U8 nCmdEnum );
-static  ASCCMDSTS CmdSetPrm( U8 nCmdEnum );
-static  ASCCMDSTS CmdRstDfl( U8 nCmdEnum );
+  static  ASCCMDSTS CmdQryPrm( U8 nCmdEnum );
+  static  ASCCMDSTS CmdSetPrm( U8 nCmdEnum );
+  static  ASCCMDSTS CmdRstDfl( U8 nCmdEnum );
 
-// constant parameter initializations -----------------------------------------
-/// declare the command strings
-static  const CODE C8 szQryPrm[ ]   = { "QPRM" };
-static  const CODE C8 szSetPrm[ ]   = { "SPRM" };
-static  const CODE C8 szRstDfl[ ]   = { "RDFL" };
+  // constant parameter initializations -----------------------------------------
+  /// declare the command strings
+  static  const CODE C8 szQryPrm[ ]   = { "QRYPRM" };
+  static  const CODE C8 szSetPrm[ ]   = { "SETPRM" };
+  static  const CODE C8 szRstDfl[ ]   = { "RSTDFL" };
 
-#if ( PARAM_SIZE_BYTES == 1 )
-static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %3d:%02X\n\r" };
-#elif ( PARAM_SIZE_BYTES == 2 )
-static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %5d:%04X\n\r" };
-#elif ( PARAM_SIZE_BYTES == 4 )
-static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %10u:%08X\n\r" };
-#else
-static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %3d:%02X\n\r" };
-#endif // PARAM_SIZE_BYTES
+  #if ( PARAM_SIZE_BYTES == 1 )
+    static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %3d:%02X\n\r" };
+  #elif ( PARAM_SIZE_BYTES == 2 )
+    static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %5d:%04X\n\r" };
+  #elif ( PARAM_SIZE_BYTES == 4 )
+    static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %10u:%08X\n\r" };
+  #else
+    static  const CODE C8 szRspQryPrm[ ]  = { "RPRM: %3d, %3d:%02X\n\r" };
+  #endif // PARAM_SIZE_BYTES
 
-/// initialize the command table
-const CODE ASCCMDENTRY atParamManagerCmdHandlerTable[ ] = 
-{
-  ASCCMD_ENTRY( szQryPrm, 4, 1, ASCFLAG_COMPARE_NONE, 0,                             CmdQryPrm ),
-  ASCCMD_ENTRY( szSetPrm, 4, 2, ASCFLAG_COMPARE_NONE, PARAM_WRITE_RESET_SYSTEM_MODE, CmdSetPrm ),
-  ASCCMD_ENTRY( szRstDfl, 4, 1, ASCFLAG_COMPARE_NONE, PARAM_WRITE_RESET_SYSTEM_MODE, CmdRstDfl ),
+  /// initialize the command table
+  const CODE ASCCMDENTRY g_atParamManagerCmdHandlerTable[ ] = 
+  {
+    ASCCMD_ENTRY( szQryPrm, 4, 1, ASCFLAG_COMPARE_NONE, 0,                             CmdQryPrm ),
+    ASCCMD_ENTRY( szSetPrm, 4, 2, ASCFLAG_COMPARE_NONE, PARAM_WRITE_RESET_SYSTEM_MODE, CmdSetPrm ),
+    ASCCMD_ENTRY( szRstDfl, 4, 1, ASCFLAG_COMPARE_NONE, PARAM_WRITE_RESET_SYSTEM_MODE, CmdRstDfl ),
 
-  // the entry below must be here
-  ASCCMD_ENDTBL( )
-};
+    // the entry below must be here
+    ASCCMD_ENDTBL( )
+  };
 #endif  // PARAM_ENABLE_DEBUG_COMMANDS
 
 /******************************************************************************
@@ -109,8 +98,10 @@ const CODE ASCCMDENTRY atParamManagerCmdHandlerTable[ ] =
  * This function will verify the parameters are valid and if not will reset
  * them to the default values
  *
- *****************************************************************************/
-void ParameterManager_Initialize( void )
+ * @param[in]   bForceReset     force a reset to defaults
+ *
+*****************************************************************************/
+void ParameterManager_Initialize( BOOL bForceReset )
 {
   U16   wActCheckValue, wExpCheckValue, wActVersion;
   U16UN tExpVersion;
@@ -119,24 +110,19 @@ void ParameterManager_Initialize( void )
   bErrorDetected = FALSE;
   
   // get the expectant version
-  tExpVersion.anValue[ LE_U16_MSB_IDX ] = ManufInfo_GetSfwMajor( );
-  tExpVersion.anValue[ LE_U16_LSB_IDX ] = ManufInfo_GetSfwMinor( );
+  tExpVersion.anValue[ LE_U16_MSB_IDX ] = ParameterManager_GetVerMajor( );
+  tExpVersion.anValue[ LE_U16_LSB_IDX ] = ParameterManager_GetVerMinor( );
   
 	// compute the checksum of the stored parameters
-  #ifdef __ATMEL_AVR__ 
-  wActCheckValue = EEP_RDWORD( wParameterCheck );
-  wActVersion = EEP_RDWORD( wVersion );
-  #else
-  EepromHandler_RdWord( PARAMETER_CHECK_ADDR, &wActCheckValue );
-  EepromHandler_RdWord( PARAMETER_VERS_ADDR, &wActVersion );
-  #endif //__ATMEL_AVR__
+  ParameterManager_RdWord( PARAMETER_CHECK_ADDR, &wActCheckValue );
+  ParameterManager_RdWord( PARAMETER_VERS_ADDR, &wActVersion );
   
   // now compare to see if equal
   wExpCheckValue = ComputeParamCheck( FALSE );
   if ( bErrorDetected == FALSE )
   {
     // now test 
-    if (( wExpCheckValue != wActCheckValue ) || ( wActVersion != tExpVersion.wValue ))
+    if (( bForceReset == TRUE ) || ( wExpCheckValue != wActCheckValue ) || ( wActVersion != tExpVersion.wValue ))
     {
       // corrupt or un-inintialized params/copy defaults
       SetDefaults( 0, PARAMSEL_MAX_NUM );
@@ -144,8 +130,8 @@ void ParameterManager_Initialize( void )
   }
   
   // good config, post done
-  #if ( PARAM_ENABLE_NOTIFICATIONS == 1)
-  TaskManager_PostEvent( PARAM_NOTIFICATION_TASK, PARAM_DONE_EVENT );
+  #if ( PARAM_ENABLE_NOTIFICATIONS ==  ON )
+    ParameterManager_PostDone( FALSE );
   #endif
 }
 
@@ -204,32 +190,25 @@ PARAMERRS	ParameterManager_GetValue( PARAMSELENUM eParam, PPARAMARG pxValue )
     switch( sizeof( PARAMARG ))
     {
       case 1 :
-        #if __ATMEL_AVR__
-        *pxValue = EEP_RDBYTE( axParameters[ eParam ] );
-        #else
-        EepromHandler_RdByte( PARAMADDR( eParam ), ( PU8 )pxValue );
-        #endif //  __ATMEL_AVR__
+        ParameterManager_RdByte( PARAMADDR( eParam ), ( PU8 )pxValue );
         break;
         
       case 2 :
-        #if __ATMEL_AVR__
-        *pxValue = EEP_RDWORD( axParameters[ eParam ] );
-        #else
-        EepromHandler_RdWord( PARAMADDR( eParam ), ( PU16 )pxValue );
-        #endif //  __ATMEL_AVR__
+        ParameterManager_RdWord( PARAMADDR( eParam ), ( PU16 )pxValue );
         break;
         
       case 4 :
-        #if __ATMEL_AVR__
-        *pxValue = EEP_RDDWRD( axParameters[ eParam ] );
-        #else
-        EepromHandler_RdLong( PARAMADDR( eParam ), ( PU32 )pxValue );
-        #endif //  __ATMEL_AVR__
+        ParameterManager_RdLong( PARAMADDR( eParam ), ( PU32 )pxValue );
         break;
         
       default :
         break;
     }
+  }
+  else
+  {
+    // set the error
+    eParam = PARAM_ERR_PNUM;
   }
   
   // return the error
@@ -244,13 +223,14 @@ PARAMERRS	ParameterManager_GetValue( PARAMSELENUM eParam, PPARAMARG pxValue )
  * This function will store the parameter value and update the current check
  * value
  *
- * @param[in]   eParam    parameter number
- * @param[in]   xValue    parameter value
+ * @param[in]   eParam        parameter number
+ * @param[in]   xValue        parameter value
+ * @param[in]   bBypassLock   parameter value
  *
  * @return      appropriate eerror
  *
  *****************************************************************************/
-PARAMERRS	ParameterManager_PutValue( PARAMSELENUM eParam, PARAMARG xValue )
+PARAMERRS	ParameterManager_PutValue( PARAMSELENUM eParam, PARAMARG xValue, BOOL bBypassLock )
 {
   PARAMERRS eError = PARAM_ERR_NONE;
   
@@ -258,33 +238,21 @@ PARAMERRS	ParameterManager_PutValue( PARAMSELENUM eParam, PARAMARG xValue )
   if ( eParam < PARAMSEL_MAX_NUM )
   {
     // check for locked
-    if ( PGM_RDBYTE( atParamDefaults[ eParam ].bLocked ) == FALSE )
+    if (( PGM_RDBYTE( atParamDefaults[ eParam ].bLocked ) == FALSE ) || ( bBypassLock == TRUE ))
     {
       // get the value
       switch( sizeof( PARAMARG ))
       {
         case 1 :
-          #if __ATMEL_AVR__
-          EEP_WRBYTE( axParameters[ eParam ], xValue );
-          #else
-          EepromHandler_WrByte( PARAMADDR( eParam ), xValue );
-          #endif //  __ATMEL_AVR__
+          ParameterManager_WrByte( PARAMADDR( eParam ), xValue );
           break;
         
         case 2 :
-          #if __ATMEL_AVR__
-          EEP_WRWORD( axParameters[ eParam ], xValue );
-          #else
-          EepromHandler_WrWord( PARAMADDR( eParam ), xValue );
-          #endif //  __ATMEL_AVR__
+          ParameterManager_WrWord( PARAMADDR( eParam ), xValue );
           break;
         
         case 4 :
-          #if __ATMEL_AVR__
-          EEP_WRDWRD( axParameters[ eParam ], xValue );
-          #else
-          EepromHandler_WrLong( PARAMADDR( eParam ), xValue );
-          #endif //  __ATMEL_AVR__
+          ParameterManager_WrLong( PARAMADDR( eParam ), xValue );
           break;
         
         default :
@@ -302,6 +270,11 @@ PARAMERRS	ParameterManager_PutValue( PARAMSELENUM eParam, PARAMARG xValue )
       // set the error
       eError = PARAM_ERR_LOCKED;
     }
+  }
+  else
+  {
+    // set the error
+    eError = PARAM_ERR_PNUM;
   }
 
   // return the error
@@ -361,36 +334,36 @@ PARAMERRS	ParameterManager_GetLimits( PARAMSELENUM eParam, PPARAMARG pxMinValue,
 }
 
 #if ( PARAM_USE_NAMES == 1 )
-/******************************************************************************
- * @function ParameterMangaer_GetName
- *
- * @brief get a parameter name
- *
- * This function will return a pointer to the parameter name
- *
- * @param[in]   eParam    parameter number
- * @param[in]   pszName   pointer to the name
- *
- * @return      appropriate eerror
- *
- *****************************************************************************/
-PARAMERRS	ParameterManager_GetName( PARAMSELENUM eParam, PFC8 pszName )
-{
-  PARAMERRS eError = PARAM_ERR_NONE;
-  
-  // reset the return value
-  *pszName = NULL;
-  
-  // valid parameter
-  if ( eParam < PARAMSEL_MAX_NUM )
+  /******************************************************************************
+   * @function ParameterMangaer_GetName
+   *
+   * @brief get a parameter name
+   *
+   * This function will return a pointer to the parameter name
+   *
+   * @param[in]   eParam    parameter number
+   * @param[in]   pszName   pointer to the name
+   *
+   * @return      appropriate eerror
+   *
+   *****************************************************************************/
+  PARAMERRS	ParameterManager_GetName( PARAMSELENUM eParam, PFC8 pszName )
   {
-    // return the pointer
-    return(( const PC8 )atParamDefaults[ eParam ].pszName );
-  }
+    PARAMERRS eError = PARAM_ERR_NONE;
   
-  // return the error
-  return( eError );
-}
+    // reset the return value
+    *pszName = NULL;
+  
+    // valid parameter
+    if ( eParam < PARAMSEL_MAX_NUM )
+    {
+      // return the pointer
+      return(( const PC8 )atParamDefaults[ eParam ].pszName );
+    }
+  
+    // return the error
+    return( eError );
+  }
 #endif
 
 /******************************************************************************
@@ -450,77 +423,69 @@ BOOL ParameterManager_GetDefaultStatus( void )
 static void SetDefaults( PARAMSELENUM eBegParam, PARAMSELENUM eEndParam )
 {
   U16UN       tVersion;
-  U16         wIdx, wTotalLength, wBlockLength, wWriteLength, wAddress;
-  PU8         pnValues;
-  U8          nValue;
-  EEPROMERR   eError;
+  U16         wWriteLength, wAddress;
+  PPARAMARG   ptValues;
+  PARAMARG    tValue;
+  U8          nNumParams, nParamCount, nParamIdx;
   PPARAMDFLTS ptDefaults;
 
   // update the version
-  tVersion.anValue[ LE_U16_MSB_IDX ] = ManufInfo_GetSfwMajor( );
-  tVersion.anValue[ LE_U16_LSB_IDX ] = ManufInfo_GetSfwMinor( );
+  tVersion.anValue[ LE_U16_MSB_IDX ] = ParameterManager_GetVerMajor( );
+  tVersion.anValue[ LE_U16_LSB_IDX ] = ParameterManager_GetVerMinor( );
   
   // write it
-  #ifdef __ATMEL_AVR__
-  EEP_WRWORD( wVersion, tVersion.wValue );
-  #else
-  EepromHandler_WrWord( PARAMETER_VERS_ADDR, tVersion.wValue );
-  #endif
+  ParameterManager_WrWord( PARAMETER_VERS_ADDR, tVersion.wValue );
 
-  // compute the total length
-  wTotalLength = PARAMSEL_MAX_NUM * sizeof( PARAMARG );
-
+  // set the parameter count/set the beginning address
+  nParamCount = PARAMSEL_MAX_NUM;
+  wAddress = PARAMETER_DATA_ADDR;
+  
   // create a local buffer
-  if (( pnValues = malloc( PARAM_UPDATE_BLOCK_SIZE )) != NULL )
+  if (( ptValues = ( PPARAMARG )malloc( PARAM_UPDATE_BLOCK_SIZE )) != NULL )
   {
     // set the block length
-    wBlockLength = PARAM_UPDATE_BLOCK_SIZE;
+    nNumParams = PARAM_UPDATE_BLOCK_SIZE / sizeof( PARAMARG );
   }
   else
   {
     // force length to 1
-    pnValues = &nValue;
-    wBlockLength = 1;
+    ptValues = &tValue;
+    nNumParams = 1;
   }
 
   // set the addresses
-  #ifdef __ATMEL_AVR__
-  #else
   wAddress = PARAMETER_DATA_ADDR;
   ptDefaults = ( PPARAMDFLTS )&atParamDefaults;
-  #endif // __ATMEL_AVR__
 
   // while there is data
-  while( wTotalLength != 0 )
+  while( nParamCount != 0 )
   {
-    // set the current block length
-    wWriteLength = MIN( wBlockLength, wTotalLength );
-
+    // clear the write length
+    wWriteLength = 0;
+    
+    // set the number of parameters to iterate this loop
+    nNumParams = MIN( nNumParams, nParamCount );
+    
     // get the default values for this block
-    for ( wIdx = 0; wIdx < wWriteLength; wIdx++ )
+    for ( nParamIdx = 0; nParamIdx < nNumParams; nParamIdx++ )
     {
-      *( pnValues + wIdx ) = ptDefaults++->xDefVal;
+      // copy the defaults
+      *( ptValues + nParamIdx ) = ptDefaults++->xDefVal;
+      wWriteLength += sizeof( PARAMARG );
     }
 
     // now write it
-    #ifdef __ATMEL_AVR__
-    #else
-    if (( eError = EepromHandler_WrBlock( wAddress, wWriteLength, pnValues )) != EEPROM_ERR_NONE )
+    if (( bErrorDetected = ParameterManager_WrBlock( wAddress, wWriteLength, ( PU8 )ptValues )) == TRUE )
     {
-      // set the flag - exit
-      bErrorDetected = TRUE;
+      // exit
       break;
     }
-    #endif
 
     // adjust address
-    #ifdef __ATMEL_AVR__
-    #else
     wAddress += wWriteLength;
-    #endif // __ATMEL_AVR__
-
-    // adjust the total length
-    wTotalLength -= wWriteLength;
+    
+    // adjust the parameter count
+    nParamCount -= nNumParams;
   }
   
   // if no error detected
@@ -550,10 +515,7 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
   U16         wCheckValue, wIdx, wTotalLength, wBlockLength, wReadLength, wAddress;
   PU8         pnValues;
   U8          nValue;
-  EEPROMERR   eError;
-  #ifdef __ATMEL_AVR__
-  PU8 pnEeprom;
-  #endif // __ATMEL_AVR__
+  BOOL        bErrorDetected = FALSE;
 
   // initialize the value
   #if ( PARAM_USE_CRC == 1 )
@@ -561,11 +523,6 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
   #else
     wCheckValue = 0;
   #endif // PARAM_USE_CRC
-
-  // set the pointer if atmel
-  #ifdef __ATMEL_AVR__
-  pnEeprom = ( PU8 )axParameters;
-  #endif
 
   // compute the total length
   wTotalLength = PARAMSEL_MAX_NUM * sizeof( PARAMARG );
@@ -584,10 +541,7 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
   }
 
   // set the addresses
-  #ifdef __ATMEL_AVR__
-  #else
   wAddress = PARAMETER_DATA_ADDR;
-  #endif // __ATMEL_AVR__
 
   // for each byte in the parameter block
   while( wTotalLength != 0 )
@@ -596,17 +550,7 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
     wReadLength = MIN( wBlockLength, wTotalLength );
 
     // read the block
-    #ifdef __ATMEL_AVR__
-    //EEP_RDBLOCK_PTR( pnValues, ( pnEeprom + wIdx )
-    //nValue = EEP_RDBYTE_PTR(( pnEeprom + wIdx ));
-    #else
-    if (( eError = EepromHandler_RdBlock( wAddress, wReadLength, pnValues )) != EEPROM_ERR_NONE )
-    {
-      // set error detected/break;
-      bErrorDetected = TRUE;
-      break;
-    }
-    #endif // __ATMEL_AVR__
+    bErrorDetected = ParameterManager_RdBlock( wAddress, wReadLength, pnValues );
 
     // now for each byte in block
     for( wIdx = 0; wIdx < wReadLength; wIdx++ )
@@ -622,10 +566,7 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
     }
 
     // adjust address
-    #ifdef __ATMEL_AVR__
-    #else
     wAddress += wReadLength;
-    #endif // __ATMEL_AVR__
 
     // adjust the total length
     wTotalLength -= wReadLength;
@@ -645,16 +586,7 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
     // determine if we are to write this value
     if ( bUpdateFlag )
     {
-      // now write the value
-      #ifdef __ATMEL_AVR__
-      EEP_WRWORD( wParameterCheck, wCheckValue );
-      #else
-      if (( eError = EepromHandler_WrWord( PARAMETER_CHECK_ADDR, wCheckValue )) != EEPROM_ERR_NONE )
-      {
-        // set the error detected
-        bErrorDetected = TRUE;
-      }
-      #endif // __ATMEL_AVR__
+      ParameterManager_WrWord( PARAMETER_CHECK_ADDR, wCheckValue );
     }
   }
 
@@ -663,141 +595,144 @@ static U16 ComputeParamCheck( BOOL bUpdateFlag )
 }
 
 #if ( PARAM_ENABLE_DEBUG_COMMANDS == 1 )
-/******************************************************************************
- * @function CmdQryPrm
- *
- * @brief query parameter value
- *
- * This function will display a parameter value if valid parameter
- *
- * @param[in]   nCmdEnum      command handler enumeration
- *
- * @return      appropriate eerror
- *
- *****************************************************************************/
-static ASCCMDSTS CmdQryPrm( U8 nCmdEnum )
-{
-  U32UN       tTemp;
-  PC8         pcBuffer;
-  PARAMERRS   eError;
-  PARAMARG    xValue;
+  /******************************************************************************
+   * @function CmdQryPrm
+   *
+   * @brief query parameter value
+   *
+   * This function will display a parameter value if valid parameter
+   *
+   * @param[in]   nCmdEnum      command handler enumeration
+   *
+   * @return      appropriate eerror
+   *
+   *****************************************************************************/
+  static ASCCMDSTS CmdQryPrm( U8 nCmdEnum )
+  {
+    U32UN       tTemp;
+    PC8         pcBuffer;
+    PARAMERRS   eError;
+    PARAMARG    xValue;
   
-  // fetch the pointer to the buffer
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+    // fetch the pointer to the buffer
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
 
-  // get the parameter number
-  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
+    // get the parameter number
+    AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
 
-  // get the parameter
-  if (( eError = ParameterManager_GetValue( tTemp.anValue[ LE_U32_LSB_IDX ], &xValue )) != PARAM_ERR_NONE )
-  {
-    // output the error
-    SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
-  }
-  else
-  {
-    // output the value
-    SPRINTF_P( pcBuffer, ( char const * )szRspQryPrm, tTemp.anValue[ LE_U32_LSB_IDX ], ( unsigned int )xValue, ( unsigned int )xValue );
-  }
+    // get the parameter
+    if (( eError = ParameterManager_GetValue( tTemp.anValue[ LE_U32_LSB_IDX ], &xValue )) != PARAM_ERR_NONE )
+    {
+      // output the error
+      SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
+    }
+    else
+    {
+      // output the value
+      SPRINTF_P( pcBuffer, ( char const * )szRspQryPrm, tTemp.anValue[ LE_U32_LSB_IDX ], ( unsigned int )xValue, ( unsigned int )xValue );
+    }
   
-  // return status
-  return( ASCCMD_STS_OUTPUTBUFFER );
-}
-
-/******************************************************************************
- * @function CmdSetPrm
- *
- * @brief set a parameter value
- *
- * This function will set a parameter value if valid parameter
- *
- * @param[in]   nCmdEnum      command handler enumeration
- *
- * @return      appropriate eerror
- *
- *****************************************************************************/
-static ASCCMDSTS CmdSetPrm( U8 nCmdEnum )
-{
-  ASCCMDSTS     eStatus = ASCCMD_STS_NONE;
-  U32UN         tTemp;
-  PC8           pcBuffer;
-  PARAMERRS     eError;
-  PARAMARG      xValue;
-  PARAMSELENUM  eParamEnum;
-
-  // fetch the pointer to the buffer
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
-
-  // get the parameter number/value
-  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
-  eParamEnum = tTemp.anValue[ LE_U32_LSB_IDX ];
-  AsciiCommandHandler_GetValue( nCmdEnum, 1, &tTemp.uValue );
-  switch( sizeof( PARAMARG ))
-  {
-    case 1 :
-      xValue = tTemp.anValue[ LE_U32_LSB_IDX ];
-      break;
-      
-    case 2 :
-      xValue = tTemp.awValue[ LE_U32_LSW_IDX ];
-      break;
-      
-    case 4 :
-      xValue = tTemp.uValue;
-      break;
-      
-    default :
-      xValue = tTemp.anValue[ LE_U32_LSB_IDX ];
-      break;
+    // return status
+    return( ASCCMD_STS_OUTPUTBUFFER );
   }
 
-  // set the parameter
-  if (( eError = ParameterManager_PutValue( eParamEnum, xValue )) != PARAM_ERR_NONE )
+  /******************************************************************************
+   * @function CmdSetPrm
+   *
+   * @brief set a parameter value
+   *
+   * This function will set a parameter value if valid parameter
+   *
+   * @param[in]   nCmdEnum      command handler enumeration
+   *
+   * @return      appropriate eerror
+   *
+   *****************************************************************************/
+  static ASCCMDSTS CmdSetPrm( U8 nCmdEnum )
   {
-    // output the error
-    SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
-    eStatus = ASCCMD_STS_OUTPUTBUFFER;
-  }
+    ASCCMDSTS     eStatus = ASCCMD_STS_NONE;
+    U32UN         tTemp;
+    PC8           pcBuffer;
+    PARAMERRS     eError;
+    PARAMARG      xValue;
+    PARAMSELENUM  eParamEnum;
+
+    // fetch the pointer to the buffer
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+    // get the parameter number/value
+    AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
+    eParamEnum = tTemp.anValue[ LE_U32_LSB_IDX ];
+    AsciiCommandHandler_GetValue( nCmdEnum, 1, &tTemp.uValue );
+
+
+    // now get the appropriate size value
+    switch( sizeof( PARAMARG ))
+    {
+      case 1 :
+        xValue = tTemp.anValue[ LE_U32_LSB_IDX ];
+        break;
+      
+      case 2 :
+        xValue = tTemp.awValue[ LE_U32_LSW_IDX ];
+        break;
+      
+      case 4 :
+        xValue = tTemp.uValue;
+        break;
+      
+      default :
+        xValue = tTemp.anValue[ LE_U32_LSB_IDX ];
+        break;
+    }
+
+    // set the parameter
+    if (( eError = ParameterManager_PutValue( eParamEnum, xValue, TRUE )) != PARAM_ERR_NONE )
+    {
+      // output the error
+      SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
+      eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    }
   
-  // return status
-  return( eStatus );
-}
-
-/******************************************************************************
- * @function CmdRstDfl
- *
- * @brief reset to defaults
- *
- * This function will reset the parameters to their default state
- *
- * @param[in]   nCmdEnum      command handler enumeration
- *
- * @return      appropriate eerror
- *
- *****************************************************************************/
-static ASCCMDSTS CmdRstDfl( U8 nCmdEnum )
-{
-  ASCCMDSTS eStatus = ASCCMD_STS_NONE;
-  PC8       pszPassWord;
-
-  // get the password
-  AsciiCommandHandler_GetArg( nCmdEnum, 0, &pszPassWord );
-
-  // now compare to password
-  if ( STRCMP_P( PARAM_RESET_DEFAULTS_PASSWORD, pszPassWord ) == 0 )
-  {
-    // reset the parameters
-    ParameterManager_SetDefaults( );
-  }
-  else
-  {
-    // send the error
-    eStatus = ASCCMD_STS_ILLPASSWORD;
+    // return status
+    return( eStatus );
   }
 
-  // return the status
-  return( eStatus );
-}
+  /******************************************************************************
+   * @function CmdRstDfl
+   *
+   * @brief reset to defaults
+   *
+   * This function will reset the parameters to their default state
+   *
+   * @param[in]   nCmdEnum      command handler enumeration
+   *
+   * @return      appropriate eerror
+   *
+   *****************************************************************************/
+  static ASCCMDSTS CmdRstDfl( U8 nCmdEnum )
+  {
+    ASCCMDSTS eStatus = ASCCMD_STS_NONE;
+    PC8       pszPassWord;
+
+    // get the password
+    AsciiCommandHandler_GetArg( nCmdEnum, 0, &pszPassWord );
+
+    // now compare to password
+    if ( STRCMP_P(( PCC8 )PARAM_RESET_DEFAULTS_PASSWORD, pszPassWord ) == 0 )
+    {
+      // reset the parameters
+      ParameterManager_SetDefaults( );
+    }
+    else
+    {
+      // send the error
+      eStatus = ASCCMD_STS_ILLPASSWORD;
+    }
+
+    // return the status
+    return( eStatus );
+  }
 #endif  // PARAM_ENABLE_DEBUG_COMMANDS
 
 /**@} EOF ParamaterManager.c */

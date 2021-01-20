@@ -32,7 +32,7 @@
 // library includes -----------------------------------------------------------
 #include "SystemTick/SystemTick.h"
 #if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-#include "SystemControlManager/SystemControlManager.h"
+  #include "SystemControlManager/SystemControlManager.h"
 #endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 // Macros and Defines ---------------------------------------------------------
@@ -79,20 +79,20 @@ typedef struct _SEQSTACK
 // local parameter declarations -----------------------------------------------
 static  LEDCTL          atLedCtls[ LEDMANAGER_ENUM_MAX ];
 #if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
-static  ANIMATIONSTATE  eAnimationState;
-static  LEDMNGRANIMENUM eCurrentAnimation;
-static  U16             wAnimationOption;
-static  U8              nCurAnimationIdx;
-static  PLEDSEQENTRY    ptCurAnimation;
-static  U16             wCurrentCount;
-#if ( LEDMANAGER_ANIMATION_CALLSTACK_DEPTH != 0 )
-static  SEQSTACK        atSeqStack[ LEDMANAGER_ANIMATION_CALLSTACK_DEPTH ];
-static  U8              nStackIndex;
-#endif
+  static  ANIMATIONSTATE  eAnimationState;
+  static  LEDMNGRANIMENUM eCurrentAnimation;
+  static  U16             wAnimationOption;
+  static  U8              nCurAnimationIdx;
+  static  PLEDSEQENTRY    ptCurAnimation;
+  static  U16             wCurrentCount;
+  #if ( LEDMANAGER_ANIMATION_CALLSTACK_DEPTH != 0 )
+    static  SEQSTACK        atSeqStack[ LEDMANAGER_ANIMATION_CALLSTACK_DEPTH ];
+    static  U8              nStackIndex;
+  #endif
 #endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
-static  U8              anColVals[ LEDMANAGER_MATRIX_MAX_NUM_ROWS ];
-static  U8              nCurScanRow;
+  static  U8              anColVals[ LEDMANAGER_MATRIX_MAX_NUM_ROWS ];
+  static  U8              nCurScanRow;
 #endif  // MATRIX DEFS
 
 // local function prototypes --------------------------------------------------
@@ -101,33 +101,33 @@ static  void  ChangeLedState( PLEDDEF ptDef, BOOL bState );
 
 /// command handlers
 #if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-static  ASCCMDSTS CmdSetLed( U8 nCmdEnum );
-#if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-static  ASCCMDSTS CmdSetRgb( U8 nCmdEnum );
-#endif  // LEDMANAGER_RGB_LEDS_ENABLED
+  static  ASCCMDSTS CmdSetLed( U8 nCmdEnum );
+  #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+    static  ASCCMDSTS CmdSetRgb( U8 nCmdEnum );
+  #endif  // LEDMANAGER_RGB_LEDS_ENABLED
 #endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 // constant parameter initializations -----------------------------------------
 // commands
 #if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-static  const CODE C8 szSetLed[ ]   = { "SETLED" };
-#if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-static  const CODE C8 szSetRgb[ ]   = { "SETRGB" };
-#endif  // LEDMANAGER_RGB_LEDS_ENABLED
+  static  const CODE C8 szSetLed[ ]   = { "SETLED" };
+    #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+    static  const CODE C8 szSetRgb[ ]   = { "SETRGB" };
+    #endif  // LEDMANAGER_RGB_LEDS_ENABLED
 #endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 #if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-const CODE ASCCMDENTRY g_atLedManagerCmdHandlerTable[ ] = 
-{
-  ASCCMD_ENTRY( szSetLed, 6, 2, ASCFLAG_COMPARE_EQ, SYSCTGRLMNGR_LCLMODE_DIAGNOSTICS,  CmdSetLed ),
-  // populate command table  
-  #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-  ASCCMD_ENTRY( szSetRgb, 6, 3, ASCFLAG_COMPARE_EQ, SYSCTGRLMNGR_LCLMODE_DIAGNOSTICS,  CmdSetRgb ),
-  #endif  // LEDMANAGER_RGB_LEDS_ENABLED
+  const CODE ASCCMDENTRY g_atLedManagerCmdHandlerTable[ ] = 
+  {
+    ASCCMD_ENTRY( szSetLed, 6, 2, ASCFLAG_COMPARE_EQ, SYSCTRLMNGR_MODE_14_DIAGNOSTICS,  CmdSetLed ),
+    // populate command table  
+    #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
+      ASCCMD_ENTRY( szSetRgb, 6, 3, ASCFLAG_COMPARE_EQ, SYSCTRLMNGR_MODE_14_DIAGNOSTICS,  CmdSetRgb ),
+    #endif  // LEDMANAGER_RGB_LEDS_ENABLED
 
-  // the entry below must be here
-  ASCCMD_ENDTBL( )
-};
+    // the entry below must be here
+    ASCCMD_ENDTBL( )
+  };
 #endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 /******************************************************************************

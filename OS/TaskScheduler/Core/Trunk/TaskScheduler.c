@@ -80,6 +80,9 @@ void TaskScheduler_Initialize( void )
 {
   // set the first to null
   ptFirstTask = NULL;
+
+  // set the tick rate
+  uSystemTickRate = SystemTick_GetTickRateUsec( );
 }
 
 /******************************************************************************
@@ -118,6 +121,11 @@ void TaskScheduler_IdleProcess( void )
         // get a normal event
         xEvent = *( ptCurTask->pxNrmEvents + ptCurTask->xNrmRdIdx );
         bEventFound = TRUE;
+      }
+      else
+      {
+        // clear flags
+        bPriorityEvent = bEventFound = FALSE;
       }
       
       // now check for event execution
@@ -242,7 +250,7 @@ PTASKSCHEDULERHANDLE TaskScheduler_Create( TASKSCHEDULERTYPE eType, PTASKSCHEDUL
         // now initialize the control structure
         ptNewTask->ptSignature      = ptNewTask;
         ptNewTask->ptNextTask       = NULL;
-        ptNewTask->uDelayTime       = uExecutionRateUsec / SystemTick_GetTickRateUsec( );
+        ptNewTask->uDelayTime       = uExecutionRateUsec / uSystemTickRate;
         ptNewTask->uDelayCount      = ptNewTask->uDelayTime;
         ptNewTask->xNrmRdIdx        = 0;
         ptNewTask->xNrmWrIdx        = 0;

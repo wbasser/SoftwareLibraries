@@ -173,6 +173,16 @@
 // define the low/high macros
 #define	LO16(a)	  (a&0xFF)
 #define	HI16(a)	  ((a>>8)&0xFF)
+#define LSB32(a)  (a&0xFF)
+#define MS132(a)  ((a>>8)&0xFF)
+#define MS232(a)  ((a>>16)&0xFF)
+#define MSB32(a)  ((a>>24)&0xFF)
+
+// define the macro for creating a word
+#define MAKEU16(m,l)  ((m<<8)|l)
+
+// define the macro for creating a long word
+#define MAKEU32(msb,ms2,ms1,lsb)  ((msb<<24)|(ms2<<16)|(ms1<<8)|lsb)
 
 // define the bit shift macros
 #define BIT(a)    (1<<a)
@@ -215,6 +225,8 @@
 #define STRTOKR_P   strtok_r
 #define MEMCPY_P    memcpy
 #define STRLEN_P    strlen
+#define STRNCPY_P   strncpy
+#define STRCAT_P    strcat
 
 // define the macro to determine the number of elements of an array of structure
 #define NUMELEMENTS( array ) \
@@ -228,6 +240,23 @@
 
 /// define the macro to swap bytes 
 #define SWAP_BYTES_16( value )  ((U16)(((value & 0xFF) << 8) | ((value & 0xFF00 ) >> 8 )))
+
+/// define the macro for creating large numbers
+#ifndef _UL_
+#define _UL_(a)   (a ## ul)
+#endif
+
+/// define a round function
+#define ROUND( a )      ((a)>=0 ? (long)((a)+0.5) : (long)((a)-0.5))
+
+/// define the mscro for creating an IP Addr
+#define IPADDRDEFLE(a,b,c,d) \
+  { \
+    .anOctets[ LE_U32_LSB_IDX ] = a, \
+    .anOctets[ LE_U32_MS1_IDX ] = b, \
+    .anOctest[ LE_U32_MS2_IDX ] = c, \
+    .anOctest[ LE_U32_MSB_IDX ] = d, \
+  }
 
 // enumerations ---------------------------------------------------------------
 
@@ -277,11 +306,13 @@ typedef volatile PU16		    PVU16;
 typedef volatile PS32		    PVS32;
 typedef volatile PU32		    PVU32;
 typedef volatile PFLOAT		  PVFLOAT;
+typedef const char*         PCC8;
 
 // define the value	unions
 typedef	union
 {
   U16	wValue;
+  S16 iValue;
   U8	anValue[ 2 ];
 } U16UN, *PU16UN;
 
@@ -289,6 +320,7 @@ typedef	union
 {
   FLOAT	fValue;
   U32		uValue;
+  S32   lValue;
   U16		awValue[ 2 ];
   U8		anValue[ 4 ];
 } U32UN, *PU32UN;
@@ -316,6 +348,14 @@ typedef union _FATTIME
 	U32 uTime;
 } FATTIME, *PFATTIME;
 #define FATTIME_SIZE    sizeof( FATTIME )
+
+/// define the IP address structure
+typedef union _IPADDR
+{
+  U8  anOctets[ 4 ];
+  U32 uAddress;
+} IPADDR, *PIPADDR;
+#define IPADDR_SIZE     sizeof( IPADDR )
 
 /**@} EOF Types.h */
 

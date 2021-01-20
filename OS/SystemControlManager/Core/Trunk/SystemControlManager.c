@@ -57,16 +57,16 @@ static  U8    Mode10_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_10_UN
 static  U8    Mode11_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_11_UNDEF
 static  U8    Mode12_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_12_UNDEF
 static  U8    Mode13_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_13_UNDEF
-static  U8    Mode14_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_14_UNDEF
+static  U8    Mode14_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_14_DIAGNOSTICS
 static  U8    Mode15_Execute( STATEEXECENGARG xArg );  // SYSCTRLMNGR_MODE_15_UNDEF
 
 /// command handlers
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-static  ASCCMDSTS CmdQryMod( U8 nCmdEnum );
-static  ASCCMDSTS CmdSetMod( U8 nCmdEnum );
-static  ASCCMDSTS CmdExtSpc( U8 nCmdEnum );
-static  ASCCMDSTS CmdEntDag( U8 nCmdEnum );
-static  ASCCMDSTS CmdEntMan( U8 nCmdEnum );
+  static  ASCCMDSTS CmdQryMod( U8 nCmdEnum );
+  static  ASCCMDSTS CmdSetMod( U8 nCmdEnum );
+  static  ASCCMDSTS CmdExtSpc( U8 nCmdEnum );
+  static  ASCCMDSTS CmdEntDag( U8 nCmdEnum );
+  static  ASCCMDSTS CmdEntMan( U8 nCmdEnum );
 #endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
 
 // constant parameter initializations -----------------------------------------
@@ -95,33 +95,33 @@ static  const CODE STATEEXECENGTABLE  atStates[ SYSCTRLMNGR_MODE_MAX ] =
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_11_UNDEF,         SetTaskStates, Mode11_Execute, NULL, &atAnyEvents ),
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_12_UNDEF,         SetTaskStates, Mode12_Execute, NULL, &atAnyEvents ),
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_13_UNDEF,         SetTaskStates, Mode13_Execute, NULL, &atAnyEvents ),
-  STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_14_UNDEF,         SetTaskStates, Mode14_Execute, NULL, &atAnyEvents ),
+  STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_14_DIAGNOSTICS,   SetTaskStates, Mode14_Execute, NULL, &atAnyEvents ),
   STATEXECENGETABLE_ENTRY( SYSCTRLMNGR_MODE_15_MANUFACTURING, SetTaskStates, Mode15_Execute, NULL, &atAnyEvents )
 };
 
 /// command strings
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-static  const CODE C8 szQryMod[ ]   = { "QRYMOD" };
-static  const CODE C8 szSetMod[ ]   = { "SETMOD" };
-static  const CODE C8 szEntDag[ ]   = { "DIAG" };
-static  const CODE C8 szEntMan[ ]   = { "MANF" };
-static  const CODE C8 szExtSpc[ ]   = { "EXIT" };
+  static  const CODE C8 szQryMod[ ]   = { "QRYMOD" };
+  static  const CODE C8 szSetMod[ ]   = { "SETMOD" };
+  static  const CODE C8 szEntDag[ ]   = { "DIAG" };
+  static  const CODE C8 szEntMan[ ]   = { "MANF" };
+  static  const CODE C8 szExtSpc[ ]   = { "EXIT" };
 
-/// initialize the command table
-const CODE ASCCMDENTRY g_atSysCtrlMngrCmdHandlerTable[ ] =
-{
-  ASCCMD_ENTRY( szQryMod, 4, 0, ASCFLAG_COMPARE_NONE, 0,                                 CmdQryMod ),
-  ASCCMD_ENTRY( szSetMod, 4, 1, ASCFLAG_COMPARE_NONE, 0,                                 CmdSetMod ),
-  ASCCMD_ENTRY( szEntDag, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,          CmdEntDag ),
-  ASCCMD_ENTRY( szEntMan, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,          CmdEntMan ),
-  ASCCMD_ENTRY( szExtSpc, 4, 0, ASCFLAG_COMPARE_GE,   SYSTEMCONTROLMANAGER_DBGCMDS_MODE, CmdExtSpc ),
+  /// initialize the command table
+  const CODE ASCCMDENTRY g_atSysCtrlMngrCmdHandlerTable[ ] =
+  {
+    ASCCMD_ENTRY( szQryMod, 6, 0, ASCFLAG_COMPARE_NONE, 0,                                 CmdQryMod ),
+    ASCCMD_ENTRY( szSetMod, 6, 1, ASCFLAG_COMPARE_NONE, 0,                                 CmdSetMod ),
+    ASCCMD_ENTRY( szEntDag, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,          CmdEntDag ),
+    ASCCMD_ENTRY( szEntMan, 4, 0, ASCFLAG_COMPARE_EQ,   SYSCTRLMNGR_LCLMODE_IDLE,          CmdEntMan ),
+    ASCCMD_ENTRY( szExtSpc, 4, 0, ASCFLAG_COMPARE_GE,   SYSCTRLMNGR_MODE_14_DIAGNOSTICS,   CmdExtSpc ),
 
-  // the entry below must be here
-  ASCCMD_ENDTBL( )
-};
+    // the entry below must be here
+    ASCCMD_ENDTBL( )
+  };
 
-/// define the response strings
-static  const CODE C8 szRspMod[ ]   = { "RMOD, %3d:0x%02X\n\r" };
+  /// define the response strings
+  static  const CODE C8 szRspMod[ ]   = { "RMOD, %3d:0x%02X\n\r" };
 #endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
 
 /******************************************************************************
@@ -266,13 +266,13 @@ static void SetTaskStates( void )
   U16                     wData;
   SYSCTRLMNGRSCHDDEF const*   ptSchdDef;
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-  TaskHandle_t pxTaskHandle;
+    TaskHandle_t pxTaskHandle;
   #else
-  TASKSCHDENUMS	eTaskEnum;      ///< task enumeration
+    TASKSCHDENUMS	eTaskEnum;      ///< task enumeration
   #if ( TASK_TICK_ENABLE == 1 )
-  TASKTICKENUMS eTickEnum;
-  SYSCTRLMNGRTICKDEF const*   ptTickDef;
-  #endif // TASK_TICK_ENABLE
+    TASKTICKENUMS eTickEnum;
+    SYSCTRLMNGRTICKDEF const*   ptTickDef;
+    #endif // TASK_TICK_ENABLE
   #endif // SYSTEMDEFINE_OS_SELECTION
   BOOL                    bState;
   PVSYSCTRLCTRLFUNC       pvCtrlFunc;
@@ -286,9 +286,9 @@ static void SetTaskStates( void )
 
     // get the task/data
     #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-    pxTaskHandle = PGM_RDWORD( ptSchdDef->pxTaskHandle );
+      pxTaskHandle = PGM_RDWORD( ptSchdDef->pxTaskHandle );
     #else
-    eTaskEnum = PGM_RDBYTE( ptSchdDef->eTaskEnum );
+      eTaskEnum = PGM_RDBYTE( ptSchdDef->eTaskEnum );
     #endif // SYSTEMDEFINE_OS_SELECTION
     wData = PGM_RDWORD( ptSchdDef->tModes.wData );
 
@@ -297,26 +297,26 @@ static void SetTaskStates( void )
 
     // call the task disable/enable with the appropriate state
     #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-    if ( pxTaskHandle != NULL )
-    {
-      // suspend or resume the task
-      if ( bState )
+      if ( pxTaskHandle != NULL )
       {
-        // resume task
-        vTaskResume( pxTaskHandle );
+        // suspend or resume the task
+        if ( bState )
+        {
+          // resume task
+          vTaskResume( pxTaskHandle );
+        }
+        else
+        {
+          // suspend task
+          vTaskSuspend( pxTaskHandle );
+        }
       }
-      else
-      {
-        // suspend task
-        vTaskSuspend( pxTaskHandle );
-      }
-    }
     #else
-    if( eTaskEnum != TASK_SCHD_ILLEGAL )
-    {
-      // enable/disable based on state
-      TaskManager_EnableDisable( eTaskEnum, bState );
-    }
+      if( eTaskEnum != TASK_SCHD_ILLEGAL )
+      {
+        // enable/disable based on state
+        TaskManager_EnableDisable( eTaskEnum, bState );
+      }
     #endif // SYSTEMDEFINE_OS_SELECTION
 
     // get the function pointer/if not null/execute with state
@@ -328,47 +328,47 @@ static void SetTaskStates( void )
   }
 
   #if ( TASK_TICK_ENABLE == 1 )
-  // for each item in the table
-  for( nTaskIndex = 0; nTaskIndex < SystemControlManager_GetNumberTickDefs( ); nTaskIndex++ )
-  {
-    // get the entry
-    ptTickDef = &g_atSysCtrlMngrTickDefs[ nTaskIndex ];
-
-    // get the task/data
-    #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-    pxTaskHandle = PGM_RDWORD( ptTickDef->pxTaskHandle );
-    #else
-    eTickEnum = PGM_RDBYTE( ptTickDef->eTaskEnum );
-    #endif // SYSTEMDEFINE_OS_SELECTION
-    wData = PGM_RDWORD( ptTickDef->tModes.wData );
-
-    // calculate the state
-    bState = (( wData & BIT( tStateControl.nCurState )) != 0 ) ? TRUE : FALSE;
-
-    // call the task disable/enable with the appropriate state
-    #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
-    if ( pxTaskHandle != NULL )
+    // for each item in the table
+    for( nTaskIndex = 0; nTaskIndex < SystemControlManager_GetNumberTickDefs( ); nTaskIndex++ )
     {
-      // suspend or resume the task
-      if ( bState )
-      {
-        // resume task
-        vTaskResume( pxTaskHandle );
-      }
-      else
-      {
-        // suspend task
-        vTaskSuspend( pxTaskHandle );
-      }
+      // get the entry
+      ptTickDef = &g_atSysCtrlMngrTickDefs[ nTaskIndex ];
+
+      // get the task/data
+      #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+        pxTaskHandle = PGM_RDWORD( ptTickDef->pxTaskHandle );
+      #else
+        eTickEnum = PGM_RDBYTE( ptTickDef->eTaskEnum );
+      #endif // SYSTEMDEFINE_OS_SELECTION
+      wData = PGM_RDWORD( ptTickDef->tModes.wData );
+
+      // calculate the state
+      bState = (( wData & BIT( tStateControl.nCurState )) != 0 ) ? TRUE : FALSE;
+
+      // call the task disable/enable with the appropriate state
+      #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )
+        if ( pxTaskHandle != NULL )
+        {
+          // suspend or resume the task
+          if ( bState )
+          {
+            // resume task
+            vTaskResume( pxTaskHandle );
+          }
+          else
+          {
+            // suspend task
+            vTaskSuspend( pxTaskHandle );
+          }
+        }
+      #else
+        if( eTickEnum != TASK_TICK_ILLEGAL )
+        {
+          // enable/disable based on state
+          TaskManager_TickEnableDisable( eTickEnum, bState );
+        }
+      #endif // SYSTEMDEFINE_OS_SELECTION
     }
-    #else
-    if( eTickEnum != TASK_TICK_ILLEGAL )
-    {
-      // enable/disable based on state
-      TaskManager_TickEnableDisable( eTickEnum, bState );
-    }
-    #endif // SYSTEMDEFINE_OS_SELECTION
-  }
   #endif // TASK_TICK_ENABLE
 
   // execute the additional entry functions if not null
@@ -462,7 +462,7 @@ static U8 Mode02_Execute( STATEEXECENGARG xArg )
       nNewState = SYSCTRLMNGR_MODE_05_RUN;
       break;
 
-    case SYSCTRLMNGR_MODE_15_MANUFACTURING :
+    case SYSCTRLMNGR_EVENT_GOMANUFACTURING :
       nNewState = SYSCTRLMNGR_MODE_15_MANUFACTURING;
       break;
 
@@ -536,7 +536,7 @@ static U8 Mode04_Execute( STATEEXECENGARG xArg )
     case SYSCTRLMNGR_MODE_11_UNDEF :
     case SYSCTRLMNGR_MODE_12_UNDEF :
     case SYSCTRLMNGR_MODE_13_UNDEF :
-    case SYSCTRLMNGR_MODE_14_UNDEF :
+    case SYSCTRLMNGR_MODE_14_DIAGNOSTICS :
     case SYSCTRLMNGR_MODE_15_MANUFACTURING :
       nNewState = xArg;
       break;
@@ -825,165 +825,165 @@ static U8 Mode15_Execute( STATEEXECENGARG xArg )
 }
 
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-/******************************************************************************
- * @function CmdWryMod
- *
- * @brief querys the current mode
- *
- * This function will query the mode
- *
- * @return  appropriate status
-  *****************************************************************************/
-static ASCCMDSTS CmdQryMod( U8 nCmdEnum )
-{
-  SYSCTRLMGRMODE  eMode;
-  PC8             pcBuffer;
-
-  // fetch it 
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
-
-  // get the current system control mode
-  eMode = SystemControlManager_GetMode( );
-
-  // output the result
-  SPRINTF_P( pcBuffer, ( char const * )szRspMod, eMode, eMode );
-
-  // return status
-  return( ASCCMD_STS_OUTPUTBUFFER );
-}
-
-/******************************************************************************
- * @function CmdSetMod
- *
- * @brief sets the current mode
- *
- * This function will attempt to set the mode
- *
- * @return  appropriate status
-  *****************************************************************************/
-static ASCCMDSTS CmdSetMod( U8 nCmdEnum )
-{
-  ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
-  U32UN           tTemp;
-  SYSCTRLMGRERR   eError;
-  PC8             pcBuffer;
-
-  // fetch it 
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
-
-  // get the address/data
-  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
-
-  // set the mode
-  if (( eError = SystemControlManager_SetMode(( SYSCTRLMGRMODE )tTemp.anValue[ LE_U32_LSB_IDX ] )) != SYSCTRLMNGR_ERROR_NONE )
+  /******************************************************************************
+   * @function CmdWryMod
+   *
+   * @brief querys the current mode
+   *
+   * This function will query the mode
+   *
+   * @return  appropriate status
+    *****************************************************************************/
+  static ASCCMDSTS CmdQryMod( U8 nCmdEnum )
   {
-    // output the error
-    SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
-    eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    SYSCTRLMGRMODE  eMode;
+    PC8             pcBuffer;
+
+    // fetch it 
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+    // get the current system control mode
+    eMode = SystemControlManager_GetMode( );
+
+    // output the result
+    SPRINTF_P( pcBuffer, ( char const * )szRspMod, eMode, eMode );
+
+    // return status
+    return( ASCCMD_STS_OUTPUTBUFFER );
   }
 
-  // return status
-  return( eStatus );
-}
-
-/******************************************************************************
- * @function CmdExtSpc
- *
- * @brief exits the diagnostic mode
- *
- * This function will exit the diagnostic mode
- *
- * @return  nothing
- *****************************************************************************/
-static ASCCMDSTS CmdExtSpc( U8 nCmdEnum )
-{
-  SYSCTRLMGRMODE  eMode;
-  PC8             pcBuffer;
-
-  // fetch it 
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
-
-  // go back ot idle
-  SystemControlManager_SetMode( SYSCTRLMNGR_LCLMODE_IDLE );
-
-  // get the current system control mode
-  eMode = SystemControlManager_GetMode( );
-
-  // output the result
-  SPRINTF_P( pcBuffer, ( char const * )szRspMod, eMode, eMode );
-
-  // change the prompt character
-  AsciiCommandHandler_SetPromptCharacter( nCmdEnum, 0 );
-
-  // return status
-  return( ASCCMD_STS_OUTPUTBUFFER );
-};
-
-/******************************************************************************
- * @function CmdEntDag
- *
- * @brief exits the diagnostic mode
- *
- * This function will exit the diagnostic mode
- *
- * @return  nothing
- *****************************************************************************/
-static  ASCCMDSTS CmdEntDag( U8 nCmdEnum )
-{
-  ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
-  SYSCTRLMGRERR   eError;
-  PC8             pcBuffer;
-
-  // fetch it 
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
-
-  // set the mode
-  if (( eError = SystemControlManager_SetMode( SYSTEMCONTROLMANAGER_DBGCMDS_MODE )) != SYSCTRLMNGR_ERROR_NONE )
+  /******************************************************************************
+   * @function CmdSetMod
+   *
+   * @brief sets the current mode
+   *
+   * This function will attempt to set the mode
+   *
+   * @return  appropriate status
+    *****************************************************************************/
+  static ASCCMDSTS CmdSetMod( U8 nCmdEnum )
   {
-    // output the error
-    SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
-    eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
+    U32UN           tTemp;
+    SYSCTRLMGRERR   eError;
+    PC8             pcBuffer;
+
+    // fetch it 
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+    // get the address/data
+    AsciiCommandHandler_GetValue( nCmdEnum, 0, &tTemp.uValue );
+
+    // set the mode
+    if (( eError = SystemControlManager_SetMode(( SYSCTRLMGRMODE )tTemp.anValue[ LE_U32_LSB_IDX ] )) != SYSCTRLMNGR_ERROR_NONE )
+    {
+      // output the error
+      SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
+      eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    }
+
+    // return status
+    return( eStatus );
   }
 
-  // change the prompt character
-  AsciiCommandHandler_SetPromptCharacter( nCmdEnum, '+' );
-
-  // return status
-  return( eStatus );
-}
-
-/******************************************************************************
- * @function CmdEntMan
- *
- * @brief exits the manual mode
- *
- * This function will exit the diagnostic mode
- *
- * @return  nothing
- *****************************************************************************/
-static ASCCMDSTS CmdEntMan( U8 nCmdEnum )
-{
-  ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
-  SYSCTRLMGRERR   eError;
-  PC8             pcBuffer;
-
-  // fetch it 
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
-
-  // set the mode
-  if (( eError = SystemControlManager_SetMode( SYSCTRLMNGR_LCLMODE_MANUFACTURING )) != SYSCTRLMNGR_ERROR_NONE )
+  /******************************************************************************
+   * @function CmdExtSpc
+   *
+   * @brief exits the diagnostic mode
+   *
+   * This function will exit the diagnostic mode
+   *
+   * @return  nothing
+   *****************************************************************************/
+  static ASCCMDSTS CmdExtSpc( U8 nCmdEnum )
   {
-    // output the error
-    SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
-    eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    SYSCTRLMGRMODE  eMode;
+    PC8             pcBuffer;
+
+    // fetch it 
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+    // go back ot idle
+    SystemControlManager_SetMode( SYSCTRLMNGR_LCLMODE_IDLE );
+
+    // get the current system control mode
+    eMode = SystemControlManager_GetMode( );
+
+    // output the result
+    SPRINTF_P( pcBuffer, ( char const * )szRspMod, eMode, eMode );
+
+    // change the prompt character
+    AsciiCommandHandler_SetPromptCharacter( nCmdEnum, 0 );
+
+    // return status
+    return( ASCCMD_STS_OUTPUTBUFFER );
+  };
+
+  /******************************************************************************
+   * @function CmdEntDag
+   *
+   * @brief exits the diagnostic mode
+   *
+   * This function will exit the diagnostic mode
+   *
+   * @return  nothing
+   *****************************************************************************/
+  static  ASCCMDSTS CmdEntDag( U8 nCmdEnum )
+  {
+    ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
+    SYSCTRLMGRERR   eError;
+    PC8             pcBuffer;
+
+    // fetch it 
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+    // set the mode
+    if (( eError = SystemControlManager_SetMode( SYSCTRLMNGR_MODE_14_DIAGNOSTICS )) != SYSCTRLMNGR_ERROR_NONE )
+    {
+      // output the error
+      SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
+      eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    }
+
+    // change the prompt character
+    AsciiCommandHandler_SetPromptCharacter( nCmdEnum, '+' );
+
+    // return status
+    return( eStatus );
   }
 
-  // change the prompt character
-  AsciiCommandHandler_SetPromptCharacter( nCmdEnum, '@' );
+  /******************************************************************************
+   * @function CmdEntMan
+   *
+   * @brief exits the manual mode
+   *
+   * This function will exit the diagnostic mode
+   *
+   * @return  nothing
+   *****************************************************************************/
+  static ASCCMDSTS CmdEntMan( U8 nCmdEnum )
+  {
+    ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
+    SYSCTRLMGRERR   eError;
+    PC8             pcBuffer;
 
-  // return status
-  return( eStatus );
-}
+    // fetch it 
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+    // set the mode
+    if (( eError = SystemControlManager_SetMode( SYSCTRLMNGR_MODE_15_MANUFACTURING )) != SYSCTRLMNGR_ERROR_NONE )
+    {
+      // output the error
+      SPRINTF_P( pcBuffer, ( char const * )g_szAsciiErrStrn, eError, eError );
+      eStatus = ASCCMD_STS_OUTPUTBUFFER;
+    }
+
+    // change the prompt character
+    AsciiCommandHandler_SetPromptCharacter( nCmdEnum, '@' );
+
+    // return status
+    return( eStatus );
+  }
 #endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
 
 /**@} EOF SystemControlManager.c */

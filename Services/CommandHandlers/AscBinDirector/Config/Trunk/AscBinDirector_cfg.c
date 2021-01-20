@@ -42,7 +42,7 @@
 // local function prototypes --------------------------------------------------
 
 // constant parameter initializations -----------------------------------------
-const CODE ASCBINDEF  atAscBinDirectDefs[ ASCBINDIR_ENUM_MAX ] =
+const CODE ASCBINDEF  g_atAscBinDirectDefs[ ASCBINDIR_ENUM_MAX ] =
 {
   // add entries to the table here
   // ASCBINENTRY( ascprot, binprot )

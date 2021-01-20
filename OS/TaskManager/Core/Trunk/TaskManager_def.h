@@ -55,10 +55,10 @@
   static TASKARG at ## bufname ## Events[ size ]
   
 /// define the time macros
-#define TASK_TIME_USECS( a )  ( a )
-#define TASK_TIME_MSECS( a )  ( a * 1000 )
-#define TASK_TIME_SECS( a )   ( a * 1000 * 1000 )
-#define TASK_TIME_MINS( a )   ( a * 1000 * 1000 * 60 )
+#define TASK_TIME_USECS( a )  _UL_( a )
+#define TASK_TIME_MSECS( a )  _UL_( a * 1000 )
+#define TASK_TIME_SECS( a )   _UL_( a * 1000 * 1000 )
+#define TASK_TIME_MINS( a )   _UL_( a * 1000 * 1000 * 60 )
 
 /// determine the event argument size
 #if ( TASK_TSKARG_SIZE_BYTES == 1 )

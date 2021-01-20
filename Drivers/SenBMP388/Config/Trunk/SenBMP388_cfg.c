@@ -27,7 +27,7 @@
 #include "SenBMP388/SenBMP388.h"
 
 // library includes -----------------------------------------------------------
-#Include "I2C/I2c.h"
+//#Include "I2C/I2c.h"
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -42,10 +42,11 @@
 // local function prototypes --------------------------------------------------
 
 // constant parameter initializations -----------------------------------------
-const CODE SENBMP388CONFIG  g_tSenBMP388Config
+const CODE SENBMP388CONFIG  g_tSenBMP388Config =
 {
   // populate this structure using the helper macro
   // SENBMP388CONFIGM( mode, presssamprate, tempsamprate, datarate, filtcoeef, irqpin ) 
+  SENBMP388CONFIGM( SENBMP388_MODE_NONBLKNORMAL, SENBMP388_OVER_SAMPRATE_32, SENBMP388_OVER_SAMPRATE_32, SENBMP388_OUTPUT_DATRATE_40MSEC, SENBMP388_FILTCOEEF_127, SENBMP388_IRQDEF_ODLO ) 
 };
 
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
@@ -83,7 +84,7 @@ void SenBMP388_ProcessIrqCallback( U8 nIrq, BOOL bState )
 {
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
   // post the event
-  TaskManager_PostIrqEvent( SENBMP388_DATAREADY_TASKENUM, SENBMP388_DATAREADY_EVENT );
+  TaskManager_PostEventIrq( SENBMP388_DATAREADY_TASKENUM, SENBMP388_DATAREADY_EVENT );
   #endif // ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 }
 
@@ -102,7 +103,7 @@ void SenBMP388_ProcessIrqCallback( U8 nIrq, BOOL bState )
  * @return      TRUE if no errors, FALSE otherwise
  *
  *****************************************************************************/
-BOOL SenBMP388_ReadRegisters( U8 nBaseReg, PU8 pnData, U8 nLength )
+BOOL SenBMP388_Read( U8 nBaseReg, PU8 pnData, U8 nLength )
 {
   BOOL bStatus = FALSE;
   
@@ -111,7 +112,7 @@ BOOL SenBMP388_ReadRegisters( U8 nBaseReg, PU8 pnData, U8 nLength )
 }
 
 /******************************************************************************
- * @function SenBMP388_WriteRegisters
+ * @function SenBMP388_WriteRegister
  *
  * @brief write registers from the device
  *
@@ -120,17 +121,30 @@ BOOL SenBMP388_ReadRegisters( U8 nBaseReg, PU8 pnData, U8 nLength )
  *
  * @param[in]   nBaseReg        base register
  * @param[in]   pnData          pointer to the data
- * @param[in]   nLength         length of the data
  *
  * @return      TRUE if no errors, FALSE otherwise
  *
  *****************************************************************************/
-BOOL SenBMP388_WriteRegisters( U8 nBaseReg, PU8 pnData, U8 nLength )
+BOOL SenBMP388_Write( U8 nBaseReg, PU8 pnData )
 {
   BOOL bStatus = FALSE;
   
   // return the status
   return( bStatus );
+}
+
+/******************************************************************************
+ * @function SenBMP388_DelayMsec
+ *
+ * @brief delay for some milliseconds
+ *
+ * This function will call the appropriae delay routine
+*
+ * @param[in]   wDelay    delay in milliseconds
+*
+ *****************************************************************************/
+void SenBMP388_DelayMsec( U16 wDelay )
+{
 }
 
 /**@} EOF SenBMP388_cfg.c */

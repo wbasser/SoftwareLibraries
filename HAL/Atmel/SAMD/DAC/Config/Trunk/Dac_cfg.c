@@ -37,7 +37,7 @@
 // structures -----------------------------------------------------------------
 
 // global parameter declarations ----------------------------------------------
-const DACDEF tDacDef =
+const DACDEF g_tDacDef =
 {
   .bExtOutEnable = OFF, 
   .bIntOutEnable = OFF,

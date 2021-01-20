@@ -22,42 +22,71 @@
  *****************************************************************************/
 
 // local includes -------------------------------------------------------------
-#include "SystemTick/SystemTick_prm.h"
 #include "SystemTick/SystemTick.h"
 
 // library includes -----------------------------------------------------------
+#include "SystemConfig/SystemConfig_prm.h"
 #include "Timers/Timers.h"
 
 // Macros and Defines ---------------------------------------------------------
 #if ( SYSTEMTICK_TIMER_SELECTED == SYSTEMTICK_TIMER_0 )
   #define TIMER_SIZE          ( TIMER_SIZE_8BIT )
   #define TIMER_MODE          ( TIMER_MODE8_CTC )
-  #if ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_1000HZ )
-    #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV64 )
-    #define TIMER_RELOAD      ( F_CPU / 64 / 1000 )
-    #define SYSTEMRICK_MS     ( 1 )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_500HZ )
-    #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV64 )
-    #define TIMER_RELOAD      ( F_CPU / 64 / 500 )
-    #define SYSTEMRICK_MS     ( 2 )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_200HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_100HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_40HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_20HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_10HZ )
+  #if ( SYSTEM_CONFIG_CPUFREQ_SELECTED == SYSTEM_CONFIG_CPUFREQ_8MHZ )
+    #if ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_1000HZ )
+      #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV64 )
+      #define TIMER_RELOAD      ( SYSTEM_CONFIG_CPUFREQ_SELECTED / 64 / 1000 )
+      #define SYSTEMTICK_MS     ( 1 )
+    #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_500HZ )
+      #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV64 )
+      #define TIMER_RELOAD      ( SYSTEM_CONFIG_CPUFREQ_SELECTED / 64 / 500 )
+      #define SYSTEMTICK_MS     ( 2 )
+    #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_200HZ )
+      #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV256 )
+      #define TIMER_RELOAD      ( SYSTEM_CONFIG_CPUFREQ_SELECTED / 256 / 200  )
+      #define SYSTEMTICK_MS     ( 5 )
+    #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_100HZ )
+      #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV256 )
+      #define TIMER_RELOAD      ( SYSTEM_CONFIG_CPUFREQ_SELECTED / 256 / 100 )
+      #define SYSTEMTICK_MS     ( 10 )
+    #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_40HZ )
+      #define TIMER_PRESCALE    ( TIMER_PRESCALE80_DIV1024 )
+      #define TIMER_RELOAD      ( SYSTEM_CONFIG_CPUFREQ_SELECTED / 1024 / 40 )
+      #define SYSTEMTICK_MS     ( 25 )
+    #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_20HZ )
+      #error Tick rate can not be acheived with CPU frequency!
+    #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_10HZ )
+      #error Tick rate can not be acheived with CPU frequency!
+    #else
+      #error  Illegal system tick rate selection!
+    #endif
+  #elif ( SYSTEMTICK_TIMER_SELECTED == SYSTEMTICK_TIMER_1 )
+    #if ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_1000HZ )
+    #error Not implemented yet!
+      #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_500HZ )
+    #error Not implemented yet!
+      #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_200HZ )
+    #error Not implemented yet!
+      #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_100HZ )
+    #error Not implemented yet!
+      #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_40HZ )
+    #error Not implemented yet!
+      #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_20HZ )
+    #error Not implemented yet!
+      #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_10HZ )
+    #else
+      #error  Illegal system tick rate selection!
+    #endif
+  #elif (( SYSTEM_CONFIG_CPUFREQ_SELECTED == SYSTEM_CONFIG_CPUFREQ_4MHZ )
+    #error Not implemented yet!
+  #elif (( SYSTEM_CONFIG_CPUFREQ_SELECTED == SYSTEM_CONFIG_CPUFREQ_2MHZ )
+    #error Not implemented yet!
+  #elif (( SYSTEM_CONFIG_CPUFREQ_SELECTED == SYSTEM_CONFIG_CPUFREQ_1MHZ )
+    #error Not implemented yet!
+  #elif (( SYSTEM_CONFIG_CPUFREQ_SELECTED == SYSTEM_CONFIG_CPUFREQ_USER )
+    #error Not implemented yet!
   #else
-    #error  Illegal system tick rate selection!
-  #endif
-#elif ( SYSTEMTICK_TIMER_SELECTED == SYSTEMTICK_TIMER_1 )
-  #if ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_1000HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_500HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_200HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_100HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_40HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_20HZ )
-  #elif ( SYSTEMTICK_RATE_SELECTED == SYSTEMTICK_RATE_10HZ )
-  #else
-    #error  Illegal system tick rate selection!
+    #error Not implemented yet!
   #endif
 #else
   #error  Illegal system tick timer selection!
@@ -113,7 +142,7 @@ static void TickHandler( TIMERCBEVENT eTimeEvent, U16 wData )
   if ( pvLclCallback != NULL )
   {
     // if not execute it
-    pvLclCallback( SYSTEMRICK_MS );
+    pvLclCallback( SYSTEMTICK_MS );
   }
 }
  

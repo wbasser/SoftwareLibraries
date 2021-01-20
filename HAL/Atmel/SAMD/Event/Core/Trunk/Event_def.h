@@ -149,9 +149,9 @@ typedef enum _EVENTGEN
   #endif // __SAM_D10_SUBFAMILY
   EVENT_GEN_ADC_RESRDY,       ///< ADC result ready
   EVENT_GEN_ADC_WINMON,       ///< ADC window monitor
-  EVENT_GEN_ADC_COMP0,        ///< ADC comparator 0
-  EVENT_GEN_ADC_COMP1,        ///< ADC comparator 1
-  EVENT_GEN_ADC_WIN0,         ///< ADC window 0
+  EVENT_GEN_AC_COMP0,         ///< AC comparator 0
+  EVENT_GEN_AC_COMP1,         ///< AC comparator 1
+  EVENT_GEN_AC_WIN0,          ///< AC window 0
   EVENT_GEN_DAC_EMPTY,        ///< DAC empty
   EVENT_GEN_PTC_EOC,          ///< PTC end of conversion
   EVENT_GEN_PTC_WCOMP,        ///< window comparator

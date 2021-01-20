@@ -27,6 +27,9 @@
 #include "RedirectionManager/RedirectionManager.h"
 
 // library includes -----------------------------------------------------------
+#if ( REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+  #include "SystemControlManager/SystemControlManager.h"
+#endif  // REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS
 
 // Macros and Defines ---------------------------------------------------------
 /// define the exit character
@@ -42,6 +45,25 @@
 static  REDIRECTENUM  aeDestinations[ REDIRECT_ENUM_MAX ];
 
 // local function prototypes --------------------------------------------------
+/// command handlers
+#if ( REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+  static  ASCCMDSTS CmdRedirect( U8 nCmdEnum );
+#endif  // REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS
+
+// constant parameter initializations -----------------------------------------
+// commands
+#if ( REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+  static  const CODE C8 szRedirect[ ]   = { "REDIRECT" };
+
+  // declare the table
+  const CODE ASCCMDENTRY g_atRedirectionManagerDbgCmdTable[ ] = 
+  {
+    ASCCMD_ENTRY( szRedirect, 8, 2, ASCFLAG_COMPARE_NONE, 0, CmdRedirect ),
+
+    // the entry below must be here
+    ASCCMD_ENDTBL( )
+  };
+#endif  // REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS
 
 // constant parameter initializations -----------------------------------------
 
@@ -114,7 +136,7 @@ BOOL RedirectionManager_SetRedirect( REDIRECTENUM eSrc, REDIRECTENUM eDst )
 BOOL RedirectionManager_RedirectChar( REDIRECTENUM eSrc, U8 nChar )
 {
   BOOL          bRedirected = FALSE;
-  REDIRECTENUM    eDst;
+  REDIRECTENUM  eDst;
   PVREDIRECTOUT pvRedirectOut;
 
   // check for valid redirection
@@ -136,7 +158,7 @@ BOOL RedirectionManager_RedirectChar( REDIRECTENUM eSrc, U8 nChar )
       bRedirected = TRUE;
 
       // get the re-direction handler
-      pvRedirectOut = ( PVREDIRECTOUT )PGM_RDWORD( &g_apvRedirectOuts[ eDst ] );
+      pvRedirectOut = ( PVREDIRECTOUT )PGM_RDWORD( g_apvRedirectOuts[ eDst ] );
       if ( pvRedirectOut != NULL )
       {
         // call it
@@ -148,5 +170,33 @@ BOOL RedirectionManager_RedirectChar( REDIRECTENUM eSrc, U8 nChar )
   // return the redirection staus
   return( bRedirected );
 }
+
+#if ( REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
+static  ASCCMDSTS CmdRedirect( U8 nCmdEnum )
+{
+  ASCCMDSTS     eStatus = ASCCMD_STS_NONE;
+  U32UN         tValue;
+  REDIRECTENUM  eSrc, eDst;
+  PC8           pcBuffer;
+
+  // get the buffer
+  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+
+  // get the source,destination
+  AsciiCommandHandler_GetValue( nCmdEnum, 0, &tValue.uValue );
+  eSrc = tValue.anValue[ LE_U32_LSB_IDX ];
+  AsciiCommandHandler_GetValue( nCmdEnum, 1, &tValue.uValue );
+  eDst = tValue.anValue[ LE_U32_LSB_IDX ];
+  if ( RedirectionManager_SetRedirect( eSrc, eDst ))
+  {
+    // report error
+    sprintf( pcBuffer, ( PCC8 )g_szAsciiErrStrn, 0xFF, 0xFF );
+    AsciiCommandHandler_OutputBuffer( nCmdEnum );
+  }
+
+  // return the status
+  return( eStatus );
+}
+#endif  // REDIRECTIONMANAGER_ENABLE_DEBUG_COMMANDS
 
 /**@} EOF RedirectionManager.c */

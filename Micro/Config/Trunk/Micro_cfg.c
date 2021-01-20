@@ -26,7 +26,9 @@
 // library includes -------------------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
   #include "TaskManager/TaskManager.h"
-#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER
+#elif ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKSCHEDULER )
+  #include "TaskScheduler/TaskScheduler.h"
+#endif // SYSTEMDEFINE_OS_SELECTION
 
 // include HAL files
 
@@ -47,7 +49,7 @@
 // structures -----------------------------------------------------------------
 
 // global parameter declarations ----------------------------------------------
-#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL ) && ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_TASKSCHEDULER )
 /// initialization function - interrupts disabled
 const CODE PVMICROINITFUNC g_apvInitIrqDsbFunctions[ ] = 
 {
@@ -84,7 +86,7 @@ const CODE PVMICROIDLEFUNC g_apvIdleFunctions[ ] =
   // add idle functions here
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
     TaskManager_IdleProcess,
-  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER
+  #endif // SYSTEMDEFINE_OS_SELECTION
 
   // do not remove this entry
   NULL
@@ -115,7 +117,7 @@ BOOL Micro_CheckTasksPending( void )
   
   #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
     bResult = TaskManager_CheckTasksPending( );
-  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER
+  #endif // SYSTEMDEFINE_OS_SELECTION
 
   // return the result
   return( bResult );
@@ -169,6 +171,9 @@ void  Micro_LocalIrqInitialize( void )
  *****************************************************************************/
 void Micro_LocalIdle(void)
 {
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKSCHEDULER )
+    TaskScheduler_IdleProcess( );
+  #endif // SYSTEMDEFFIN_OS_SELECTON
 }
 
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS )

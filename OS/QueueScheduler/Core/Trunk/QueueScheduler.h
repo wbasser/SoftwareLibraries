@@ -28,9 +28,10 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "TaskScheduler/TaskScheduler.h"
+#include "QueueScheduler/QueueScheduler_prm.h"
 
 // library includes -----------------------------------------------------------
+#include "TaskScheduler/TaskScheduler.h"
 
 // Macros and Defines ---------------------------------------------------------
 
@@ -61,15 +62,27 @@ typedef PVOID   PQUEUESCHEDULERHANDLE;
 
 // global function prototypes --------------------------------------------------
 extern	void									QueueScheduler_Initialize( void );
-extern  PQUEUESCHEDULERHANDLE	QueueScheduler_Creat( PTASKSCHEDULERHANDLE ptTask, U8 nNumEntries, U16 wEntrySize, BOOL bEmptyEnb, BOOL bPutEnb, BOOL bGetEnb, BOOL bFullEnb );
-extern  QUEUESTATUS 					QueueScheduler_PutHead( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
-extern  QUEUESTATUS 					QueueScheduler_PutTail( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
+extern  PQUEUESCHEDULERHANDLE	QueueScheduler_Create( PTASKSCHEDULERHANDLE ptTask, U8 nNumEntries, U16 wEntrySize, BOOL bEmptyEnb, BOOL bPutEnb, BOOL bGetEnb, BOOL bFullEnb );
 extern  QUEUESTATUS 					QueueScheduler_Get( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
-extern  QUEUESTATUS 					QueueScheduler_Peek( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
-extern  QUEUESTATUS 					QueueScheduler_Pop( PQUEUESCHEDULERHANDLE ptQueue );
-extern  QUEUESTATUS 					QueueScheduler_Flush( PQUEUESCHEDULERHANDLE ptQueue );
-extern  QUEUESTATUS 					QueueScheduler_GetRemaining( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnRemaining );
-extern  QUEUESTATUS 					QueueScheduler_GetStatus( PQUEUESCHEDULERHANDLE ptQueue );  
+extern  QUEUESTATUS 					QueueScheduler_PutTail( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
+#if ( QUEUESCHEDULER_INCLUDE_PUTHEAD == TRUE )
+  extern  QUEUESTATUS 					QueueScheduler_PutHead( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
+#endif
+#if ( QUEUESCHEDULER_INCLUDE_PEEK == TRUE )
+  extern  QUEUESTATUS 					QueueScheduler_Peek( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnEntry );
+#endif
+#if ( QUEUESCHEDULER_INCLUDE_POP == TRUE )
+  extern  QUEUESTATUS 					QueueScheduler_Pop( PQUEUESCHEDULERHANDLE ptQueue );
+#endif
+#if ( QUEUESCHEDULER_INCLUDE_FLUSH == TRUE )
+  extern  QUEUESTATUS 					QueueScheduler_Flush( PQUEUESCHEDULERHANDLE ptQueue );
+#endif
+#if ( QUEUESCHEDULER_INCLUDE_GETREMAINING == TRUE )
+  extern  QUEUESTATUS 					QueueScheduler_GetRemaining( PQUEUESCHEDULERHANDLE ptQueue, PU8 pnRemaining );
+#endif
+#if ( QUEUESCHEDULER_INCLUDE_GETSTATUS == TRUE )
+  extern  QUEUESTATUS 					QueueScheduler_GetStatus( PQUEUESCHEDULERHANDLE ptQueue );  
+#endif
 
 /**@} EOF QueueScheduler.h */
 

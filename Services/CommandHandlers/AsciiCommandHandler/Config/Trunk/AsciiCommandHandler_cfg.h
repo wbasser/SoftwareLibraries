@@ -46,7 +46,7 @@ typedef enum _ASCCMDENUM
 } ASCCMDENUM;
 
 // global parameter declarations -----------------------------------------------
-extern  const CODE  ASCCMDDEF   atAscCmdDefs[ ASCCMD_ENUM_MAX ];
+extern  const CODE  ASCCMDDEF   g_atAscCmdDefs[ ASCCMD_ENUM_MAX ];
 
 
 /**@} EOF AsciiCommandHandler_cfg.h */

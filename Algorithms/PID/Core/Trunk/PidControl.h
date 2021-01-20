@@ -38,14 +38,14 @@
 // Macros and Defines ---------------------------------------------------------
 /// set the argument size
 #if ( PIDCONTROL_ARG_TYPE == PIDCONTROL_ARGTYPE_FLOAT )
-	typedef FLOAT PIDARG;
+	typedef FLOAT PIDCONTROLARG;
 #elif ( PIDCONTROL_ARG_TYPE == PIDCONTROL_ARGTYPE_INTEGER )
   #if ( PIDCONTROL_INTARG_SIZE_BYTES == 1 )
-    typedef S8    PIDARG;
+    typedef S8    PIDCONTROLARG;
   #elif ( PIDCONTROL_INTARG_SIZE_BYTES == 2 )
-    typedef S16   PIDARG;
+    typedef S16   PIDCONTROLARG;
   #elif ( PIDCONTROL_INTARG_SIZE_BYTES == 4 )
-    typedef S32   PIDARG;
+    typedef S32   PIDCONTROLARG;
   #else
     #error illegal PID integer argument length
   #endif
@@ -54,24 +54,32 @@
 #endif // PIDCONTROL_ARG_TYPE
 
 // structures -----------------------------------------------------------------
-/// enumerate the typedef structure
-typedef struct _PIDCTRL
+/// define the definition structure
+typedef struct _PIDCONTROLDEF
 {
-  PIDARG  xLastError;       ///< last error
-  PIDARG  xTotalError;      ///< total error
-  PIDARG  xCurError;        ///< current error
-  PIDARG  xKp;              ///< proportional coefficient
-  PIDARG  xKi;              ///< integral coefficient
-  PIDARG  xKd;              ///< derivative coefficient
-  PIDARG  xLd;              ///< limit doeefficient
-  PIDARG  xMinOutput;       ///< minimum output level
-  PIDARG  xMaxOutput;       ///< maximum output level
-} PIDCTRL, *PPIDCTRL;
-#define PIDCTRL_SIZE      sizeof( PIDCTRL )
+  PIDCONTROLARG  xKp;              ///< proportional coefficient
+  PIDCONTROLARG  xKi;              ///< integral coefficient
+  PIDCONTROLARG  xKd;              ///< derivative coefficient
+  PIDCONTROLARG  xLd;              ///< limit doeefficient
+  PIDCONTROLARG  xMinOutput;       ///< minimum output level
+  PIDCONTROLARG  xMaxOutput;       ///< maximum output level
+} PIDCONTROLDEF, *PPIDCONTROLDEF;
+#define PIDCONTROLDEF_SIZE                      sizeof( PIDCONTROLDEF )
+
+
+/// define the controls structure
+typedef struct _PIDCONTROLVAR
+{
+  PIDCONTROLARG  xLastError;       ///< last error
+  PIDCONTROLARG  xTotalError;      ///< total error
+  PIDCONTROLARG  xCurError;        ///< current error
+  PIDCONTROLDEF  tDefs;            ///< definitions
+} PIDCONTROLVAR, *PPIDCONTROLVAR;
+#define PIDCONTROLVAR_SIZE                            sizeof( PIDCONTROLVAR )
 
 // global function prototypes --------------------------------------------------
-extern  void    PidControl_Initialize( void );
-extern  PIDARG  PidControl_Process( PPIDCTRL ptPidCtl, PIDARG xSetPoint, PIDARG xProcVar );
+extern  void            PidControl_Initialize( void );
+extern  PIDCONTROLARG   PidControl_Process( PPIDCONTROLVAR ptPidCtl, PIDCONTROLARG xSetPoint, PIDCONTROLARG xProcVar );
 
 /**@} EOF PidControl.h */
 

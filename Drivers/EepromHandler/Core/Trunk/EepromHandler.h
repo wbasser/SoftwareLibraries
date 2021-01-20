@@ -28,20 +28,20 @@
 #define _EEPROMHANDLER_H
 
 // system includes ------------------------------------------------------------
-#include "Types/Types.h"
 
 // local includes -------------------------------------------------------------
-//#if  (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
 #include "EepromHandler/Eepromhandler_cfg.h"
-//#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 
 // library includes -----------------------------------------------------------
+#include "Types/Types.h"
 #if ( EEPROMHANDLER_ENABLE_EMULATION == 0 )
 #include "I2C/I2c.h"
 #endif // EEPROMHANDLER_ENABLE_EMULATION
 #if ( EEPROMHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
 #include "AsciiCommandHandler/AsciiCommandHandler.h"
 #endif // EEPROMHANDLER_ENABLE_DEBUGCOMMANDS
+
+// Macros and Defines ---------------------------------------------------------
 #if ( EEPROMHANDLER_ENABLE_BACKGROUND_WRITES == 1 )
 #include "TaskManager/TaskManager.h"
 #endif // EEPROMHANDLER_ENABLE_BACKGROUND_WRITES

@@ -34,12 +34,6 @@
 
 // Macros and Defines ---------------------------------------------------------
 
-/// define the number of queue events
-#define MANCHESTERCODEC_QUEUE_SIZE        ( 16 )
-
-/// define the number of events
-#define MANCHESTERCODEC_NUM_EVENTS        ( MANCHESTERCODEC_QUEUE_SIZE + 4 )
-
 // enumerations ---------------------------------------------------------------
 
 // structures -----------------------------------------------------------------
@@ -47,12 +41,16 @@
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern  void  ManchesterCodec_Initialize( void );
-extern  BOOL  ManchesterCodec_ProcessEvent( TASKARG xArg );
-extern  void  ManchesterCodec_Xmit( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum );
-extern  void  ManchesterCodec_Recv( PU8 pnData, U8 nLength, TASKSCHDENUMS eTaskEnum );
+#if ( MANCHESTERCODEC_ENALBE_DYNAMICINIT == OFF )
+  extern  void  ManchesterCodec_Initialize( void );
+#else
+  extern  void  ManchesterCodec_Initialize( PMANCHESTERCODECDEF ptDef );
+#endif // MANCHESTERCODEC_ENALBE_DYNAMICINIT
+extern  void  ManchesterCodec_Xmit( PU8 pnData, U8 nLength );
+extern  void  ManchesterCodec_Recv( PU8 pnData, U8 nLength );
 extern  void  ManchesterCodec_StopRecv( void );
 extern  void  ManchesterCodec_ProcessXmtTimer( void );
+extern  void  ManchesterCodec_ProcessReceive( BOOL bTimeout, U16 wBitTime, MANCHESTERCODECEDGE eEdge );
 
 /**@} EOF ManchesterCodec.h */
 

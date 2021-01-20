@@ -34,6 +34,13 @@
 #include "GPIO/Gpio.h"
 
 // enumerations ---------------------------------------------------------------
+/// enumerate the error values
+typedef enum _SPIERR
+{
+  SPI_ERR_NONE = 0,         ///< no error
+  SPI_ERR_ILLDEV = 0xE0,    ///< illegal device
+} SPIERR;
+
 /// enumerate the SPI channels
 typedef enum _SPICHAN
 {
@@ -92,6 +99,9 @@ typedef enum _SPIMOSISCLKSEL
 } SPIMOSISCLKSEL;
 
 // structures -----------------------------------------------------------------
+/// define the task handle
+typedef PVOID   PVSPIHANDLE;
+
 /// define the structure for defining the SPI
 typedef struct _SPIDEF
 {
@@ -110,9 +120,9 @@ typedef struct _SPIDEF
 #define SPIDEF_SIZE               sizeof( SPIDEF )
 
 // global function prototypes --------------------------------------------------
-extern  void    Spi_Initialize( PSPIDEF ptDef );
-extern  void    Spi_Write( SPICHAN eChan, PU8 pnBuffer, U16 wSize, BOOL bStoreRead );
-extern  void    Spi_Read( SPICHAN eChan, U8 nOutData, PU8 pnBuffer, U16 wSize );
+extern  PVSPIHANDLE Spi_Configure( PSPIDEF ptDef );
+extern  SPIERR      Spi_Write( PVSPIHANDLE pvHandle, PU8 pnBuffer, U16 wSize, BOOL bStoreRead );
+extern  SPIERR      Spi_Read( PVSPIHANDLE pvHandle, U8 nOutData, PU8 pnBuffer, U16 wSize );
 
 /**@} EOF Spi.h */
 

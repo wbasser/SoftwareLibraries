@@ -56,7 +56,7 @@ void SystemTick_Initialize( U32 uTickRateHz, PVSYSTEMTICKFUNC pvCallback )
   
   // initialize the system tick counter
   SysTick->CTRL = 0;
-  SysTick->LOAD = Clock_GetFreq( ) / uTickRateHz;
+  SysTick->LOAD = Clock_GetSysFreq( ) / uTickRateHz;
   SysTick->VAL  = 0;
   SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
 
@@ -69,6 +69,20 @@ void SystemTick_Initialize( U32 uTickRateHz, PVSYSTEMTICKFUNC pvCallback )
 #else
   wTickRateMsec = 1000 / uTickRateHz;
 #endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
+}
+
+/******************************************************************************
+ * @function SystemTick_Close
+ *
+ * @brief diable he system tick
+ *
+ * This function disables the system tick 
+ * 
+ *****************************************************************************/
+void  SystemTick_Close( void )
+{
+  // turn off the system tick
+  SysTick->CTRL = 0;
 }
 
 #if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
@@ -180,7 +194,6 @@ void SysTick_Handler( void )
 #else
   pvTickFunc( wTickRateMsec );
 #endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
-
 }
  
 /**@} EOF SystemTick.c */

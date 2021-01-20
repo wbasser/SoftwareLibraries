@@ -34,17 +34,16 @@
 #include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the process rate/number events
-#define BTNMNGR_PROCESS_RATE        ( TASK_TIME_MSECS( BTNMNGR_PROCESS_RATE_MSECS ))
-#define BTNMNGR_PROCESS_NUMEVENTS   ( 4 )
 
 // define the extraction macros for getting key/event
-#if ( TASKARG_SIZE_BYTES == 1 )
-#define BTNMNGR_GET_EVENT( taskarg )  ( taskarg >> EVENT_SHIFT_CNT )
-#define BTNMNGR_GET_KEY( taskarg )    ( taskarg & EVENT_KEY_MASK ) 
+#if ( TASK_TSKARG_SIZE_BYTES == 1 )
+#define BTNMNGR_GET_EVENT( taskarg )      ( taskarg >> EVENT_SHIFT_CNT )
+#define BTNMNGR_GET_KEY( taskarg )        ( taskarg & EVENT_KEY_MASK ) 
+#define BTNMNGR_MAKE_EVENT( event, key )  (( event << EVENT_SHIFT_CNT ) | key )
 #else
-#define BTNMNGR_GET_EVENT( taskarg )  ( taskarg >> 8 )
-#define BTNMNGR_GET_KEY( taskarg )    ( taskarg & 0xFF )
+#define BTNMNGR_GET_EVENT( taskarg )      ( HI16( taskarg ))
+#define BTNMNGR_GET_KEY( taskarg )        ( LO16( taskarg ))
+#define BTNMNGR_MAKE_EVENT( event, key )  ( MAKEU16( event, key ))
 #endif
 
 // enumerations ---------------------------------------------------------------

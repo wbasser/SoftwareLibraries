@@ -35,7 +35,12 @@
 
 // library includes -----------------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-#inclde "TaskManager/TaskManager.h"
+#include "TaskManager/TaskManager.h"
+#endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER
+
+// macros/defines -------------------------------------------------------------
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+#define SYSTEMMONITOR_TRANSMIT_NUM_EVENTS               ( 2 )
 #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER
 
 // enumerations ---------------------------------------------------------------
@@ -54,8 +59,10 @@ extern  const CODE SYSMONENTDEF atSysMonDefs[ ];
 
 // global function prototypes --------------------------------------------------
 extern  void  SystemMonitor_LocalInitialize( void );
+extern  void  SystemMonitor_EnableDisableTask( BOOL bState );
+extern  void  SystemMonitor_SetScanTaskTime( U16 wTaskTime );
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
-extern  BOOL SystemMonitor_ScanTask( TASKARG xArg );
+extern  BOOL  SystemMonitor_ScanTask( TASKARG xArg );
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 /**@} EOF SystemMonitor_cfg.h */

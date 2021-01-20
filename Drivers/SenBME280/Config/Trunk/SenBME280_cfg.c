@@ -27,15 +27,15 @@
 #include "SenBME280/SenBME280.h"
 
 // library includes -----------------------------------------------------------
-
+#include "I2C/I2c.h"
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_FREERTOS )
-// OS includes ----------------------------------------------------------------
-//#include "FreeRTOS/FreeRTOSInclude.h"
+  // OS includes ----------------------------------------------------------------
+  //#include "FreeRTOS/FreeRTOSInclude.h"
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 // Macros and Defines ---------------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_FREERTOS )
-//#define SENBME280_SCAN_TASK_PRIORITY      ( tskIDLE_PRIORITY + 1 )
+  //#define SENBME280_SCAN_TASK_PRIORITY      ( tskIDLE_PRIORITY + 1 )
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 // enumerations ---------------------------------------------------------------
@@ -48,7 +48,7 @@
 
 // local function prototypes --------------------------------------------------
 #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_FREERTOS )
-//static void ScanTask( PVOID pvParameters );
+  static void ScanTask( PVOID pvParameters );
 #endif // SYSTEMDEFINE_OS_SELECTION
 
 // constant parameter initializations -----------------------------------------
@@ -63,13 +63,83 @@
  *****************************************************************************/
 void SenBME280_LocalInitialize( void )
 {
-//  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_FREERTOS )
-//  // create the animation task
-//  xTaskCreate( ScanTask, "SenBME280Scan", configMINIMAL_STACK_SIZE, NULL, SENBME280_SCAN_TASK_PRIORITY, NULL );
-//  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
+  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_FREERTOS )
+  // create the animation task
+    xTaskCreate( ScanTask, "SenBME280Scan", configMINIMAL_STACK_SIZE, NULL, SENBME280_SCAN_TASK_PRIORITY, NULL );
+  #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_FREERTOS
 }
- 
- #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_USE_TASKMANAGER )
+
+/******************************************************************************
+ * @function SenBME280_WriteRegister
+ *
+ * @brief write a register
+ *
+ * This function will write the passed value to the selected register
+ *
+ * @param[in]   nRegister       register to write
+ * @param[in]   nData           data to write
+ *
+ * @return      FALSE if no errors, TRUE otherwise
+ *
+ *****************************************************************************/
+BOOL SenBME280_WriteRegister( U8 nRegister, U8 nData )
+{
+  BOOL      bErrDet;
+  I2CERR    eI2cErr;
+  I2CXFRCTL tXfrCtl;  
+
+  // set up for write
+  tXfrCtl.nDevAddr = SENSENBME280_DEV_ADDR;
+  tXfrCtl.tAddress.anValue[ LE_U32_LSB_IDX ] = nRegister;
+  tXfrCtl.nAddrLen = 1;
+  tXfrCtl.pnData = &nData;
+  tXfrCtl.wDataLen = sizeof( U8 );
+  tXfrCtl.uTimeout = 100;
+  eI2cErr = I2c_Write( I2C_LCLBUS, &tXfrCtl );
+  
+  // set the error
+  bErrDet = ( eI2cErr == I2C_ERR_NONE ) ? FALSE : TRUE;
+  
+  // return the status
+  return( bErrDet );
+}
+
+/******************************************************************************
+ * @function SenBME280_ReadRegisters
+ *
+ * @brief read a registers
+ *
+ * This function will read the passed value to the selected register
+ *
+ * @param[in]   nRegisters       register to write
+ * @param[in]   pnData           data to write
+ *
+ * @return      FALSE if no errors, TRUE otherwise
+ *
+ *****************************************************************************/
+BOOL SenBME280_ReadRegisters( U8 nRegister, PU8 pnData, U8 nLength )
+{
+  BOOL      bErrDet;
+  I2CERR    eI2cErr;
+  I2CXFRCTL tXfrCtl;  
+
+  // set up for read
+  tXfrCtl.nDevAddr = SENSENBME280_DEV_ADDR;
+  tXfrCtl.tAddress.anValue[ LE_U32_LSB_IDX ] = nRegister;
+  tXfrCtl.nAddrLen = 1;
+  tXfrCtl.pnData = pnData;
+  tXfrCtl.wDataLen = nLength;
+  tXfrCtl.uTimeout = 500;
+  eI2cErr = I2c_Read( SENBME280_I2C_ENUM, &tXfrCtl );
+
+  // set the error  
+  bErrDet = ( eI2cErr == I2C_ERR_NONE ) ? FALSE : TRUE;
+  
+  // return the status
+  return( bErrDet );
+}
+
+ #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 /******************************************************************************
  * @function SenBME280_ProcessScanTask
  *
@@ -104,7 +174,7 @@ static void ScanTask( PVOID pvParameters )
   FOREVER
   {
     // call the process scan task
-    SenBME280_ProcessScan_ProcessScan( );
+    SenBME280_ProcessScan( );
     
     // sleep for the required period
     vTaskDelay( SENBME280_SCAN_RATE_MSECS / portTICK_RATE_MS );

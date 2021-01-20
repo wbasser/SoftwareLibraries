@@ -40,7 +40,7 @@
 
 
 /// create entry for each queue
-const CODE QUEUEDEF  atQueueDefs[ QUEUE_ENUM_MAX ] =
+const CODE QUEUEDEF  g_atQueueDefs[ QUEUE_ENUM_MAX ] =
 {
   // QUEUE_ENTRY( task, entry_size, num_entries, name, empflg, putflg, getflg, fullflg ),
 };

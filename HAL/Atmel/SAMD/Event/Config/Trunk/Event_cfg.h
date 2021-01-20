@@ -50,7 +50,7 @@ typedef enum EVENTENUM
 // structures -----------------------------------------------------------------
 
 // global parameter declarations -----------------------------------------------
-extern  const EVENTDEF  atEventDefs[ ];
+extern  const EVENTDEF  g_atEventDefs[ ];
 
 /**@} EOF Event_cfg.h */
 

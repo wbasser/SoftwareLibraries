@@ -48,9 +48,11 @@ static  SNDMNGRANIMENUM eCurSeq;
 static  U8              nCurSeqIdx;
 static  PSOUNDSEQENTRY  ptCurSequence;
 static  SOUNDSEQENTRY   tCurSeqEntry;
+static  PSOUNDSEQENTRY  ptCurSeqEntry;
 static  PLAYSTATE       ePlayState;
 static  U16             wCurCounts;
 static  S16             sCurStep, sCurFrequency;
+static  PVSNDMNGRCBFNC  pvLclCallbackFunc;
 
 // local function prototypes --------------------------------------------------
 
@@ -68,6 +70,9 @@ void SoundManager_Initialize( void )
 {
   // clear the sound sequence in progress flag
   ePlayState = PLAYSTATE_IDLE;
+  
+  // clear the callback
+  pvLclCallbackFunc = NULL;
 }
 
 /******************************************************************************
@@ -77,12 +82,16 @@ void SoundManager_Initialize( void )
  *
  * This function will play a sequence 
  *
- * @param[in]   eSoundSeq   sound to play
+ * @param[in]   eSoundSeq       sound to play
+ * @param[in]   pvCallbackFunc  pointer to the callback function
  *
  *****************************************************************************/
-SOUNDMANAGERERR SoundManager_PlaySequence( SNDMNGRANIMENUM eSoundSeq )
+SOUNDMANAGERERR SoundManager_PlaySequence( SNDMNGRANIMENUM eSoundSeq, PVSNDMNGRCBFNC pvCallbackFunc )
 {
   SOUNDMANAGERERR eError = SOUNDMANAGER_ERR_NONE;
+  
+  // store the callback
+  pvLclCallbackFunc = pvCallbackFunc;
   
   // check for a valid sequence
   if ( eSoundSeq < SNDMNGR_ANIMATION_ENUM_MAX )
@@ -90,15 +99,14 @@ SOUNDMANAGERERR SoundManager_PlaySequence( SNDMNGRANIMENUM eSoundSeq )
     // check to see if a sequence is in progress
     if ( ePlayState != PLAYSTATE_IDLE )
     {
-      // turn off the sequence
-      SoundManager_StopSequence( );
+      // clear the play state
+      ePlayState = SOUND_SEQEVENT_DONE;
     }
-
-    // reset the index
-    nCurSeqIdx = 0;
+    
+    // set the current sequence
     eCurSeq = eSoundSeq;
     
-    // start the sequence
+    // go to play state start
     ePlayState = PLAYSTATE_START;
   }
   else
@@ -121,11 +129,8 @@ SOUNDMANAGERERR SoundManager_PlaySequence( SNDMNGRANIMENUM eSoundSeq )
  *****************************************************************************/
 void SoundManager_StopSequence( void )
 {
-  // stop the timer
-  SoundManager_ToneControl( 0, OFF );
-  
-  // reset the state
-  ePlayState = PLAYSTATE_IDLE;
+  // clear the play state
+  ePlayState = SOUND_SEQEVENT_DONE;
 }
 
 /******************************************************************************
@@ -134,6 +139,8 @@ void SoundManager_StopSequence( void )
  * @brief sound manager task handler
  *
  * This function processes the sound playing task
+ *
+ * @param[in]   uEvent   task event
  *
  *****************************************************************************/
 void SoundManager_PlayTask( void )
@@ -155,24 +162,24 @@ void SoundManager_PlayTask( void )
       // go to execute state
       ePlayState = PLAYSTATE_EXEC;
       break;
-      
+    
     case PLAYSTATE_EXEC :
       // get the sequence entry
-      MEMCPY_P( &tCurSeqEntry, &ptCurSequence[ nCurSeqIdx ], SOUNDSEQENTRY_SIZE );
+      ptCurSeqEntry = &ptCurSequence[ nCurSeqIdx ];
 
       // generate a sound
-      SoundManager_ToneControl( tCurSeqEntry.wFrequency, ON );
+      SoundManager_ToneControl( ptCurSeqEntry->wFrequency );
 
       // convert the time into counts
-      wCurCounts = tCurSeqEntry.wDurationMsecs / SOUNDMANAGER_PLAY_TIME_MSECS;
+      wCurCounts = ptCurSeqEntry->wDurationMsecs / SOUNDMANAGER_PLAY_TIME_MSECS;
       wCurCounts = MAX( wCurCounts, 1 );
 
       // now determine the next state
-      if ( tCurSeqEntry.eEvent == SOUND_SEQEVENT_SWEEP )
+      if ( ptCurSeqEntry->eEvent == SOUND_SEQEVENT_SWEEP )
       {
         // set sweep state/copy the frequency/calculate the step/set count to 1
-        sCurFrequency = tCurSeqEntry.wFrequency;
-        sCurStep = ( tCurSeqEntry.wOption - sCurFrequency ) / wCurCounts;
+        sCurFrequency = ptCurSeqEntry->wFrequency;
+        sCurStep = ( ptCurSeqEntry->wOption - sCurFrequency ) / wCurCounts;
         wCurCounts = 1;
       }
 
@@ -185,7 +192,7 @@ void SoundManager_PlayTask( void )
       if ( --wCurCounts ==  0 )
       {
         // process the next event
-        switch( tCurSeqEntry.eEvent )
+        switch( ptCurSeqEntry->eEvent )
         {
           case SOUND_SEQEVENT_NEXT :
             // increment the index
@@ -199,15 +206,15 @@ void SoundManager_PlayTask( void )
             ePlayState = PLAYSTATE_EXEC;
             break;
             
-          case SOUND_SEQEVENT_JUMPSEQ :
+          case SOUND_SEQEVENT_JMPSEQ :
             // set the sequence to the option'
-            nCurSeqIdx = tCurSeqEntry.wOption;
+            nCurSeqIdx = ptCurSeqEntry->wOption;
             ePlayState = PLAYSTATE_EXEC;
             break;
             
           case SOUND_SEQEVENT_REPEAT :
             // decrement the option count 
-            if ( --tCurSeqEntry.wOption == 0 )
+            if ( --ptCurSeqEntry->wOption == 0 )
             {
               // increment the index
               nCurSeqIdx++;
@@ -217,11 +224,11 @@ void SoundManager_PlayTask( void )
 
           case SOUND_SEQEVENT_SWEEP :
             // test for done
-            if ( sCurFrequency < tCurSeqEntry.wOption )
+            if ( sCurFrequency < ptCurSeqEntry->wOption )
             {
               // apply the step/update the tone
               sCurFrequency += sCurStep;
-              SoundManager_ToneControl( sCurFrequency, ON );
+              SoundManager_ToneControl( sCurFrequency );
 
               // reset the count
               wCurCounts = 1;
@@ -233,24 +240,45 @@ void SoundManager_PlayTask( void )
               ePlayState = PLAYSTATE_EXEC;
             }
             break;
-
+                
           case SOUND_SEQEVENT_DONE :
           default :
             // stop playing sound, error
-            SoundManager_ToneControl( 0, OFF );
+            SoundManager_ToneControl( 0 );
+            
+            // check for a callback
+            if ( pvLclCallbackFunc != NULL )
+            {
+              // call it
+              pvLclCallbackFunc( );
+            }
             
             // reset state back to idle
             ePlayState = PLAYSTATE_IDLE;
             break;
         }
       }
-      break;
-
+      break;        
+    
     default :
-      // should never happen
-      ePlayState = PLAYSTATE_IDLE;
       break;
   }
+}
+
+/******************************************************************************
+ * @function SoundManager_IsPlayingSequence
+ *
+ * @brief check to see if a sound is playing
+ *
+ * This function returns the current state of the sound plyaer
+ *
+ * @return    TRUE if sound playing, FALSE otherwise
+ *
+ *****************************************************************************/
+BOOL SoundManager_IsPlayingSequence( void )
+{
+  // return the state of the player
+  return(( ePlayState == PLAYSTATE_IDLE ) ? FALSE : TRUE );
 }
 
 /**@} EOF SoundManager.c */

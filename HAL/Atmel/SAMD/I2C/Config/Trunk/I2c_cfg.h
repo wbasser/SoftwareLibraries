@@ -55,7 +55,7 @@ typedef enum  _I2CDEVENUM
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern  const I2CDEF atI2cDefs[ ];
+extern  const I2CDEF g_atI2cDefs[ ];
 
 /**@} EOF I2c_cfg.h */
 

@@ -39,7 +39,7 @@
   .ePressSampRate = presssamprate, \
   .eTempSampRate = tempsamprate, \
   .eDataRate = datarate, \
-  .eFiltCoeef = filtcoeef \
+  .eFiltCoeef = filtcoeef, \
   .eIrqPin = irqpin
 
 // enumerations ---------------------------------------------------------------
@@ -49,7 +49,7 @@ typedef enum _SENBMP388MODE
   SENBMP388_MODE_BLKFORCED = 0,
   SENBMP388_MODE_BLKNORMAL,
   SENBMP388_MODE_NONBLKFORCED,
-  SENBMP388_MODE_NONFBLKNORMAL,
+  SENBMP388_MODE_NONBLKNORMAL,
   SENBMP388_MODE_MAX
 } SENBMP388MODE;
 
@@ -85,7 +85,7 @@ typedef enum _SENBMP388OUTDATARATE
   SENBMP388_OUTPUT_DATRATE_81SEC92,
   SENBMP388_OUTPUT_DATRATE_161SEC84,
   SENBMP388_OUTPUT_DATRATE_327SEC68,
-  SENBMP388_OUTPUT_DATRATE_655SEC36
+  SENBMP388_OUTPUT_DATRATE_655SEC36,
   SENBMP388_OUTPUT_DATRATE_MAX
 } SENBMP388OUTDATARATE;
 
@@ -110,7 +110,8 @@ typedef enum _SENBMP388IRQDEF
   SENBMP388_IRQDEF_ODLO,
   SENBMP388_IRQDEF_PPHI,
   SENBMP388_IRQDEF_ODHI,
-  SENBMP388_IRQDEF_MAX
+  SENBMP388_IRQDEF_MAX,
+  SENBMP388_IRQDEF_NONE
 } SENBMP388IRQDEF;
 
 // structures -----------------------------------------------------------------

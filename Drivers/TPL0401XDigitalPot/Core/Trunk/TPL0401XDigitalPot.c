@@ -45,8 +45,8 @@ static  I2CXFRCTL tI2cXfr;
 // constant parameter initializations -----------------------------------------
 static  const CODE  U8  anDeviceAddress[ TPL0401X_DIGPOT_DEV_MAX ] =
 {
-  0x5E,         ///< Type A device
-  0x7E,         ///< Type B device
+  0x2E,         ///< Type A device
+  0x3E,         ///< Type B device
 };
 
 /******************************************************************************
@@ -87,7 +87,7 @@ TPL0401DIGPOTERR TPL0401XDigitalPot_Write( TPL0401XDIGPOTDEV eDevice, U8 nValue 
     tI2cXfr.tAddress.anValue[ LE_U32_LSB_IDX ] = 0;
     tI2cXfr.wDataLen = 1;
     tI2cXfr.pnData = &nValue; 
-    tI2cXfr.uTimeout = 100;
+    tI2cXfr.uTimeout = 1000;
     
     // now write it
     I2c_Write( TPL0401XDIGITALPOT_I2C_ENUM, &tI2cXfr );      
@@ -128,7 +128,7 @@ TPL0401DIGPOTERR TPL0401XDigitalPot_Read( TPL0401XDIGPOTDEV eDevice, PU8 pnValue
     tI2cXfr.tAddress.anValue[ LE_U32_LSB_IDX ] = 0;
     tI2cXfr.wDataLen = 1;
     tI2cXfr.pnData = pnValue;
-    tI2cXfr.uTimeout = 100;
+    tI2cXfr.uTimeout = 1000;
     
     // now write it
     I2c_Read( TPL0401XDIGITALPOT_I2C_ENUM, &tI2cXfr );

@@ -33,7 +33,7 @@
 // local constant parameter initializations -----------------------------------------
 
 // global constant parameter initializations -----------------------------------------
-const CODE  ASCCMDDEF   atAscCmdDefs[ ASCCMD_ENUM_MAX ] =
+const CODE  ASCCMDDEF   g_atAscCmdDefs[ ASCCMD_ENUM_MAX ] =
 {
   // add entries to this table using the below macro
   // ASCCMD_DEF( bufsize, numargs, name, enbecho, prompt, eolchar, writefunc, delims, cmdtbl )

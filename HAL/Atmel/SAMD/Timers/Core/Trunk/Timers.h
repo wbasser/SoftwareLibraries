@@ -44,6 +44,7 @@ typedef enum _TIMERIOCTL
 {
   TIMER_IOCTL_CHANGEDEF = 0,    ///< change the timer definition
   TIMER_IOCTL_STOPSTART,        ///< stop/start the timer
+  TIMER_IOCTL_GETCLKFRQ,        ///< get the clock frequency
   TIMER_IOCTL_GETCOUNT,         ///< get the count
   TIMER_IOCTL_SETCOUNT,         ///< set the count
   TIMER_IOCTL_GETPERIOD,        ///< get the period
@@ -54,6 +55,8 @@ typedef enum _TIMERIOCTL
   TIMER_IOCTL_GETCAPTURE,       ///< get the capture value
   TIMER_IOCTL_SETCAPTURE,       ///< set the capture value
   TIMER_IOCTL_GETPRESCALEDIV,   ///< get the prescale divisor
+  TIMER_IOCTL_SETPPERIOD50,     ///< set period with 50% duty cycle
+  TIMER_IOCTL_GETTIMEBASE,      ///< get the timers time base
   TIMER_IOCTL_MAX
 } TIMERIOCTL;
 

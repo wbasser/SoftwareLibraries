@@ -63,10 +63,10 @@ void Dac_Initialize( void )
 
   // setup the DAC
   tCtl.reg = 0;
-  tCtl.bit.EOEN = tDacDef.bExtOutEnable;
-  tCtl.bit.IOEN = tDacDef.bIntOutEnable;
-  tCtl.bit.VPD = tDacDef.bVPumpDisable;
-  tCtl.bit.REFSEL = tDacDef.eRefSelect;
+  tCtl.bit.EOEN = g_tDacDef.bExtOutEnable;
+  tCtl.bit.IOEN = g_tDacDef.bIntOutEnable;
+  tCtl.bit.VPD = g_tDacDef.bVPumpDisable;
+  tCtl.bit.REFSEL = g_tDacDef.eRefSelect;
   DAC->CTRLB = tCtl;
 
   // enable it

@@ -35,40 +35,58 @@
 // Macros and Defines ---------------------------------------------------------
 
 // enumerations ---------------------------------------------------------------
-/// typedef enum _IMUICM20948ERR
+/// enumerate the errors
+typedef enum _IMUICM20948ERR
 {
   IMUICM20948_ERR_NONE = 0,
   IMUICM20948_ERR_NODATA,
-} IMUICMU20948ERR;
+} IMUICM20948ERR;
+
+/// enumerate the individual data fields 
+typedef enum _IMUICM20948DATAFLDS
+{
+  IMUICM20948_DATAFLDS_ACCELX = 0,
+  IMUICM20948_DATAFLDS_ACCELY,
+  IMUICM20948_DATAFLDS_ACCELZ,
+  IMUICM20948_DATAFLDS_GYROX,
+  IMUICM20948_DATAFLDS_GYROY,
+  IMUICM20948_DATAFLDS_GYROZ,
+  IMUICM20948_DATAFLDS_MAGNX,
+  IMUICM20948_DATAFLDS_MAGNY,
+  IMUICM20948_DATAFLDS_MAGNZ,
+} IMUICM20948DATAFLDS;
 
 // structures -----------------------------------------------------------------
-/// define the basic data structure
-typedef struct _IMUICM20948BASE
+/// define the base axis struct
+typedef struct _IMUICM20948AXISVAL
 {
-  FLOAT   fValueX;          ///< X value
-  FLOAT   fValueY;          ///< Y value
-  FLOAT   fValueZ;          ///< Z value
-} IMUICM20948BASE, *PIMUICM20948BASE
-#define  IMUICM20948BASE_SIZE                 sizeof( IMUICM20948BASE )
+  FLOAT   fAxisX;
+  FLOAT   fAxisY;
+  FLOAT   fAxisZ;
+} IMUICM20948AXISVAL, *PIMUICM20948AXISVAL;
+#define IMUICM20948AXISVAL_SIZE                 sizeof( IMUICM20948AXISVAL )
 
-/// define the data structure
-typedef struct _IMUICM20948DATA
+/// define the imu all data structure
+typedef struct _IMUICM20948ALL
 {
-  IMUICM20948BASE tAccel;   ///< acceleration
-  IMUICM20948BASE tGyro;    ///< gyro
-  IMUICM20948BASE tMagn;    ///< magnetometer
-} IMUICM20948DATA, *PIMUICM20948DATA;
-#define IMUICM20948DATA_SIZE                  sizeof( IMUICM20948DATA )
+  IMUICM20948AXISVAL  tAccel;
+  IMUICM20948AXISVAL  tGyro;
+  IMUICM20948AXISVAL  tMagn;
+  FLOAT               fTemp;
+} IMUICM20948ALL, *PIMUICM20948ALL;
+#define IMUICM20948ALL_SIZE                     sizeof( IMUICM20948ALL )
 
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
 extern  void            ImuICM20948_Initialize( void );
-extern  IMUICM20948ERR  ImuICM20948_GetAccel( PIMUICM20948BASE ptAccel );
-extern  IMUICM20948ERR  ImuICM20948_GetGyro( PIMUICM20948BASE ptGyro );
-extern  IMUICM20948ERR  ImuICM20948_GetMagn( PIMUICM20948BASE ptMagn );
-extern  IMUICM20948ERR  ImuICM20948_GetAllData( PIMUICM20948DATA ptData );
-extern  void            ImuICM20948_ProcessIrq( void );
+extern  IMUICM20948ERR  ImuICM20948_GetAccel( PIMUICM20948AXISVAL ptAccel );
+extern  IMUICM20948ERR  ImuICM20948_GetGyro( PIMUICM20948AXISVAL ptGyro );
+extern  IMUICM20948ERR  ImuICM20948_GetMagn( PIMUICM20948AXISVAL ptMagn );
+extern  IMUICM20948ERR  ImuICM20948_GetAllData( PIMUICM20948ALL ptData );
+extern  FLOAT           ImuICM20948_GetImuFieldValue( IMUICM20948DATAFLDS eField );
+extern  void            ImuICM20948_ProcessDataReady( void );
+extern  void            ImuICM20948_GetRawData( PIMUICM20948DATA ptRawData );
 
 /**@} EOF ImuICM20948.h */
 

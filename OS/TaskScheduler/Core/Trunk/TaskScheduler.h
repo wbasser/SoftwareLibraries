@@ -50,8 +50,8 @@ typedef enum _TASKSCHEDULERERR
 typedef enum _TASKSCHEDULERTYPE
 {
   TASKSCHEDULER_TYPE_EVENT = 0,           ///< event task
-	TASKSCHEDULER_TYPE_TIMED_ONESHOT,       ///< timed one shot
-	TASKSCHEDULER_TYPE_TIMED_CONTINUOUS,    ///< timed continuous 
+  TASKSCHEDULER_TYPE_TIMED_ONESHOT,       ///< timed one shot
+  TASKSCHEDULER_TYPE_TIMED_CONTINUOUS,    ///< timed continuous 
   TASKSCHEDULER_TYPE_MAX  
 } TASKSCHEDULERTYPE;
 
@@ -61,20 +61,20 @@ typedef PVOID   PTASKSCHEDULERHANDLE;
 
 /// determine the event argument size
 #if ( TASKSCHEDULER_EVENT_SIZE_BYTES == 1 )
-	typedef U8		                          TASKSCHEDULEREVENT;
-	typedef	PU8		                          PTASKSCHEDULEREVENT;
-  #define	TASKSCHEDULER_TIMEOUT_EVENT	    0xFF
-  #define TASKSCHEDULER_INITIALIZE_EVENT  0xFE
+    typedef U8                              TASKSCHEDULEREVENT;
+    typedef PU8                             PTASKSCHEDULEREVENT;
+  #define TASKSCHEDULER_TIMEOUT_EVENT       ( 0xFF )
+  #define TASKSCHEDULER_INITIALIZE_EVENT    ( 0xFE )
 #elif ( TASKSCHEDULER_EVENT_SIZE_BYTES == 2 )
-	typedef U16		                          TASKSCHEDULEREVENT;
-	typedef PU16	                          PTASKSCHEDULEREVENT;
-  #define	TASKSCHEDULER_TIMEOUT_EVENT	    0xFFFF
-  #define TASKSCHEDULER_INITIALIZE_EVENT  0xFFFE
+    typedef U16                             TASKSCHEDULEREVENT;
+    typedef PU16                            PTASKSCHEDULEREVENT;
+  #define TASKSCHEDULER_TIMEOUT_EVENT       ( 0XFFFF )
+  #define TASKSCHEDULER_INITIALIZE_EVENT    ( 0xFFFE )
 #elif ( TASKSCHEDULER_EVENT_SIZE_BYTES == 4 )
-	typedef U32		                          TASKSCHEDULEREVENT;
-	typedef	PU32	                          PTASKSCHEDULEREVENT;
-  #define	TASKSCHEDULER_TIMEOUT_EVENT	    0xFFFFFFFF
-  #define TASKSCHEDULER_INITIALIZE_EVENT  0xFFFFFFFE
+    typedef U32                             TASKSCHEDULEREVENT;
+    typedef PU32                            PTASKSCHEDULEREVENT;
+  #define TASKSCHEDULER_TIMEOUT_EVENT       ( 0XFFFFFFFF )
+  #define TASKSCHEDULER_INITIALIZE_EVENT    ( 0xFFFFFFFE )
 #else
   #error You must select a task argument size int TaskManager_prm.h
 #endif
@@ -93,8 +93,8 @@ typedef BOOL    ( *PTASKSCHEDULERFUNC )( TASKSCHEDULEREVENT );
 
 // global function prototypes --------------------------------------------------
 extern  void                  TaskScheduler_Initialize( void );
-extern	void 	                TaskScheduler_IdleProcess( void );
-extern	void	                TaskScheduler_TickProcess( void );
+extern	void                  TaskScheduler_IdleProcess( void );
+extern	void                  TaskScheduler_TickProcess( void );
 extern  PTASKSCHEDULERHANDLE  TaskScheduler_Create( TASKSCHEDULERTYPE eType, PTASKSCHEDULERFUNC pvHandler, TASKSCHEDULEQUESIZEARG xNumOfNrmEvents, U8 nNumOfPriEvents, U32 uExecutionRateUsec, U8 nPriority, BOOL bInitialOn, BOOL bRunOnInit );
 extern  TASKSCHEDULERERR      TaskScheduler_Delete( PTASKSCHEDULERHANDLE ptTask );
 extern  TASKSCHEDULERERR      TaskScheduler_PostEvent( PTASKSCHEDULERHANDLE ptTask, TASKSCHEDULEREVENT xEvent );

@@ -83,15 +83,15 @@ typedef U8    XQUEUENUMENTRIES;
 
 /// define a macro to generate a QUEUEGET event
 #define QUEUEGET_EVENT( queueenum ) \
-  (( QUEUE_EVENT_GET << QUEUE_EVENT_SHIFT ) | queueenum )
+(( QUEUE_EVENT_GET << QUEUE_EVENT_SHIFT ) | queueenum )
 
 /// define a macro to generate a QUEUEPUT event
 #define QUEUEPUT_EVENT( queueenum ) \
-  (( QUEUE_EVENT_PUT << QUEUE_EVENT_SHIFT ) | queueenum )
+(( QUEUE_EVENT_PUT << QUEUE_EVENT_SHIFT ) | queueenum )
 
 /// define a macro to generate a QUEUEPUTFULL event
 #define QUEUEPUTFULL_EVENT( queueenum ) \
-  (( QUEUE_EVENT_PUTFULL << QUEUE_EVENT_SHIFT ) | queueenum )
+(( QUEUE_EVENT_PUTFULL << QUEUE_EVENT_SHIFT ) | queueenum )
 
 // enumerations ---------------------------------------------------------------
 /// define the queue event flag structure

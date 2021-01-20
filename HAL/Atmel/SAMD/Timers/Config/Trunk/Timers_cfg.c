@@ -32,14 +32,15 @@ const TIMERDEF  g_atTimerDefs[ TIMER_ENUM_MAX ] =
 {
   // using the below macro add timers to the definition table
   // TIMER_TCCPWMSINGUS( chan, prescale, initon, standby, oneshot, period, cc0pct, cc1pct, cc2pct, cc3pct, cc0enb, cc1enb, cc2enb, cc3enb, callback )
-  // TIMER_TCCPWMSINGLE( chan, prescale, initon, standby, oneshot, period, cc0pct, cc1pct, cc2pct, cc3pct, cc0enb, cc1enb, cc2enb, cc3enb, callback )
+  // TIMER_TCCPWMSINGHZ( chan, prescale, initon, standby, oneshot, period, cc0pct, cc1pct, cc2pct, cc3pct, cc0enb, cc1enb, cc2enb, cc3enb, callback )
   // TIMER_TCCPWMDUALBOT( chan, prescale, initon, standby, oneshot, period, cc0pct, cc1pct, cc2pct, cc3pct, cc0enb, cc1enb, cc2enb, cc3enb, callback )
   // TIMER_TCCCAPDEF( chan, prescale, initon, standby, ovfirqenable, resettozero, invertedge, callback )
   // TIMER_TCWAVMFDEF( chan, invert, oneshot, initon, standby, outenable, ovfenable, matchirqenable, ovfirqenable, direction, prescale, ratehz, priority, callback )
   // TIMER_TCCAPDEF( chan, prescale, initon, standby, ovfirqenable, resettozero, invertedge, callback )
   // TIMER_TCCAPPWPDEF( chan, prescale, initon, standby, cc0enb, cc1enb, ovfirqenable, resettozero, invertedge, callback )
   // TIMER_TCCAPPPWDEF( chan, prescale, initon, standby, cc0enb, cc1enb, ovfirqenable, resettozero, invertedge, callback )
-  // TIMER_TCPWMFDEF( chan, invert0, invert1, initon, standby, outenable0, outenable1, ovfenable, matchirqenable0, matchirqenable1, ovfirqenable, direction, prescale, priority, callback )
+  // TIMER_TCPMWMFDEF( chan, invert0, invert1, initon, standby, outenable0, outenable1, ovfenable, matchirqenable0, matchirqenable1, ovfirqenable, direction, prescale, priority, callback )
+  // TIMER_TCCOUNTDEF( chan, invert, initon, standby, outenable, ovfenable, ovfirqenable, direction, callback )
 };
  
 /**@} EOF Timers_cfg.c */

@@ -48,7 +48,7 @@ extern  const CODE ASCCMDENTRY g_atConfigManagerCmdHandlerTable[ ];
 #endif  // CONFIGMANAGER_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------
-extern  void  ConfigManager_Initialize( void );
+extern  void  ConfigManager_Initialize( BOOL bForceReset );
 extern  U16   ConfigManager_GetSignature( void );
 extern  BOOL  ConfigManager_ResetDefaults( void );
 extern  U16   ConfigManager_UpdateCRC( CONFIGSOURCE eSource );

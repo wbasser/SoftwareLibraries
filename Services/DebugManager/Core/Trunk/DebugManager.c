@@ -86,11 +86,13 @@ static  const CODE C8 szNewLine[ ]  = { "\n\r" };
 
 /// declare the command strings
 static  const CODE C8 szDmpDbg[ ]   = { "DDBG" };
+static  const CODE C8 szDmpDbg1[ ]  = { "DMPDBG" };
 
 /// initialize the command table
 const CODE ASCCMDENTRY g_atDebugManagerCmdHandlerTable[ ] =
 {
-  ASCCMD_ENTRY( szDmpDbg, 4, 1, ASCFLAG_COMPARE_NONE, 0, CmdDmpDbg ),
+  ASCCMD_ENTRY( szDmpDbg,  4, 1, ASCFLAG_COMPARE_NONE, 0, CmdDmpDbg ),
+  ASCCMD_ENTRY( szDmpDbg1, 6, 1, ASCFLAG_COMPARE_NONE, 0, CmdDmpDbg ),
 
   // the entry below must be here
   ASCCMD_ENDTBL( )

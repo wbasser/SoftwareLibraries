@@ -52,10 +52,11 @@
   }
   
 /// define the helper macro for creating an interrupt pin
-#define GPIOIRQDEF( port, pin, sense, wakeup, filter, callback, event, initon ) \
+#define GPIOIRQDEF( port, pin, pupdn, sense, wakeup, filter, callback, event, initon ) \
   { \
     .ePort          = port, \
     .nPin           = pin, \
+    .ePupdn         = pupdn, \
     .eSense         = sense, \
     .bWakeupEnb     = wakeup, \
     .bFilterEnb     = filter, \
@@ -65,11 +66,12 @@
     .bInitOn        = initon \
   }
 
-/// define the helper macro for creating an interrupt pin
-#define GPIOEVNDEF( port, pin, sense, wakeup, filter ) \
+/// define the helper macro for creating an event pin
+#define GPIOEVNDEF( port, pin, pupdn, sense, wakeup, filter ) \
   { \
     .ePort          = port, \
     .nPin           = pin, \
+    .ePupdn         = pupdn, \
     .eSense         = sense, \
     .bWakeupEnb     = wakeup, \
     .bFilterEnb     = filter, \
@@ -134,9 +136,18 @@ typedef enum _GPIODIR
   GPIO_DIR_MAX          
 } GPIODIR;
 
+/// enumerate the GPIO IRQ pullup modes
+typedef enum _GPIOIRQPUPDN
+{
+  GPIO_IRQPUPDN_NONE = 0,   ///< no pull up/down
+  GPIO_IRQPUPDN_PULLDN,     ///< pull down
+  GPIO_IRQPUPDN_PULLUP,     ///< pull up
+  GPIO_IRQPUPDN_MAX
+} GPIOIRQPUPDN;
+
 // structures -----------------------------------------------------------------
 /// define the callback
-typedef void ( *PVGPIOIRQCALLBACK )( U8, U8 );
+typedef void ( *PVGPIOIRQCALLBACK )( U8 nIrq, U8 nEvent, BOOL bState );
 
 /// define the pin definition structure
 typedef struct _GPIOPINDEF
@@ -166,6 +177,7 @@ typedef struct _GPIOIRQDEF
 {
   GPIOPORT          ePort;          ///< port selection
   U8                nPin;           ///< port pin
+  GPIOIRQPUPDN      ePupdn;         ///< pull up/down
   GPIOIRQSENSE      eSense;         ///< sense
   BOOL              bWakeupEnb;     ///< wakeup enable
   BOOL              bFilterEnb;     ///< filter enable

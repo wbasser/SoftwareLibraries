@@ -39,19 +39,19 @@
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the error values
-typedef enum _I2CERR
+typedef enum _I2CERROROR
 {
-  I2C_ERR_NONE = 0,         ///< no error
-  I2C_ERR_BLKING,           ///< device is blocked
-  I2C_ERR_ILLDEV = 0xE0,    ///< illegal device
-  I2C_ERR_ILLPRM,           ///< illegal parameter
-  I2C_ERR_ILLACT,           ///< illegal IOCTL action
-  I2C_ERR_TIMEOUT,          ///< timeout
-  I2C_ERR_BUSBUSY,          ///< bus busy
-  I2C_ERR_BUSFAULT,         ///< bus fault
-  I2C_ERR_ARBLOST,          ///< arbitration lost
-  I2C_ERR_SLVNAK,           ///< slave NAK
-} I2CERR;
+  I2C_ERROR_NONE = 0,         ///< no error
+  I2C_ERROR_BLKING,           ///< device is blocked
+  I2C_ERROR_ILLDEV = 0xE0,    ///< illegal device
+  I2C_ERROR_ILLPRM,           ///< illegal parameter
+  I2C_ERROR_ILLACT,           ///< illegal IOCTL action
+  I2C_ERROR_TIMEOUT,          ///< timeout
+  I2C_ERROR_BUSBUSY,          ///< bus busy
+  I2C_ERROR_BUSFAULT,         ///< bus fault
+  I2C_ERROR_ARBLOST,          ///< arbitration lost
+  I2C_ERROR_SLVNAK,           ///< slave NAK
+} I2CERROR;
 
 /// enumerate the IOCTL actions
 typedef enum _I2CACTION
@@ -84,12 +84,12 @@ typedef struct _I2CCHKBSY
 #define I2CCHKBSY_SIZE        sizeof( I2CCHKBSY )
 
 // global function prototypes --------------------------------------------------
-extern  void    I2c_Initialize( void );
-extern  void    I2c_CloseAll( void );
-extern  I2CERR  I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl );
-extern  I2CERR  I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl );
-extern  I2CERR  I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData );
-extern  I2CERR  I2c_Close( I2CDEVENUM eDev );
+extern  void      I2c_Initialize( void );
+extern  void      I2c_CloseAll( void );
+extern  I2CERROR  I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl );
+extern  I2CERROR  I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl );
+extern  I2CERROR  I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData );
+extern  I2CERROR  I2c_Close( I2CDEVENUM eDev );
 
 /**@} EOF I2c.h */
 

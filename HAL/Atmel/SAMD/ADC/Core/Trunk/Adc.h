@@ -56,6 +56,7 @@ typedef enum _ADCERRS
 // global function prototypes --------------------------------------------------
 extern  void    Adc_Initialize( void );
 extern  void    Adc_Close( void );
+extern  void    Adc_EnableCorrection( S16 sGain, S16 sOffset );
 extern  ADCERRS Adc_ConvertChannel( ADCENUM eAdcChan, PU16 pwResult );
 extern  ADCERRS Adc_ControlEventChannel( ADCENUM eAdcChan, BOOL bState );
 

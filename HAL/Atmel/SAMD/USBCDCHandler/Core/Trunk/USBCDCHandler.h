@@ -1,5 +1,5 @@
 /******************************************************************************
- * @file USBCBCHandler.h
+ * @file USBCDCHandler.h
  *
  * @brief USB-CDC handler declarations
  *
@@ -17,24 +17,22 @@
  * $Rev: $
  * 
  *
- * \addtogroup USBCBCHandler
+ * \addtogroup USBCDCHandler
  * @{
  *****************************************************************************/
  
 // ensure only one instantiation
-#ifndef _USBCBCHANDLER_H
-#define _USBCBCHANDLER_H
+#ifndef _USBCDCHANDLER_H
+#define _USBCDCHANDLER_H
 
 // system includes ------------------------------------------------------------
-#include "Types/Types.h"
+#include "USBCDCHandler/USBCDCHandler_cfg.h"
 
 // local includes -------------------------------------------------------------
 
 // library includes -----------------------------------------------------------
 
 // Macros and Defines ---------------------------------------------------------
-/// define the endpoint size
-#define USB_ENDPOINT_SIZE                      ( 64 )
 
 // enumerations ---------------------------------------------------------------
 
@@ -43,8 +41,13 @@
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern  void  USBCBCHandler_Initialize( void );
+extern  void  USBCDCHandler_Initialize( void );
+extern  BOOL  USBCDCHandler_AreCharsAvailable( U8 nDev );
+extern  BOOL  USBCDCHandler_IsConfigured( U8 nDev );
+extern  U16   USBCDCHandler_GetData( U8 nDev, PU8 pnData, U16 wLength );
+extern  U16   USBCDCHandler_PutData( U8 nDev, PU8 pnData, U16 wLength );
+extern  void  USBCDCHandler_Close( U8 nDev );
 
-/**@} EOF USBCBCHandler.h */
+/**@} EOF USBCDCHandler.h */
 
-#endif  // _USBCBCHANDLER_H
+#endif  // _USBCDCHANDLER_H

@@ -28,33 +28,36 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the macro to enable debug commands
-#define MANUFINFO_ENABLE_DEBUGCOMMANDS  ( 0 )
+#define MANUFINFO_ENABLE_DEBUGCOMMANDS          ( 0 )
 
 /// define the macro to enable software revision test
-#define MANUFINFO_REV_SFW_TST_ENABLE 		( 1 )
+#define MANUFINFO_REV_SFW_TST_ENABLE 		        ( 1 )
+
+/// define the boot loader reveison enable
+#define MANUFINFO_REV_BLT_VER_ENABLE            ( 0 )
 
 /// define the lengths for the serial number/part numbers
-#define MANUFINFO_TITLE_LEN             ( 16 )
-#define MANUFINFO_SERNUM_LEN            ( 8 )
-#define MANUFINFO_PRTNUM1_LEN           ( 14 )
-#define MANUFINFO_PRTNUM2_LEN           ( 11 )
+#define MANUFINFO_TITLE_LEN                     ( 16 )
+#define MANUFINFO_SERNUM_LEN                    ( 8 )
+#define MANUFINFO_PRTNUM1_LEN                   ( 14 )
+#define MANUFINFO_PRTNUM2_LEN                   ( 11 )
 
 /// define the major/minor/test version numbers
-#define MANUFINFO_HDW_MAJ               ( 0x01 )
-#define MANUFINFO_HDW_MIN               ( 0x00 )
+#define MANUFINFO_HDW_MAJ                       ( 0x01 )
+#define MANUFINFO_HDW_MIN                       ( 0x00 )
 
 /// define the major/minor/test version numbers
-#define MANUFINFO_SFW_MAJ               ( 0x00 )
-#define MANUFINFO_SFW_MIN               ( 0x00 )
+#define MANUFINFO_SFW_MAJ                       ( 0x00 )
+#define MANUFINFO_SFW_MIN                       ( 0x00 )
 #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
-#define MANUFINFO_SFW_TST               ( 0x01 )
+  #define MANUFINFO_SFW_TST                     ( 0x01 )
 #endif // MANUFINFO_REV_SFW_TST_ENABLE
 
 /// define the sernum
-#define MANUFINFO_TITLE                 ( "" )
-#define MANUFINFO_SERNUM                ( "" )
-#define MANUFINFO_PRTNUM1               ( "" )
-#define MANUFINFO_PRTNUM2               ( "" )
+#define MANUFINFO_TITLE                         ( "" )
+#define MANUFINFO_SERNUM                        ( "" )
+#define MANUFINFO_PRTNUM1                       ( "" )
+#define MANUFINFO_PRTNUM2                       ( "" )
 
 /**@} EOF ManufInfo_prm.h */
 

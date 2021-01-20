@@ -132,7 +132,7 @@ void I2c_Initialize( void )
   TWAR = ( tDef.nSlaveAddr << 1 ) | 1;
 
   // set the speed
-  I2c_Ioctl( I2C_LCLBUS_DEV_ENUM, I2C_ACTION_SET_BAUDRATE, ( PVOID )&tDef.uBaudRate );
+  I2c_Ioctl( I2C_DEV_ENUM_LCLBUS, I2C_ACTION_SET_BAUDRATE, ( PVOID )&tDef.uBaudRate );
 
   // are we in slave or master/slave mode
   if(( tDef.eMode == I2C_MODE_SLAVE ) || ( tDef.eMode == I2C_MODE_MULTI_MASTER ))

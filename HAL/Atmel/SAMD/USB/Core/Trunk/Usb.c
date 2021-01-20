@@ -1,15 +1,15 @@
 /******************************************************************************
- * @file 
+ * @file Usb.c
  *
- * @brief 
+ * @brief USB implementation
  *
- * This file 
+ * This file provides the implementation for the USB hardware driver
  *
  * @copyright Copyright (c) 2012 Cyber Intergration
  * This document contains proprietary data and information of Cyber Integration 
  * LLC. It is the exclusive property of Cyber Integration, LLC and will not be 
  * disclosed in any form to any party without prior written permission of 
- * Cyber Integration, LLC. This document may not be reproduced or further used 
+ * Cyber Integration, LLC. This document may not be rnEproduced or further used 
  * without the prior written permission of Cyber Integration, LLC.
  *
  * Version History
@@ -17,649 +17,642 @@
  * $Rev: $
  * 
  *
- * \addtogroup 
+ * \addtogroup Usb
  * @{
  *****************************************************************************/
 
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "Usb/Usb.h"
+#include "USB/Usb.h"
 
 // library includes -----------------------------------------------------------
 
 // Macros and Defines ---------------------------------------------------------
-#define NVM_USB_PAD_TRANSN_POS              ( 45 )
-#define NVM_USB_PAD_TRANSN_SIZE             ( 5 )
-#define NVM_USB_PAD_TRANSP_POS              ( 50 )
-#define NVM_USB_PAD_TRANSP_SIZE             ( 5 )
-#define NVM_USB_PAD_TRIM_POS                ( 55 )
-#define NVM_USB_PAD_TRIM_SIZE               ( 3 )
+/// define the ovffset/shifts for the NVM 
+#define NVM_USB_TRANSN_POS                    ( 45 )
+#define NVM_USB_TRANSN_SIZE                   (  5 )
+#define NVM_USB_TRANSP_POS                    ( 50 )
+#define NVM_USB_TRANSP_SIZE                   (  5 )
+#define NVM_USB_TRIM_POS                      ( 55 )
+#define NVM_USB_TRIM_SIZE                     (  3 )
 
-/// define the endpoint size
-#define ENDPOINT_MASK                       ( 0x3F )
-
-#define USB_EP_size_to_gc(x)  ((x <= 8   )?0:\
-                               (x <= 16  )?1:\
-                               (x <= 32  )?2:\
-                               (x <= 64  )?3:\
-                               (x <= 128 )?4:\
-                               (x <= 256 )?5:\
-                               (x <= 512 )?6:\
-                                           7)
-
-/// define the endpoint mask
-#if ( USB_ENDPOINT0_SIZE <= 8 )
-#define USB_ENDPOINT0_GC                    ( 0 )
-#elif ( USB_ENDPOINT0_SIZE <= 16 )
-#define USB_ENDPOINT0_GC                    ( 1 )
-#elif ( USB_ENDPOINT0_SIZE <= 32 )
-#define USB_ENDPOINT0_GC                    ( 2 )
-#elif ( USB_ENDPOINT0_SIZE <= 64 )
-#define USB_ENDPOINT0_GC                    ( 3 )
-#elif ( USB_ENDPOINT0_SIZE <= 128 )
-#define USB_ENDPOINT0_GC                    ( 4 )
-#elif ( USB_ENDPOINT0_SIZE <= 256 )
-#define USB_ENDPOINT0_GC                    ( 5 )
-#elif ( USB_ENDPOINT0_SIZE <= 512 )
-#define USB_ENDPOINT0_GC                    ( 6 )
-#else
-#define USB_ENDPOINT0_GC                    ( 7 )
-#endif
+/// define the macro for getting a NVM value
+#define NVM_READ_CAL(cal) \
+    ((*(( PU32 )NVMCTRL_OTP4 + NVM_##cal##_POS / 32)) >> (NVM_##cal##_POS % 32)) & ((1 << NVM_##cal##_SIZE) - 1)
+    
 
 // enumerations ---------------------------------------------------------------
+/// enumerate the packet size
+typedef enum _PKCTSIZE
+{
+  PCKT_SIZE_8 = 0,
+  PCKT_SIZE_16,
+  PCKT_SIZE_32,
+  PCKT_SIZE_64,
+  PCKT_SIZE_128,
+  PCKT_SIZE_256,
+  PCKT_SIZE_512,
+  PCKT_SIZE_1023,
+  PCKT_SIZE_MAX
+} PKCTSIZE;
+
+/// enumerate the endpoint type
+typedef enum _USB_EPTYPE
+{
+  USB_EP_TYPE_DISABLED = 0,
+  USB_EP_TYPE_CONTROL,
+  USB_EP_TYPE_ISOCHRONOUS,
+  USB_EP_TYPE_BULK,
+  USB_EP_TYPE_INTERRUPT,
+  USB_EP_TYPE_DUAL_BANK,
+  USB_EPTYPE_MAX
+} USB_EPTYPE;
+
 
 // structures -----------------------------------------------------------------
+typedef union _USBMEM
+{
+  UsbDeviceDescBank    tBank[ 2 ];
+  struct
+  {
+    UsbDeviceDescBank  tOut;
+    UsbDeviceDescBank  tIn;
+  } tDirBanks;
+} USBMEM, *PUSBMEM;
+#define USBMEM_SIZE                         sizeof( USBMEM )
 
 // global parameter declarations ----------------------------------------------
-U8  ALIGNED4 g_anUsbEp0BufIn[ USB_ENDPOINT0_SIZE ];
-U8  ALIGNED4 g_anUsbEp0BufOut[ USB_ENDPOINT0_SIZE ];
 
 // local parameter declarations -----------------------------------------------
-static  UsbDeviceDescriptor atUsbEndpoints[ USB_NUMBER_ENDPOINTS ];
+static USBMEM       atUsbMem[ USB_NUM_ENDPOINTS ];
+static ALIGNED4 U8  anCtlInBuf[ USB_MAX_PACKET_SIZE ];
+static ALIGNED4 U8  anCtlOutBuf[ USB_MAX_PACKET_SIZE ];
 
 // local function prototypes --------------------------------------------------
+
 // constant parameter initializations -----------------------------------------
 
 /******************************************************************************
  * @function Usb_Initialize
  *
- * @brief USB initialization
+ * @brief initialize the device
  *
- * This function will initialize the USB controller
+ * This function will perform any needed initialization for the USB controller
  *
  *****************************************************************************/
 void Usb_Initialize( void )
 {
-  U32 uTransN, uTransP, uTrim;
-
-  // call the local initialization
-  Usb_LocalInitialize( );
-
-  // Reset the device/wait for sync
-  USB->DEVICE.CTRLA.reg = USB_CTRLA_SWRST;
-  while ( USB->DEVICE.SYNCBUSY.bit.SWRST );
-
-  // enable it
-  USB->DEVICE.CTRLA.reg = USB_CTRLA_ENABLE | USB_CTRLA_MODE_DEVICE;
-  while ( USB->DEVICE.SYNCBUSY.bit.ENABLE );
-
-  // Load Pad Calibration
-  uTransN = ( *(( PU32 )( NVMCTRL_OTP4 )	+ ( NVM_USB_PAD_TRANSN_POS / 32 )) >> ( NVM_USB_PAD_TRANSN_POS % 32 )) & (( BIT( NVM_USB_PAD_TRANSN_SIZE )) - 1 );
-  if ( uTransN = 0x1F )
-  {
-    // clamp it at 5
-    uTransN = 5;
-  }
+  U8  nEp;
   
-  uTransP = ( *(( PU32 )( NVMCTRL_OTP4 )	+ ( NVM_USB_PAD_TRANSP_POS / 32 )) >> ( NVM_USB_PAD_TRANSP_POS % 32 )) & (( BIT( NVM_USB_PAD_TRANSP_SIZE )) - 1 );
-  if ( uTransP = 0x1F )
-  {
-    // clamp it at 29
-    uTransP = 29;
-  }
-  
-  uTrim = ( *(( PU32 )( NVMCTRL_OTP4 )	+ ( NVM_USB_PAD_TRIM_POS / 32 )) >> ( NVM_USB_PAD_TRIM_POS % 32 )) & (( BIT( NVM_USB_PAD_TRIM_SIZE )) - 1 );
-  if ( uTransP = 0x7 )
-  {
-    // clamp it at 3
-    uTrim = 3;
-  }
+  // reset the device
+  USB->DEVICE.CTRLA.bit.SWRST = 1;
+  while( USB->DEVICE.SYNCBUSY.bit.SWRST );
 
-  // now set it
-  USB->DEVICE.PADCAL.reg = USB_PADCAL_TRANSN( uTransN ) | USB_PADCAL_TRANSP( uTransP ) | USB_PADCAL_TRIM( uTrim );
-  
-  // clear the endpoints
-  memset( atUsbEndpoints, 0, USB_NUMBER_ENDPOINTS * sizeof( UsbDeviceDescriptor ));
-  USB->DEVICE.DESCADD.reg = ( U32 )( & atUsbEndpoints[ 0 ] );
+  // set the pad calibration values
+  USB->DEVICE.PADCAL.bit.TRANSN = NVM_READ_CAL( USB_TRANSN );
+  USB->DEVICE.PADCAL.bit.TRANSP = NVM_READ_CAL( USB_TRANSP );
+  USB->DEVICE.PADCAL.bit.TRIM   = NVM_READ_CAL( USB_TRIM );
+
+  // clear the bank endpoint control/set the address
+  memset(( PU8 )atUsbMem, 0, sizeof( atUsbMem ));
+  USB->DEVICE.DESCADD.reg = ( U32 )atUsbMem;
+
+  // set the device/runstandby/speed/attach
+  USB->DEVICE.CTRLA.bit.MODE = USB_CTRLA_MODE_DEVICE_Val;
+  USB->DEVICE.CTRLA.bit.RUNSTDBY = 1;
+  USB->DEVICE.CTRLB.bit.SPDCONF = USB_DEVICE_CTRLB_SPDCONF_FS_Val;
+
+  // enable the reset interrupt/enable setup interrupt on endpoint 0
   USB->DEVICE.INTENSET.reg = USB_DEVICE_INTENSET_EORST;
+  USB->DEVICE.DeviceEndpoint[ 0 ].EPINTENSET.bit.RXSTP = 1;
 
-  // cause a reset
-  Usb_Reset();
-}
+  for ( nEp = 0; nEp < USB_NUM_ENDPOINTS; nEp++ )
+  {
+    Usb_ResetEndpoint( nEp, USB_ENDPOINT_IN );
+    Usb_ResetEndpoint( nEp, USB_ENDPOINT_OUT );
+  }
 
-/******************************************************************************
- * @function Usb_Attach
- *
- * @brief attach the device
- *
- * This function will cause an attachment to the bus
- *
- *****************************************************************************/
-void Usb_Attach( void )
-{
-  // enable the interrupt/clear the detach bit
+  // enable the interrupts/enable the device
   NVIC_EnableIRQ( USB_IRQn );
-  USB->DEVICE.CTRLB.bit.DETACH = 0;
+  USB->DEVICE.CTRLA.reg |= USB_CTRLA_ENABLE;
 }
 
 /******************************************************************************
- * @function Usb_Detach
+ * @function Usb_AttachDetach
  *
- * @brief detach from bus
+ * @brief attach/detach the device
  *
- * This function will cause a detachment from the bus
+ * This function will set/clear thel detach bit appropriately
+ *
+ * @param[in]   bDetach   TRUE to detach, FALSE to attach
  *
  *****************************************************************************/
-void Usb_Detach( void )
+void Usb_AttachDetach( BOOL bDetach )
 {
-  // set the detach bit/disable interrupt
-  USB->DEVICE.CTRLB.bit.DETACH = 1;
-  NVIC_DisableIRQ( USB_IRQn );
+  // set/clear the detach bit
+  USB->DEVICE.CTRLB.bit.DETACH = bDetach;
 }
 
 /******************************************************************************
- * @function Usb_Reset
+ * @function Usb_ResetEndpoint
  *
- * @brief reset the USB
+ * @brief reset an endpont
  *
- * This function will reset the endpoint and reset the controller
+ * This function will reset/disable a given endpoint
+ *
+ * @param[in]   nEp     endpoint index
+ * @param[in[   nDir    endpoint direction
  *
  *****************************************************************************/
-void Usb_Reset( void )
+void Usb_ResetEndpoint( U8 nEp, U8 nDir )
 {
-  // reset the control endpoint
-  atUsbEndpoints[ 0 ].DeviceDescBank[ 0 ].ADDR.reg = ( U32 )&g_anUsbEp0BufOut;
-  atUsbEndpoints[ 0 ].DeviceDescBank[ 0 ].PCKSIZE.bit.SIZE = USB_ENDPOINT0_GC;
-  atUsbEndpoints[ 0 ].DeviceDescBank[ 1 ].ADDR.reg = ( U32 )&g_anUsbEp0BufIn;
-  atUsbEndpoints[ 0 ].DeviceDescBank[ 1 ].PCKSIZE.bit.SIZE = USB_ENDPOINT0_GC;
-  atUsbEndpoints[ 0 ].DeviceDescBank[ 1 ].PCKSIZE.bit.AUTO_ZLP = 1;
-  USB->DEVICE.DeviceEndpoint[ 0 ].EPINTENSET.reg = USB_DEVICE_EPINTENSET_RXSTP;
-//  USB->DEVICE.DeviceEndpoint[ 0 ].EPCFG.reg  = USB_DEVICE_EPCFG_EPTYPE0( USB_EPTYPE_CONTROL ) | USB_DEVICE_EPCFG_EPTYPE1( USB_EPTYPE_CONTROL );
-  USB->DEVICE.DeviceEndpoint[ 0 ].EPCFG.reg  = USB_DEVICE_EPCFG_EPTYPE0( 1 ) | USB_DEVICE_EPCFG_EPTYPE1( 1 );
+  // clera  the endpont point type
+  if ( USB_ENDPOINT_IN == nDir )
+  {
+    USB->DEVICE.DeviceEndpoint[ nEp ].EPCFG.bit.EPTYPE1 = USB_DEVICE_EPCFG_EPTYPE0( USB_EP_TYPE_DISABLED );
+  }
+  else
+  {
+    USB->DEVICE.DeviceEndpoint[ nEp ].EPCFG.bit.EPTYPE0 = USB_DEVICE_EPCFG_EPTYPE0( USB_EP_TYPE_DISABLED );
+  }
 }
 
+/******************************************************************************
+ * @function Usb_ConfigureEndpoint
+ *
+ * @brief configure an endpoint
+ *
+ * This function will configure an endpont
+ *
+ * @param[in]   nEndpoint     desired endpoint
+ * @param[in]   nDir          direction
+ * @param[in]   nType         endpoint type
+ * @param[in]   wSize         endpoint size
+ *
+ *****************************************************************************/
+void Usb_ConfigureEndpoint( U8 nEndpoint, U8 nType, U16 wSize )
+{
+  PKCTSIZE    ePktSize;
+  USB_EPTYPE  eEpType;
+  U8          nDir;
+
+  // get the direction
+  nDir = nEndpoint & USB_ENDPOINT_IN;
+
+  // mask out the direction on the endpoint
+  nEndpoint &= USB_ENDPOINT_INDEX_MASK;
+  
+  // raeset the endpoint
+  Usb_ResetEndpoint( nEndpoint, nDir );
+
+  // now determine the size
+  if ( wSize <= 8 )
+  {
+    ePktSize = PCKT_SIZE_8;
+  }
+  else if ( wSize <= 16 )
+  {
+    ePktSize = PCKT_SIZE_16;
+  }
+  else if ( wSize <= 32 )
+  {
+    ePktSize = PCKT_SIZE_32;
+  }
+  else if ( wSize <= 64 )
+  {
+    ePktSize = PCKT_SIZE_64;
+  }
+  else if ( wSize <= 128 )
+  {
+    ePktSize = PCKT_SIZE_128;
+  }
+  else if ( wSize <= 256 )
+  {
+    ePktSize = PCKT_SIZE_256;
+  }
+  else if ( wSize <= 512 )
+  {
+    ePktSize = PCKT_SIZE_512;
+  }
+  else if ( wSize <= 1023 )
+  {
+    ePktSize = PCKT_SIZE_1023;
+  }
+  else
+  {
+    ePktSize = PCKT_SIZE_8;
+  }
+    
+  // now set the type
+  switch( nType )
+  {
+    case USB_ENDPNTTYPE_CONTROL :
+      eEpType = USB_EP_TYPE_CONTROL;
+      break;
+
+    case USB_ENDPNTTYPE_ISOCHRONOUS :
+      eEpType = USB_EP_TYPE_ISOCHRONOUS;
+      break;
+
+    case USB_ENDPNTTYPE_BULK :
+      eEpType = USB_EP_TYPE_BULK;
+      break;
+      
+    default :
+      eEpType = USB_EP_TYPE_INTERRUPT;
+      break;
+  }
+
+  // determine the direction
+  if ( USB_ENDPOINT_IN == nDir )
+  {
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPCFG.bit.EPTYPE1 = eEpType;
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPINTENSET.bit.TRCPT1 = 1;
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPSTATUSCLR.bit.DTGLIN = 1;
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPSTATUSCLR.bit.BK1RDY = 1;
+    atUsbMem[ nEndpoint ].tDirBanks.tIn.PCKSIZE.bit.SIZE = ePktSize;
+  }
+  else
+  {
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPCFG.bit.EPTYPE0 = eEpType;
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPINTENSET.bit.TRCPT0 = 1;
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPSTATUSCLR.bit.DTGLOUT = 1;
+    USB->DEVICE.DeviceEndpoint[ nEndpoint ].EPSTATUSSET.bit.BK0RDY = 1;
+    atUsbMem[ nEndpoint ].tDirBanks.tOut.PCKSIZE.bit.SIZE = ePktSize;
+  }
+}
+
+/******************************************************************************
+ * @function Usb_IsEndpointConfigured
+ *
+ * @brief checks to see if ean endpoint is configure
+ *
+ * This function will return the configured status of a given endpoint
+ *
+ * @param[in]   nEp     endpoint index
+ * @param[in[   nDir    endpoint direction
+ *
+ * @return      TRUE if endpoint congiured, FALSE otherwise
+ *
+ *****************************************************************************/
+BOOL Usb_IsEndpointConfigured( U8 nEp, U8 nDir )
+{
+  BOOL  bConfigured;
+  
+  // determine the direction
+  if ( USB_ENDPOINT_IN == nDir )
+  {
+    bConfigured = ( USB->DEVICE.DeviceEndpoint[ nEp ].EPCFG.bit.EPTYPE1 != USB_EP_TYPE_DISABLED );
+  }
+  else
+  {
+    bConfigured = ( USB->DEVICE.DeviceEndpoint[ nEp ].EPCFG.bit.EPTYPE0 != USB_EP_TYPE_DISABLED );
+  }
+  
+  // return the status
+  return( bConfigured );
+}
+
+/******************************************************************************
+ * @function Usb_EndpointGetStatus
+ *
+ * @brief get the endpoint status
+ *
+ * This function will return the endpoint status
+ *
+ * @param[in]   nEp     endpoint index
+ * @param[in[   nDir    endpoint direction
+ *
+ * @return      endpoint status
+ *
+ *****************************************************************************/
+BOOL Usb_EndpointGetStatus( U8 nEp, U8 nDir )
+{
+  BOOL bStatus;
+  
+  // determine the direction
+  if ( USB_ENDPOINT_IN == nDir )
+  {
+    bStatus = USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUS.bit.STALLRQ1;
+  }
+  else
+  {
+    bStatus = USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUS.bit.STALLRQ0;
+  }
+  
+  // return the status
+  return( bStatus );
+}
+
+/******************************************************************************
+ * @function Usb_EndpointSetFeature
+ *
+ * @brief set an endpoint feature
+ *
+ * This function will set the designated endpoint's feature
+ *
+ * @param[in]   nEp     endpoint index
+ * @param[in[   nDir    endpoint direction
+ *
+ *****************************************************************************/
+void Usb_EndpointSetFeature( U8 nEp, U8 nDir )
+{
+  // determine the direction
+  if ( USB_ENDPOINT_IN == nDir )
+  {
+    USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSSET.bit.STALLRQ1 = ON;
+  }
+  else
+  {
+    USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSSET.bit.STALLRQ0 = ON;
+  }
+}
+
+/******************************************************************************
+ * @function Usb_EndpointClearFeature
+ *
+ * @brief clear an endpoint feature
+ *
+ * This function will clear an endpoint feature
+ *
+ * @param[in]   nEp     endpoint index
+ * @param[in[   nDir    endpoint direction
+ *
+ *****************************************************************************/
+void Usb_EndpointClearFeature( U8 nEp, U8 nDir )
+{
+  // determine the direction
+  if ( USB_ENDPOINT_IN == nDir )
+  {
+    // if stalled
+    if ( USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUS.bit.STALLRQ1 )
+    {
+      // un-stall it
+      USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSCLR.bit.STALLRQ1 = ON;
+      
+      // if the stall req int flag is set
+      if ( USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.bit.STALL1 )
+      {
+        // clear it/clear data toggle
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_STALL1;
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSCLR.bit.DTGLIN = ON;
+      }
+    }
+  }
+  else
+  {
+    // if stalled
+    if ( USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUS.bit.STALLRQ0 )
+    {
+      // un-stall it
+      USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSCLR.bit.STALLRQ0 = ON;
+      
+      // if the stall req int flag is set
+      if ( USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.bit.STALL0 )
+      {
+        // clear it/clear data toggle
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_STALL0;
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSCLR.bit.DTGLOUT = ON;
+      }
+    }
+  }
+}
 
 /******************************************************************************
  * @function Usb_SetAddress
  *
- * @brief set the device address
+ * @brief set the address
  *
- * This function will set the device address in the USB controller
+ * This function will set the address
  *
- * @param[in]   nAddr   addres to set
+ * @param[in]   nAddress    address to set
  *
  *****************************************************************************/
-void Usb_SetAddress( U8 nAddr)
+void Usb_SetAddress( U8 nAddress )
 {
   // set the address
-  USB->DEVICE.DADD.reg = USB_DEVICE_DADD_ADDEN | nAddr;
+  USB->DEVICE.DADD.reg = USB_DEVICE_DADD_ADDEN | USB_DEVICE_DADD_DADD( nAddress );
 }
 
 /******************************************************************************
- * @function Usb_EnableEp
+ * @function Usb_Send
  *
- * @brief enable the designated endpoint
+ * @brief send data
  *
- * This function will set the type, size and enable an endoint
+ * This function will send the data
  *
- * @param[in]   nEp       endpoint
- * @param[in]   eType     endpoint type
- * @param[in]   nPktSize  size of the packet
+ * @param[in]   nEp     endpoint selection
+ * @param[in]   pnData  pointer to the data
+ * @param[in]   wLength length of data to send
  *
  *****************************************************************************/
-void Usb_EnableEp( U8 nEp, USBEPTYPE eType, U8 nPktSize )
+void Usb_Send( U8 nEp, PU8 pnData, U16 wLength )
 {
-  U8  nEpNum;
+  // set the data address/size/reset byte count
+  atUsbMem[ nEp ].tDirBanks.tIn.ADDR.reg = ( U32 )pnData;
+  atUsbMem[ nEp ].tDirBanks.tIn.PCKSIZE.bit.BYTE_COUNT = wLength;
+  atUsbMem[ nEp ].tDirBanks.tIn.PCKSIZE.bit.MULTI_PACKET_SIZE = 0;
   
-  // get the endpoint number
-  nEpNum = nEp & ENDPOINT_MASK;
+  // set the ready bit
+  USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSSET.bit.BK1RDY = ON;
+}
+
+/******************************************************************************
+ * @function Usb_Recv
+ *
+ * @brief receive some data
+ *
+ * This function will queue up for a data receive
+ *
+ * @param[in]   nEp     endpoint selection
+ * @param[in]   pnData  pointer to the data
+ * @param[in]   wLength length of data to receive
+ *
+ *****************************************************************************/
+void Usb_Recv( U8 nEp, PU8 pnData, U16 wLength )
+{
+  // set the address/size/clear byte count
+  atUsbMem[ nEp ].tDirBanks.tOut.ADDR.reg = ( U32 )pnData;
+  atUsbMem[ nEp ].tDirBanks.tOut.PCKSIZE.bit.BYTE_COUNT = 0;
+  atUsbMem[ nEp ].tDirBanks.tOut.PCKSIZE.bit.MULTI_PACKET_SIZE = wLength;
   
-  // check for direction
-  if ( nEp & USB_DIRECTION_IN )
+  // set the ready bit
+  USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSCLR.bit.BK0RDY = ON;
+}
+
+/******************************************************************************
+ * @function Usb_ControlSendZlp
+ *
+ * @brief send a zero length packet on the control endpoint
+ *
+ * This function will send a ZLP ( zero length packet on the control endpoint
+ *
+ *****************************************************************************/
+void Usb_ControlSendZlp( void )
+{
+  // clear the byte count
+  atUsbMem[ 0 ].tDirBanks.tIn.PCKSIZE.bit.BYTE_COUNT = 0;
+  
+  // reset the complete flag/send it
+  USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1;
+  USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSSET.bit.BK1RDY = ON;
+  
+  // wait till done
+  while( !USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.bit.TRCPT1 );
+}
+
+/******************************************************************************
+ * @function Usb_ControlStall
+ *
+ * @brief stall the control port
+ *
+ * This function will stall the control port
+ *
+ *****************************************************************************/
+void Usb_ControlStall( void )
+{
+  // set the stall bit
+  USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSSET.bit.STALLRQ1 = ON;
+}
+
+/******************************************************************************
+ * @function Usb_ControlSend
+ *
+ * @brief send data on the control endpoint
+ *
+ * This function will send data on the control endpoint
+ *
+ * @param[in]   pnData    pointer to the data
+ * @param[in]   wLength   length of data
+ *
+ *****************************************************************************/
+void Usb_ControlSend( PU8 pnData, U16 wLength )
+{
+  // check for small payload
+  if ( wLength <= USB_MAX_PACKET_SIZE )
   {
-    // 
-    atUsbEndpoints[ nEpNum ].DeviceDescBank[ 1 ].PCKSIZE.bit.SIZE = USB_EP_size_to_gc( nPktSize );
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPCFG.bit.EPTYPE1 = eType + 1;
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSCLR.reg = USB_DEVICE_EPSTATUS_BK1RDY | USB_DEVICE_EPSTATUS_STALLRQ( 0x2 ) | USB_DEVICE_EPSTATUS_DTGLIN;
+    // copy to an aligned buffer/set the address
+    memcpy( anCtlInBuf, pnData, wLength );
+    atUsbMem[ 0 ].tDirBanks.tIn.ADDR.reg = ( U32 )anCtlInBuf;
   }
   else
   {
-    atUsbEndpoints[ nEpNum ].DeviceDescBank[ 1 ].PCKSIZE.bit.SIZE = USB_EP_size_to_gc( nPktSize );
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPCFG.bit.EPTYPE0 = eType + 1;
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSSET.reg = USB_DEVICE_EPSTATUS_BK0RDY;
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSCLR.reg = USB_DEVICE_EPSTATUS_STALLRQ( 0x1 ) | USB_DEVICE_EPSTATUS_DTGLOUT;
-  }
-}
-
-/******************************************************************************
- * @function Usb_DisableEp
- *
- * @brief disable endpoint
- *
- * This function will disable the designated endoint
- *
- * @param[in]   nEp     endpoint
- *
- *****************************************************************************/
-void Usb_DisableEp( U8 nEp )
-{
-  U8  nEpNum;
-  
-  // get the endpoint number
-  nEpNum = nEp & ENDPOINT_MASK;
-  
-  // check for direction
-  if ( nEp & USB_DIRECTION_IN )
-  {
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSCLR.reg = USB_DEVICE_EPSTATUS_BK1RDY;
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPCFG.bit.EPTYPE1 = 0;
-  }
-  else
-  {
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSSET.reg = USB_DEVICE_EPSTATUS_BK0RDY;
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPCFG.bit.EPTYPE0 = 0;
-  }
-}
-
-/******************************************************************************
- * @function Usb_ResetEp
- *
- * @brief reset and endpoint
- *
- * This function will reset the given endpoint
- *
- * @param[in]   nEp     endpoint
- *
- *****************************************************************************/
-void Usb_ResetEp( U8 nEp )
-{
-  U8  nEpNum;
-  
-  // get the endpoint number
-  nEpNum = nEp & ENDPOINT_MASK;
-  
-  if ( nEp & USB_DIRECTION_IN )
-  {
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSCLR.reg = USB_DEVICE_EPSTATUS_BK1RDY;
-  }
-  else
-  {
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUSSET.reg = USB_DEVICE_EPSTATUS_BK0RDY;
-  }
-}
-
-/******************************************************************************
- * @function Usb_EpReady
- *
- * @brief test for endpoint ready
- *
- * This function will return the ready uStatus
- *
- * @param[in]   nEp     endpoint
- *
- * @return      TRUE if ready, FALSE if not
- *
- *****************************************************************************/
-BOOL Usb_EpReady( U8 nEp )
-{
-  BOOL  bReady;
-  U8    nEpNum;
-  
-  // get the endpoint number
-  nEpNum = nEp & ENDPOINT_MASK;
-  
-  // check for direction
-  if ( nEp & USB_DIRECTION_IN )
-  {
-    bReady = !(USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUS.bit.BK1RDY || Usb_EpPending( nEp ));
-  }
-  else
-  {
-    bReady = !(USB->DEVICE.DeviceEndpoint[ nEpNum ].EPSTATUS.bit.BK0RDY || Usb_EpPending( nEp ));
+    // large payouds, just set the addtess
+    atUsbMem[ 0 ].tDirBanks.tIn.ADDR.reg = ( U32 )pnData;
   }
   
-  // return the ready stattus
-  return( bReady );
-}
-
-/******************************************************************************
- * @function Usb_EpPending
- *
- * @brief test for endoint pending
- *
- * This function will return the endpoint pending uStatus
- *
- * @param[in]   nEp     endpoint
- *
- * @return      TRUE if pending, FALSE if not
- *
- *****************************************************************************/
-BOOL Usb_EpPending( U8 nEp )
-{
-  BOOL  bPending;
-  U8    nEpNum;
+  // set the byte count/clear multi packet
+  atUsbMem[ 0 ].tDirBanks.tIn.PCKSIZE.bit.BYTE_COUNT = wLength;
+  atUsbMem[ 0 ].tDirBanks.tIn.PCKSIZE.bit.MULTI_PACKET_SIZE = 0;
   
-  // get the endpoint number
-  nEpNum = nEp & ENDPOINT_MASK;
+  // reset the complete flag/send it
+  USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1;
+  USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSSET.bit.BK1RDY = ON;
   
-  // check for direction
-  if ( nEp & USB_DIRECTION_IN )
-  {
-    bPending = USB->DEVICE.DeviceEndpoint[ nEpNum ].EPINTFLAG.bit.TRCPT1;
-  }
-  else
-  {
-    bPending = USB->DEVICE.DeviceEndpoint[ nEpNum ].EPINTFLAG.bit.TRCPT0;
-  }
-  
-  // reutrn the pending uStatus
-  return( bPending );
+  // wait till done
+  while( !USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.bit.TRCPT1 );
 }
 
 /******************************************************************************
- * @function Usb_WaitForReady
- *
- * @brief wait for ready
- *
- * This function will wait for an endoint to become ready
- *
- * @param[in]   nEp     endpoint
- *
- *****************************************************************************/
-void Usb_WaitForReady( U8 nEp )
-{
-  // loop here
-  while( !Usb_EpReady( nEp ));
-}
-
-/******************************************************************************
- * @function Usb_WaitForPending
- *
- * @brief wait for pending
- *
- * This function will wait for an endoint to complete
- *
- * @param[in]   nEp   endont
- *
- *****************************************************************************/
-void Usb_WaitForPending( U8 nEp )
-{
-  // loop here
-  while( !Usb_EpPending( nEp ));
-}
-
-/******************************************************************************
- * @function Usb_StartOut
- *
- * @brief start an out endpoint
- *
- * This function will set up an out endpoint for data transmission and start the
- * transfer
- *
- * @param[in]   nEp     endpoint number
- * @param[in]   pnData  pointer to data
- * @param[in]   nLen    length of the data
- *
- * @return      0
- *
- *****************************************************************************/
-U8 Usb_StartOut( U8 nEp, PU8 pnData, U8 nLen )
-{
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 0 ].PCKSIZE.bit.MULTI_PACKET_SIZE = nLen;
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 0 ].PCKSIZE.bit.BYTE_COUNT = 0;
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 0 ].ADDR.reg = ( U32 )pnData;
-  USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT0 | USB_DEVICE_EPINTFLAG_TRFAIL0;
-  USB->DEVICE.DeviceEndpoint[ nEp ].EPINTENSET.reg = USB_DEVICE_EPINTENSET_TRCPT0;
-  USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSCLR.reg = USB_DEVICE_EPSTATUS_BK0RDY;
-  
-  // return 0
-  return( 0 );
-}
-
-/******************************************************************************
- * @function Usb_EpStartIn
- *
- * @brief start an in inepoint
- *
- * This function will set up an in endpoint for data reception and start the
- * reception
- *
- * @param[in]   nEp     endpoint number
- * @param[in]   pnData  pointer to data
- * @param[in]   nSize   size of the buffer
- * @param[in]   bZlp    allow zero packet 
- *
- * @return      0
- *
- *****************************************************************************/
-U8 Usb_EpStartIn( U8 nEp, PU8 pnData, U8 nSize, BOOL bZlp )
-{
-  // clear the direction bit
-  nEp &= ENDPOINT_MASK;
-  
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 1 ].PCKSIZE.bit.AUTO_ZLP = bZlp;
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 1 ].PCKSIZE.bit.MULTI_PACKET_SIZE = 0;
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 1 ].PCKSIZE.bit.BYTE_COUNT = nSize;
-  atUsbEndpoints[ nEp ].DeviceDescBank[ 1 ].ADDR.reg = ( U32 )pnData;
-  USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1 | USB_DEVICE_EPINTFLAG_TRFAIL1;
-  USB->DEVICE.DeviceEndpoint[ nEp ].EPINTENSET.reg = USB_DEVICE_EPINTENSET_TRCPT1;
-  USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSSET.reg = USB_DEVICE_EPSTATUS_BK1RDY;
-  
-  // return 0
-  return( 0 );
-}
-
-/******************************************************************************
- * @function Usb_EpGetOutLength
- *
- * @brief get output legnth
- *
- * This function will get the output length
- *
- * @param[in]   nEp     endpoint
- *  
- * @return      byte count
- *
- *****************************************************************************/
-U8 Usb_EpGetOutLength( U8 nEp )
-{
-  // return the byte count
-  return( atUsbEndpoints[ nEp ].DeviceDescBank[ 0 ].PCKSIZE.bit.BYTE_COUNT );
-}
-
-/******************************************************************************
- * @function Usb_EpSetHandled
- *
- * @brief set an endpoint to handler
- *
- * This function will clear the interuupt indicating that the endpoint was 
- * handled
- *
- * @param[in]   nEp     endpoint
- *
- *****************************************************************************/
-void Usb_EpSetHandled( U8 nEp )
-{
-  U8    nEpNum;
-  
-  // get the endpoint number
-  nEpNum = nEp & ENDPOINT_MASK;
-  
-  // check for direction
-  if ( nEp & USB_DIRECTION_IN )
-  {
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1;
-  }
-  else
-  {
-    USB->DEVICE.DeviceEndpoint[ nEpNum ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT0;
-  }
-}
-
-/******************************************************************************
- * @function Usb_Ep0In
- *
- * @brief start EP #0 input
- *
- * This function will start endpoint 0 for input
- *
- * @param[in]   nSize   size of the transfer
- *
- *****************************************************************************/
-void Usb_Ep0In( U8 nSize )
-{
-  // start endpoint 0 for input
-  Usb_EpStartIn( USB_DIRECTION_IN | 0, g_anUsbEp0BufIn, nSize, TRUE );
-}
-
-/******************************************************************************
- * @function Usb_Ep0Out
- *
- * @brief start endpoint 0 for output
- *
- * This function will start endpoint 0 for an output
- *
- *****************************************************************************/
-void Usb_Ep0Out( void )
-{
-  // start endpoint 0 for out
-  Usb_StartOut( 0, g_anUsbEp0BufOut, USB_ENDPOINT0_SIZE );
-}
-
-/******************************************************************************
- * @function Usb_Ep0Stall
- *
- * @brief stall endpoint 0
- *
- * This function will stall endpoint 0
- *
- *****************************************************************************/
-void Usb_Ep0Stall( void )
-{
-  // set the stall request for end point 0
-  USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSSET.reg = USB_DEVICE_EPSTATUS_STALLRQ( 0x3 );
-}
-
-/******************************************************************************
- * @function Usb_SetSpeed
- *
- * @brief set the speed       
- *
- * This function will set the low/full speed bits
- *
- * @param[in]   eSpeed      speed select
- *
- *****************************************************************************/
-void Usb_SetSpeed( USBSPEED eSpeed )
-{
-  if ( USB_SPEED_FULL == eSpeed )
-  { 
-    USB->DEVICE.CTRLB.bit.SPDCONF = USB_DEVICE_CTRLB_SPDCONF_FS_Val;
-  }
-  else if ( USB_SPEED_LOW == eSpeed )
-  {
-    USB->DEVICE.CTRLB.bit.SPDCONF = USB_DEVICE_CTRLB_SPDCONF_LS_Val;
-  }
-}
-
-/******************************************************************************
- * @function Usb_GetSpeed
- *
- * @brief get the speed
- *
- * This function will return the USB speed
- *
- * @return      will return the current speed
- *
- *****************************************************************************/
-USBSPEED Usb_GetSpeed( void )
-{
-  USBSPEED  eSpeed;
-  
-  // set the speed
-  eSpeed = ( USB->DEVICE.STATUS.bit.SPEED == 0 ) ? USB_SPEED_LOW : USB_SPEED_FULL;
-  
-  // return it
-  return( eSpeed );
-}
-
-/******************************************************************************
- * @function Usb_Handler
+ * @function USB_Handler
  *
  * @brief USB interrupt handler
  *
- * This function will process the USB handler
+ * This function will process any USB intterrupts
  *
  *****************************************************************************/
-void USB_Handler( ) 
+void USB_Handler( void )
 {
-  U32 uSummary, uStatus;
-  U16 iIdx;
-
-  // get the summary and status flags
-  uSummary = USB->DEVICE.EPINTSMRY.reg;
-  uStatus = USB->DEVICE.INTFLAG.reg;
+  U16 wEpInt;
+  U8  nEpFlags, nEp, nIntMask;
   
-  // is this an EORST
-  if ( uStatus & USB_DEVICE_INTFLAG_EORST )
+  // check for a End of reset
+  if ( USB->DEVICE.INTFLAG.bit.EORST )
   {
+    // clear the interrupt/reset the address
     USB->DEVICE.INTFLAG.reg = USB_DEVICE_INTFLAG_EORST;
-    Usb_Reset( );
+    USB->DEVICE.DADD.reg = USB_DEVICE_DADD_ADDEN;
+    
+    // reset the endpoints
+    for ( nEp = 0; nEp < USB_NUM_ENDPOINTS; nEp++ )
+    {
+      Usb_ResetEndpoint( nEp, USB_ENDPOINT_IN );
+      Usb_ResetEndpoint( nEp, USB_ENDPOINT_OUT );
+    }
+    
+    // enable control endpoints/reset the readys
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPCFG.reg = USB_DEVICE_EPCFG_EPTYPE0( USB_EP_TYPE_CONTROL )  | USB_DEVICE_EPCFG_EPTYPE1( USB_EP_TYPE_CONTROL );
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSSET.bit.BK0RDY = ON;
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSCLR.bit.BK1RDY = ON;
+    
+    // set the memory control for the control in endpoint
+    atUsbMem[ 0 ].tDirBanks.tIn.ADDR.reg = ( U32 )anCtlInBuf;
+    atUsbMem[ 0 ].tDirBanks.tIn.PCKSIZE.bit.SIZE = PCKT_SIZE_64;
+    atUsbMem[ 0 ].tDirBanks.tIn.PCKSIZE.bit.BYTE_COUNT = 0;
+    atUsbMem[ 0 ].tDirBanks.tIn.PCKSIZE.bit.MULTI_PACKET_SIZE = 0;
+    
+    // set the memory control for the control out endpoint
+    atUsbMem[ 0 ].tDirBanks.tOut.ADDR.reg = ( U32 )anCtlOutBuf;
+    atUsbMem[ 0 ].tDirBanks.tOut.PCKSIZE.bit.SIZE = PCKT_SIZE_64;
+    atUsbMem[ 0 ].tDirBanks.tOut.PCKSIZE.bit.BYTE_COUNT = 0;
+    atUsbMem[ 0 ].tDirBanks.tOut.PCKSIZE.bit.MULTI_PACKET_SIZE = 8;
+    
+    // clear the out ready/enable RXSTP interrupt
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSCLR.bit.BK0RDY = ON;
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPINTENSET.bit.RXSTP = ON;
   }
-  else
+  
+  // now check for receive setup interrupt
+  if ( USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.bit.RXSTP )
   {
-    // check for normal request
-    if ( uSummary & 1 )
+    // reset the interrupt/clear BK0RDY
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_RXSTP;
+    USB->DEVICE.DeviceEndpoint[ 0 ].EPSTATUSCLR.bit.BK0RDY = ON;
+    
+    // handle the standard request
+    Usb_HandleStandardRequest( anCtlOutBuf ); 
+  }
+  
+  // get the endpoint summary 
+  wEpInt = USB->DEVICE.EPINTSMRY.reg;
+  
+  // now process it
+  for ( nEp = 0; ( nEp < USB_NUM_ENDPOINTS ) && ( wEpInt != 0 ); nEp++ )
+  {
+    // check for interrupt set intterup set
+    nIntMask = BIT( nEp );
+    if (( nIntMask & wEpInt ) != 0 )
     {
-      U32 uFlags = USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.reg;
-      USB->DEVICE.DeviceEndpoint[ 0 ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1 | USB_DEVICE_EPINTFLAG_TRCPT0 | USB_DEVICE_EPINTFLAG_RXSTP;
+      // clear the interrupt
+      wEpInt &= ~nIntMask;
       
-      // now check for a setup packet
-      if ( uFlags & USB_DEVICE_EPINTFLAG_RXSTP )
+      // get the endpoint flags
+      nEpFlags = USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg;
+      
+      // check for a transfer complete out
+      if ( nEpFlags & USB_DEVICE_EPINTFLAG_TRCPT0 )
       {
-        // call the abstraction handler
-        Usb_HandleSetup( );
+        // clear the interrupt/set the BK0RDY
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT0;
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSSET.bit.BK0RDY = ON;
+        
+        // process the callback
+        Usb_ProcessRecvCallback( nEp, atUsbMem[ nEp ].tDirBanks.tOut.PCKSIZE.bit.BYTE_COUNT );
       }
 
-      // check for a control out packet
-      if ( uFlags & USB_DEVICE_EPINTFLAG_TRCPT0 )
+      // check for a transfer complete in
+      if ( nEpFlags & USB_DEVICE_EPINTFLAG_TRCPT1 )
       {
-        // call the abstraction handler
-        Usb_HandleControlOutCallback( );
-      }
-
-      // check for a control in packet
-      if ( uFlags & USB_DEVICE_EPINTFLAG_TRCPT1 )
-      {
-        // call the abstraction handler
-        Usb_HandleCcontrolInCallback( );
-      }
-    }
-
-    // now ceck for each endpoint
-    for ( iIdx = 1; iIdx < USB_NUMBER_ENDPOINTS; iIdx++ )
-    {
-      if ( uSummary & BIT( iIdx ))
-      {
-        uStatus = USB->DEVICE.DeviceEndpoint[ iIdx ].EPINTFLAG.reg;
-        USB->DEVICE.DeviceEndpoint[ iIdx ].EPINTENCLR.reg = uStatus;
+        // clear the interrupt/set the BK1RDY
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1;
+        USB->DEVICE.DeviceEndpoint[ nEp ].EPSTATUSSET.bit.BK1RDY = OFF;
+        
+        // process the callback
+        Usb_ProcessSendCallback( nEp );
       }
     }
-
-    // handle the endpoints callback
-    Usb_HandleEndpointsCallback( );
   }
 }
 
-/**@} EOF .c */
+/**@} EOF Usb.c */

@@ -63,7 +63,7 @@ typedef struct _LCLCTL
 {
   PI2CXFRCTL  ptXfrCtl;     ///< transfer control ointer
   U16         wBufIdx;      ///< buffer index
-  I2CERR      eError;       ///< current error
+  I2CERROR      eError;       ///< current error
   BOOL        bRunning;     ///< running state
   BUSDIR      eBusDir;      ///< bus direction
 } LCLCTL, *PLCLCTL;
@@ -78,7 +78,7 @@ static  SercomI2cm*   GetSercomChannel( I2CCHAN eChan );
 static  void          IrqCommonHandler( I2CDEVENUM eDev );
 static  PRCWRACTION   ProcessMasterWrite( PLCLCTL ptCtl, SercomI2cm* ptI2c );
 static  BOOL          ProcessMasterRead( PLCLCTL ptCtl, SercomI2cm* ptI2c );
-static  void          ProcessComplete( I2CERR eError, PI2CDEF ptDef, PLCLCTL ptCtl, SercomI2cm* ptI2c );
+static  void          ProcessComplete( I2CERROR eError, PI2CDEF ptDef, PLCLCTL ptCtl, SercomI2cm* ptI2c );
 static  U32           ComputeBaudRate( I2CCHAN eChan, U32 uBaud );
 
 /******************************************************************************
@@ -184,9 +184,9 @@ void I2c_CloseAll( void )
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
+I2CERROR I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
 {
-  I2CERR 	    eError = I2C_ERR_NONE;
+  I2CERROR 	    eError = I2C_ERROR_NONE;
   PI2CDEF 	  ptDef;
   PLCLCTL 	  ptCtl;
   U32         uTime;  
@@ -210,7 +210,7 @@ I2CERR I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
     // set the running flag/direction/state
     ptCtl->bRunning = TRUE;
     ptCtl->eBusDir = BUS_DIR_WRITE;
-    ptCtl->eError = I2C_ERR_NONE;
+    ptCtl->eError = I2C_ERROR_NONE;
 
     // enable the interrupts
     ptI2c->INTFLAG.reg = SERCOM_I2CM_INTFLAG_MASK;
@@ -235,7 +235,7 @@ I2CERR I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
         {
           // timeout occured - flag error
           ptCtl->bRunning = FALSE;
-          ptCtl->eError = I2C_ERR_TIMEOUT;
+          ptCtl->eError = I2C_ERROR_TIMEOUT;
         }
       }
 
@@ -248,13 +248,13 @@ I2CERR I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
     else
     {
       // set the error to busy
-      eError = I2C_ERR_BLKING;
+      eError = I2C_ERROR_BLKING;
     }
   }
   else
   {
     // illegal device
-    eError = I2C_ERR_ILLDEV;
+    eError = I2C_ERROR_ILLDEV;
   }
 
   // return the status
@@ -274,9 +274,9 @@ I2CERR I2c_Write( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
+I2CERROR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
 {
-  I2CERR      eError = I2C_ERR_NONE;
+  I2CERROR      eError = I2C_ERROR_NONE;
   PI2CDEF     ptDef;
   PLCLCTL     ptCtl;
   U32         uTime;  
@@ -308,7 +308,7 @@ I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
     ptCtl->bRunning = TRUE;
 
     // clear the error
-    ptCtl->eError = I2C_ERR_NONE;
+    ptCtl->eError = I2C_ERROR_NONE;
 
     // compute the bus address
     nAddr = ( ptXfrCtl->nDevAddr << 1 );
@@ -346,7 +346,7 @@ I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
         {
           // timeout occured - flag error
           ptCtl->bRunning = FALSE;
-          ptCtl->eError = I2C_ERR_TIMEOUT;
+          ptCtl->eError = I2C_ERROR_TIMEOUT;
         }
       }
 
@@ -359,17 +359,17 @@ I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
     else
     {
       // set the error to busy
-      eError = I2C_ERR_BLKING;
+      eError = I2C_ERROR_BLKING;
     }
   }
   else
   {
     // illegal device
-    eError = I2C_ERR_ILLDEV;
+    eError = I2C_ERROR_ILLDEV;
   }
   
   // return the error
-  return(( I2CERR )eError );
+  return(( I2CERROR )eError );
 }
 
 /******************************************************************************
@@ -386,9 +386,9 @@ I2CERR I2c_Read( I2CDEVENUM eDev, PI2CXFRCTL ptXfrCtl )
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
+I2CERROR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
 {
-  I2CERR      eError = I2C_ERR_NONE;
+  I2CERROR      eError = I2C_ERROR_NONE;
   PI2CDEF     ptDef;
   PU32        puData;
   SercomI2cm* ptI2c;
@@ -441,7 +441,7 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
         if ( ptI2c->STATUS.reg & SERCOM_I2CM_STATUS_RXNACK )
         {
           // set error 
-          eError = I2C_ERR_SLVNAK;
+          eError = I2C_ERROR_SLVNAK;
         }
 
         // issue stop
@@ -462,14 +462,14 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
         
       default :
         // illegal action
-        eError = I2C_ERR_ILLACT;
+        eError = I2C_ERROR_ILLACT;
         break;
     }
   }
   else
   {
     // illegal device
-    eError = I2C_ERR_ILLDEV;
+    eError = I2C_ERROR_ILLDEV;
   }
   
   // return the error
@@ -488,9 +488,9 @@ I2CERR I2c_Ioctl( I2CDEVENUM eDev, I2CACTION eAction, PVOID pvData )
  * @return      appropriate error value
  *
  *****************************************************************************/
-I2CERR I2c_Close( I2CDEVENUM eDev )
+I2CERROR I2c_Close( I2CDEVENUM eDev )
 {
-  I2CERR       eError = I2C_ERR_NONE;
+  I2CERROR       eError = I2C_ERROR_NONE;
   SercomI2cm*  ptI2c;
   
   // check for a valid UART
@@ -509,7 +509,7 @@ I2CERR I2c_Close( I2CDEVENUM eDev )
   else
   {
     // illegal device
-    eError = I2C_ERR_ILLDEV;
+    eError = I2C_ERROR_ILLDEV;
   }
   
   // return the error
@@ -656,7 +656,7 @@ static void IrqCommonHandler( I2CDEVENUM eDev )
     ptI2c->INTFLAG.reg |= SERCOM_I2CM_INTFLAG_ERROR;
     
     // set the error and exit
-    ProcessComplete( I2C_ERR_BUSFAULT, ptDef, ptCtl, ptI2c );
+    ProcessComplete( I2C_ERROR_BUSFAULT, ptDef, ptCtl, ptI2c );
   }
 
   // check master on bus
@@ -669,12 +669,12 @@ static void IrqCommonHandler( I2CDEVENUM eDev )
     if ( ptI2c->STATUS.bit.ARBLOST )
     {
       // error - arbitration lost
-      ProcessComplete( I2C_ERR_ARBLOST, ptDef, ptCtl, ptI2c );
+      ProcessComplete( I2C_ERROR_ARBLOST, ptDef, ptCtl, ptI2c );
     }
     else if ( ptI2c->STATUS.bit.RXNACK )
     {
       // error - NAK
-      ProcessComplete( I2C_ERR_SLVNAK, ptDef, ptCtl, ptI2c );
+      ProcessComplete( I2C_ERROR_SLVNAK, ptDef, ptCtl, ptI2c );
     }
     else
     {
@@ -683,7 +683,7 @@ static void IrqCommonHandler( I2CDEVENUM eDev )
       {
         case PRC_WR_ACTION_DONE :
           //  call process complete
-          ProcessComplete( I2C_ERR_NONE, ptDef, ptCtl, ptI2c );
+          ProcessComplete( I2C_ERROR_NONE, ptDef, ptCtl, ptI2c );
           break;
 
         case PRC_WR_ACTION_RESTART :
@@ -714,7 +714,7 @@ static void IrqCommonHandler( I2CDEVENUM eDev )
     if ( ProcessMasterRead( ptCtl, ptI2c ) == TRUE )
     {
       //  call process complete
-      ProcessComplete( I2C_ERR_NONE, ptDef, ptCtl, ptI2c );
+      ProcessComplete( I2C_ERROR_NONE, ptDef, ptCtl, ptI2c );
     }
   }
 }
@@ -838,7 +838,7 @@ static BOOL ProcessMasterRead( PLCLCTL ptCtl, SercomI2cm* ptI2c )
  * @param[in]   ptI2c     pointer to the I2C module
  *
  *****************************************************************************/
-static void ProcessComplete( I2CERR eError, PI2CDEF ptDef, PLCLCTL ptCtl, SercomI2cm* ptI2c )
+static void ProcessComplete( I2CERROR eError, PI2CDEF ptDef, PLCLCTL ptCtl, SercomI2cm* ptI2c )
 {
   // clear the funning flag/set the state to idle/set the error
   ptCtl->bRunning = FALSE;

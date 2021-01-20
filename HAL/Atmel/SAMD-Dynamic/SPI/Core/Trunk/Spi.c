@@ -29,6 +29,8 @@
 #include "PowerManager/PowerManager.h"
 
 // Macros and Defines ---------------------------------------------------------
+/// define the macro to map the control pointer
+#define MAP_HANDLE_TO_POINTER( handle )   (( SercomSpi* )handle )
 
 // enumerations ---------------------------------------------------------------
 
@@ -37,11 +39,11 @@
 // local parameter declarations -----------------------------------------------
 
 // local function prototypes --------------------------------------------------
-static  SercomSpi* GetSercomChannel( SPICHAN eChan );
+static  SercomSpi* GetSercomChannel( SPICHAN eChan, PU32 puPeriphClockID );
 static  void       EnableClockPower( SPICHAN eChan );
 
 /******************************************************************************
- * @function Spi_Initialize
+ * @function Spi_Configure
  *
  * @brief SPI initialization
  *
@@ -49,29 +51,32 @@ static  void       EnableClockPower( SPICHAN eChan );
  *
  * @param[in]   ptDef       pointer to the definiation structure
  *
+ * @return    handle to interface
+ *
  *****************************************************************************/
-void Spi_Initialize( PSPIDEF ptDef )
+PVSPIHANDLE Spi_Configure( PSPIDEF ptDef )
 {
   SercomSpi*            ptSpi;
   SERCOM_SPI_CTRLA_Type tCtrlA;
+  U32                   uPeriphClock;
 
   // set the pointer
-  ptSpi = GetSercomChannel( ptDef->eChan );
+  ptSpi = GetSercomChannel( ptDef->eChan, &uPeriphClock );
 
-  // enable the channel power and clock
-  EnableClockPower( ptDef->eChan );
-  
   // enable the gpio pins
   Gpio_Configure( ptDef->eDevPort, ptDef->nMosiPin, GPIO_MODE_OUTPUT_INPDSB, OFF, ptDef->eDevMux, FALSE );
   Gpio_Configure( ptDef->eDevPort, ptDef->nSclkPin, GPIO_MODE_OUTPUT_INPDSB, OFF, ptDef->eDevMux, FALSE );
-  Gpio_Configure( ptDef->eDevPort, ptDef->nMisoPin, GPIO_MODE_INPUT_PULLUP,  OFF, ptDef->eDevMux, FALSE );
+  if ( ptDef->eMisoSel != SPI_MISOSEL_MAX )
+  {
+    Gpio_Configure( ptDef->eDevPort, ptDef->nMisoPin, GPIO_MODE_INPUT_PULLUP,  OFF, ptDef->eDevMux, FALSE );
+  }
 
   // disable - just in case
   ptSpi->CTRLA.bit.SWRST = 1;
   while( ptSpi->SYNCBUSY.bit.SWRST );
 
   // now set the baudrate
-  ptSpi->BAUD.reg = Clock_GetFreq( ) / ptDef->uBaudRate;
+  ptSpi->BAUD.reg =  Clock_GetPeriphClock( uPeriphClock ) / ptDef->uBaudRate;
 
   // now build the control A value
   tCtrlA.bit.DORD = ptDef->eBitOrder;
@@ -81,7 +86,7 @@ void Spi_Initialize( PSPIDEF ptDef )
   tCtrlA.bit.CPHA = (( ptDef->eMode == SPI_MODE_1 ) || ( ptDef->eMode == SPI_MODE_3 )) ? ON : OFF;
 
   // now select the pin modes
-  tCtrlA.reg |= SERCOM_SPI_CTRLA_DIPO( ptDef->eMisoSel );
+  tCtrlA.reg |= ( ( ptDef->eMisoSel != SPI_MISOSEL_MAX ) ) ? SERCOM_SPI_CTRLA_DIPO( ptDef->eMisoSel ) : 0;
   tCtrlA.reg |= SERCOM_SPI_CTRLA_DOPO( ptDef->eMosiSclkSel );
 
   // set the mode
@@ -93,6 +98,9 @@ void Spi_Initialize( PSPIDEF ptDef )
   // now enable it
   ptSpi->CTRLA.bit.ENABLE = ON;
   while( ptSpi->SYNCBUSY.reg != 0 );
+
+  // return the handle
+  return(( PVSPIHANDLE ) ptSpi );
 }
 
 /******************************************************************************
@@ -102,40 +110,50 @@ void Spi_Initialize( PSPIDEF ptDef )
  *
  * This function will write the prescribed number of bytes to the SPI
  *
- * @param[in]   eChan       channel
+ * @param[in]   pvHandle    handle of serial channel
  * @param[io]   pnBuffer    pointer to the read/write buffer
  * @param[in]   wSize       number of bytes to write
  * @param[in]   bStoreRead  TRUE, storsnarf7550
  e
  *
  *****************************************************************************/
-void Spi_Write( SPICHAN eChan, PU8 pnBuffer, U16 wSize, BOOL bStoreRead )
+SPIERR Spi_Write( PVSPIHANDLE pvHandle, PU8 pnBuffer, U16 wSize, BOOL bStoreRead )
 {
+  SPIERR      eError = SPI_ERR_NONE;
   SercomSpi*  ptSpi;
   U16         wBufIdx;
 
   // get the pointer to the channel
-  ptSpi = GetSercomChannel( eChan );
-
-  // for each byte in the buffer
-  for ( wBufIdx = 0; wBufIdx < wSize; wBufIdx++ )
+  if (NULL != ( ptSpi = MAP_HANDLE_TO_POINTER( pvHandle )))
   {
-    // wait for not busy
-    while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_DRE ));
-
-    // write it
-    ptSpi->DATA.reg = *( pnBuffer + wBufIdx );
-
-    // check for read
-    if ( bStoreRead )
+    // for each byte in the buffer
+    for ( wBufIdx = 0; wBufIdx < wSize; wBufIdx++ )
     {
-      // wait for receive ready
-      while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_RXC ));
+      // wait for not busy
+      while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_DRE ));
 
-      // now read the data
-      *( pnBuffer + wBufIdx ) = ptSpi->DATA.reg;
+      // write it
+      ptSpi->DATA.reg = *( pnBuffer + wBufIdx );
+
+      // check for read
+      if ( bStoreRead )
+      {
+        // wait for receive ready
+        while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_RXC ));
+
+        // now read the data
+        *( pnBuffer + wBufIdx ) = ptSpi->DATA.reg;
+      }
     }
   }
+  else
+  {
+    // set the illegal device error
+    eError = SPI_ERR_ILLDEV;
+  }
+
+  // return the error
+  return( eError );
 }
 
 /******************************************************************************
@@ -153,29 +171,39 @@ void Spi_Write( SPICHAN eChan, PU8 pnBuffer, U16 wSize, BOOL bStoreRead )
  * @return  error   appropriate error value
  *
  *****************************************************************************/
-void Spi_Read( SPICHAN eChan, U8 nOutData, PU8 pnBuffer, U16 wSize )
+SPIERR Spi_Read( PVSPIHANDLE pvHandle, U8 nOutData, PU8 pnBuffer, U16 wSize )
 {
+  SPIERR      eError = SPI_ERR_NONE;
   SercomSpi*  ptSpi;
   U16         wBufIdx;
 
   // get the pointer to the channel
-  ptSpi = GetSercomChannel( eChan );
-
-  // for each byte in the buffer
-  for ( wBufIdx = 0; wBufIdx < wSize; wBufIdx++ )
+  if (NULL != ( ptSpi = MAP_HANDLE_TO_POINTER( pvHandle )))
   {
-    // wait for not busy
-    while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_DRE ));
+    // for each byte in the buffer
+    for ( wBufIdx = 0; wBufIdx < wSize; wBufIdx++ )
+    {
+      // wait for not busy
+      while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_DRE ));
 
-    // write it
-    ptSpi->DATA.reg = nOutData;
+      // write it
+      ptSpi->DATA.reg = nOutData;
 
-    // wait for receive ready
-    while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_RXC ));
+      // wait for receive ready
+      while( !( ptSpi->INTFLAG.reg & SERCOM_SPI_INTFLAG_RXC ));
 
-    // now read the data
-    *( pnBuffer + wBufIdx ) = ptSpi->DATA.reg;
+      // now read the data
+      *( pnBuffer + wBufIdx ) = ptSpi->DATA.reg;
+    }
   }
+  else
+  {
+    // set the illegal device error
+    eError = SPI_ERR_ILLDEV;
+  }
+
+  // return the error
+  return( eError );
 }
 
 /******************************************************************************
@@ -191,41 +219,54 @@ void Spi_Read( SPICHAN eChan, U8 nOutData, PU8 pnBuffer, U16 wSize )
  * @return      pointer to a SercomI2c or NULL if illegal channel
  *
  *****************************************************************************/
-static SercomSpi* GetSercomChannel( SPICHAN eChan )
+static SercomSpi* GetSercomChannel( SPICHAN eChan, PU32 puPeriphClockID )
 {
   Sercom*     ptSercom = NULL;
+  CLOCKMUXID  eClockId;
 
   switch( eChan )
   {
     case SPI_CHAN_0 :
       ptSercom = SERCOM0;
+      eClockId = CLOCK_MUXID_SERCOM_0;
+      *puPeriphClockID = PM_APBCMASK_SERCOM0;
       break;
       
     case SPI_CHAN_1 :
       ptSercom = SERCOM1;
+      eClockId = CLOCK_MUXID_SERCOM_1;
+      *puPeriphClockID = PM_APBCMASK_SERCOM1;
       break;
     
     #ifdef SERCOM2
     case SPI_CHAN_2:
       ptSercom = SERCOM2;
+      eClockId = CLOCK_MUXID_SERCOM_2;
+      *puPeriphClockID = PM_APBCMASK_SERCOM2;
       break;
     #endif // SERCOM2
     
     #ifdef SERCOM3
     case SPI_CHAN_3 :
       ptSercom = SERCOM3;
+      eClockId = CLOCK_MUXID_SERCOM_3;
+      *puPeriphClockID = PM_APBCMASK_SERCOM3;
       break;
     #endif // SERCOM3
     
     #ifdef SERCOM4
     case SPI_CHAN_4 :
       ptSercom = SERCOM4;
+      eClockId = CLOCK_MUXID_SERCOM_4;
+      *puPeriphClockID = PM_APBCMASK_SERCOM4;
       break;
     #endif // SERCOM4
     
     #ifdef SERCOM5
     case SPI_CHAN_5 :
       ptSercom = SERCOM5;
+      eClockId = CLOCK_MUXID_SERCOM_5;
+      *puPeriphClockID = PM_APBCMASK_SERCOM5;
       break;
     #endif // SERCOM5
     
@@ -234,72 +275,17 @@ static SercomSpi* GetSercomChannel( SPICHAN eChan )
       break;
   }
   
+  // if ptsercom not null
+  if ( ptSercom != NULL )
+  {
+    // now enable the clock and power mask
+    Clock_PeriphEnable( eClockId, CLOCK_GENID_0 );
+    PowerManager_DisableEnablePeriphC( *puPeriphClockID, ON );
+  }
+
   // return the pointer to the channlel
   return( &ptSercom->SPI );
 }
 
-/******************************************************************************
- * @function EnableClockPower
- *
- * @brief enables clock power for this device
- *
- * This function will enable the device in the power manager and the clocj
- *
- * @param[in]   eChan			SERCOM channel
- *
- *****************************************************************************/
-static void EnableClockPower( SPICHAN eChan )
-{
-  CLOCKMUXID  eClockId;
-  U32         uPeriphId;
-
-  switch( eChan )
-  {
-    case SPI_CHAN_0 :
-      eClockId = CLOCK_MUXID_SERCOM_0;
-      uPeriphId = PM_APBCMASK_SERCOM0;
-      break;
-      
-    case SPI_CHAN_1 :
-      eClockId = CLOCK_MUXID_SERCOM_1;
-      uPeriphId = PM_APBCMASK_SERCOM1;
-      break;
-    
-    #ifdef SERCOM2
-    case SPI_CHAN_2:
-      eClockId = CLOCK_MUXID_SERCOM_2;
-      uPeriphId = PM_APBCMASK_SERCOM2;
-      break;
-    #endif // SERCOM2
-    
-    #ifdef SERCOM3
-    case SPI_CHAN_3 :
-      eClockId = CLOCK_MUXID_SERCOM_3;
-      uPeriphId = PM_APBCMASK_SERCOM3;
-      break;
-    #endif // SERCOM3
-    
-    #ifdef SERCOM4
-    case SPI_CHAN_4 :
-      eClockId = CLOCK_MUXID_SERCOM_4;
-      uPeriphId = PM_APBCMASK_SERCOM4;
-      break;
-    #endif // SERCOM4
-    
-    #ifdef SERCOM5
-    case SPI_CHAN_5 :
-      eClockId = CLOCK_MUXID_SERCOM_5;
-      uPeriphId = PM_APBCMASK_SERCOM5;
-      break;
-    #endif // SERCOM5
-    
-    default :
-      break;
-  }
-  
-  // now enable the clock and power mask
-  Clock_PeriphEnable( eClockId, CLOCK_GENID_0 );
-  PowerManager_DisableEnablePeriph( uPeriphId, ON );
-}
 
 /**@} EOF Spi.c */

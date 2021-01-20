@@ -48,6 +48,7 @@ typedef enum _SYSMONERRS
   SYSMON_ERRS_ILLSETUP,         ///< illegal setup
   SYSMON_ERRS_FRAMEOVF,         ///< frame overflow
   SYSMON_ERRS_ILLVALUE,         ///< illegal value on put
+  SYSMON_ERRS_ILLTIME,          ///< illegal time
 } SYSMONERRS;
 
 /// enumerate the commands

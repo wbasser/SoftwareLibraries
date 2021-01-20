@@ -26,7 +26,9 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
+#include "Clock/Clock.h"
 #include "DAC/Dac.h"
+#include "PowerManager/PowerManager.h"
 
 // library includes -----------------------------------------------------------
 
@@ -53,20 +55,29 @@
  * This function will initialize the DAC
  *
  *****************************************************************************/
-void Dac_Initialize( void )
+void Dac_Initialize( PDACDEF ptDef )
 {
   DAC_CTRLB_Type  tCtl;
+  
+  // turn on the peripheral
+  PowerManager_DisableEnablePeriphC( PM_APBCMASK_DAC, ON );
 
+  // turn on the clock
+  Clock_PeriphEnable( CLOCK_MUXID_DAC, CLOCK_GENID_0 );
+
+  // configure the GPIO pins
+  Gpio_Configure( ptDef->eDevPort, ptDef->nDacPin, GPIO_MODE_OUTPUT_INPDSB, OFF, ptDef->eDevMux, OFF );
+  
   // reset the DAC
   DAC->CTRLA.bit.SWRST = ON;
   while( DAC->STATUS.bit.SYNCBUSY );
 
   // setup the DAC
   tCtl.reg = 0;
-  tCtl.bit.EOEN = tDacDef.bExtOutEnable;
-  tCtl.bit.IOEN = tDacDef.bIntOutEnable;
-  tCtl.bit.VPD = tDacDef.bVPumpDisable;
-  tCtl.bit.REFSEL = tDacDef.eRefSelect;
+  tCtl.bit.EOEN = ptDef->bExtOutEnable;
+  tCtl.bit.IOEN = ptDef->bIntOutEnable;
+  tCtl.bit.VPD = ptDef->bVPumpDisable;
+  tCtl.bit.REFSEL = ptDef->eRefSelect;
   DAC->CTRLB = tCtl;
 
   // enable it
@@ -119,8 +130,7 @@ void  Dac_SetPercentOutput( U16 wPercent )
   U16 wOutputValue;
 
   // compute the output value
-  //wOutputValue = SCALE( wPercent, 1000, MAX_DAC_VALUE );
-  wOutputValue = wPercent;
+  wOutputValue = MAP( wPercent, 0, 1000, 0, MAX_DAC_VALUE );
 
   // output the data
   DAC->DATA.reg = wOutputValue; 

@@ -32,7 +32,7 @@
 
 // library includes -----------------------------------------------------------
 #if ( LOGHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-#include "AsciiCommandHandler/AsciiCommandHandler.h"
+  #include "AsciiCommandHandler/AsciiCommandHandler.h"
 #endif // LOGHANDLER_ENABLE_DEBUGCOMMANDS
 
 // enumerations ---------------------------------------------------------------
@@ -59,7 +59,7 @@ typedef enum _LOGDISPMODE
 
 // global parameter declarations -----------------------------------------------
 #if ( LOGHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
-extern  const CODE ASCCMDENTRY atLogHandlerCmdHandlerTable[ ];
+  extern  const CODE ASCCMDENTRY g_atLogHandlerCmdHandlerTable[ ];
 #endif // LOGHANDLER_ENABLE_DEBUGCOMMANDS
 
 // global function prototypes --------------------------------------------------

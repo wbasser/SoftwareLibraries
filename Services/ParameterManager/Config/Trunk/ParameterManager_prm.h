@@ -21,14 +21,17 @@
  * @{
  *****************************************************************************/
 // library includes
+#include "SystemDefines/SystemDefines_prm.h"
 #include "TaskManager/TaskManager.h"
-#include "SystemControlManager/SystemControlManager.h"
 
 // ensure only one instantiation
 #ifndef _PARAMETERMANAGER_PRM_H
 #define _PARAMETERMANAGER_PRM_H
 
 // Macros and Defines ---------------------------------------------------------
+/// define the base address for the eeprom location
+#define PARAM_BASE_ADDRESS              ( 0 )
+
 /// define the paramaeter argument size - valid values are 1, 2 or 4
 #define PARAM_SIZE_BYTES                ( 1 )
 
@@ -38,17 +41,17 @@
 /// define the macro to enable CRC vs Checksum
 #define PARAM_USE_CRC                   ( 1 )
 
+/// define the size of the block for updates
+#define PARAM_UPDATE_BLOCK_SIZE     ( 256 )
+
 /// define the macro to enable notifications
 #define	PARAM_ENABLE_NOTIFICATIONS      ( 1 )
 
 /// define the macro to enable callbacks
 #define	PARAM_ENABLE_CALLBACKS          ( 0 )
 
-/// define the size of the block for updates
-#define PARAM_UPDATE_BLOCK_SIZE     ( 256 )
-
 /// define the callback or the task
-#if ( PARAM_ENABLE_NOTIFICATIONS == 1 )
+#if ( PARAM_ENABLE_NOTIFICATIONS == 0 )
   #if ( PARAM_ENABLE_CALLBACKS == 1 )
     #define	PARAM_DONE_CALLBACK( )  		( NULL )
   #else
@@ -65,7 +68,17 @@
 #define PARAM_WRITE_RESET_SYSTEM_MODE   ( 0 )
 
 /// define the password to allow resetting of the parameters
-#define PARAM_RESET_DEFAULTS_PASSWORD   ( "DEADBEEF" )
+#define PARAM_RESET_DEFAULTS_PASSWORD   ( SYSTEMDEFINE_CONFIG_RESET_DEFAULT )
+
+/// define the macro to enable config version reset
+#define PARAM_ENABLE_CONFIGFVER             ( ON )
+
+#if ( PARAM_ENABLE_CONFIGVER == ON )
+  /// define the configuration version
+  #define PARAM_CONFIG_VERMAJ               ( 2 )
+  #define PARAM_CONFIG_VERMIN               ( 0 )
+#endif
+
 
 /**@} EOF ParameterManager_prm.h */
 

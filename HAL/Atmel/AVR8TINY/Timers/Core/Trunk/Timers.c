@@ -137,55 +137,6 @@ ISR( TIMER0_OVF_vect )
 }
 #endif
 
-
-#if defined( TIM0_COMPA_vect )
-/******************************************************************************
- * @function TIM0_COMPA_vect
- *
- * @brief timer 0 compare A IRQ vector
- *
- * This function provides the timer 0 compare A IRQ vector
- *
- *****************************************************************************/
-ISR( TIM0_COMPA_vect )
-{
-  // call the common interrupt
-  CommonCmpIrq( 0 );
-}
-#endif
-
-#if defined( TIM0_COMPB_vect )
-/******************************************************************************
- * @function TIM0_COMPB_vect
- *
- * @brief timer 0 compare B IRQ vector
- *
- * This function provides the timer 0 compare B IRQ vector
- *
- *****************************************************************************/
-ISR( TIM0_COMPB_vect )
-{
-  // call the common interrupt
-  CommonCmpIrq( 0 );
-}
-#endif
-
-#if defined( TIM0_OVF_vect )
-/******************************************************************************
- * @function TIM0_OVF_vect
- *
- * @brief timer 0 overflow vector
- *
- * This function provides the timer 0 overflow vector
- *
- *****************************************************************************/
-ISR( TIM0_OVF_vect )
-{
-  // call the common interrupt
-  CommonOvfIrq( 0 );
-}
-#endif
-
 #if defined( TIMER1_CAPT_vect )
 /******************************************************************************
  * @function TIMER1_CAPT_vect
@@ -297,7 +248,7 @@ static void Setup8BitTimer( TIMERMODE8 eMode, U8 nPrescale, U8 nReload )
       OCR0A = nReload;
       
 			// enable the interrupts
-      TIMSK0 |= BIT( OCIE0A );
+      TIMSK |= BIT( OCIE0A );
 
 			// turn on the timer
 			TCCR0B |= nPrescale; 

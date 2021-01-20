@@ -22,6 +22,7 @@
  *****************************************************************************/
 
 // system includes ------------------------------------------------------------
+#include "SystemDefines/SystemDefines_prm.h"
 
 // local includes -------------------------------------------------------------
 #include "ManufInfo/ManufInfo.h"
@@ -41,7 +42,7 @@
 // local function prototypes --------------------------------------------------
 #if ( MANUFINFO_ENABLE_DEBUGCOMMANDS  == 1 )
 /// command handlers
-static  ASCCMDSTS CmdQryVer( U8 nCmdEnum );
+  static  ASCCMDSTS CmdQryVer( U8 nCmdEnum );
 #endif // MANUFINFO_ENABLE_DEBUGCOMMANDS
 
 // constant parameter initializations -----------------------------------------
@@ -71,10 +72,10 @@ static  const CODE U8  nSfwVerMinor =
 
 /// initialize the software version test
 #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
-static  const CODE U8  nSfwVerTest =
-{
-  MANUFINFO_SFW_TST
-};
+  static  const CODE U8  nSfwVerTest =
+  {
+    MANUFINFO_SFW_TST
+  };
 #endif // MANUFINFO_REV_SFW_TST_ENABLE
 
 /// initialize the title
@@ -97,39 +98,40 @@ static  const CODE C8  szPartNum1[ MANUFINFO_PRTNUM1_LEN ] =
 
 /// initialize the 2nd part number
 #if (MANUFINFO_PRTNUM2_LEN != 0 )
-static  const CODE C8  szPartNum2[ MANUFINFO_PRTNUM2_LEN ] = 
-{
-  MANUFINFO_PRTNUM2
-};
+  static  const CODE C8  szPartNum2[ MANUFINFO_PRTNUM2_LEN ] = 
+  {
+    MANUFINFO_PRTNUM2
+  };
 #endif  // MANUFINFO_PRTNUM2_LEN
 
 #if ( MANUFINFO_ENABLE_DEBUGCOMMANDS  == 1 )
+  // constant parameter initializations -----------------------------------------
+  /// declare the command strings
+  static  const CODE C8 szQryVer[ ]   = { "QVER" };
+  static  const CODE C8 szQryVerX[ ]  = { "QRYVER" };
 
-// constant parameter initializations -----------------------------------------
-/// declare the command strings
-static  const CODE C8 szQryVer[ ]   = { "QVER" };
-static  const CODE C8 szQryVerX[ ]  = { "QRYVER" };
+  /// initialize the command table
+  const CODE ASCCMDENTRY g_atManufInfoCmdHandlerTable[ ] =
+  {
+    ASCCMD_ENTRY( szQryVer,  4, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
+    ASCCMD_ENTRY( szQryVerX, 6, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
 
-/// initialize the command table
-const CODE ASCCMDENTRY g_atManufInfoCmdHandlerTable[ ] =
-{
-  ASCCMD_ENTRY( szQryVer,  4, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
-  ASCCMD_ENTRY( szQryVerX, 6, 0, ASCFLAG_COMPARE_NONE, 0, CmdQryVer ),
+    // the entry below must be here
+    ASCCMD_ENDTBL( )
+  };
 
-  // the entry below must be here
-  ASCCMD_ENDTBL( )
-};
-
-/// define the response strings
-static  const CODE C8 szRspVr1[ ]   = { "RVER, " };
-static  const CODE C8 szRspVr2[ ]   = { ", HDW:%02X_%02X, " };
-#if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
-static  const CODE C8 szRspVr3[ ]   = { "SFW:%02X_%02X_%02X\n\r" };
-#else
-static  const CODE C8 szRspVr3[ ]   = { "SFW:%02X_%02X\n\r" };
-#endif // MANUFINFO_REV_SFW_TST_ENABLE
-
-static  const CODE C8 szNewLine[ ]  = { "\n\r" };
+  /// define the response strings
+  static  const CODE C8 szRspVr1[ ]   = { "RVER, " };
+  #if (( MANUFINFO_REV_BLT_VER_ENABLE == 1 ) && ( SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS != 0 ))
+    static  const CODE C8 szRspBtl[ ] = { ", BTL:%02X_%02X" };
+  #endif // SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS
+  static  const CODE C8 szRspVr2[ ]   = { ", HDW:%02X_%02X, " };
+  #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+    static  const CODE C8 szRspVr3[ ]   = { "SFW:%02X_%02X_%02X, " };
+  #else
+    static  const CODE C8 szRspVr3[ ]   = { "SFW:%02X_%02X" };
+  #endif // MANUFINFO_REV_SFW_TST_ENABLE
+  static  const CODE C8 szNewLine[ ]  = { "\n\r" };
 #endif // MANUFINFO_ENABLE_DEBUGCOMMANDS
 
 /******************************************************************************
@@ -165,21 +167,21 @@ U8 ManufInfo_GetSfwMinor( void )
 }
 
 #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
-/******************************************************************************
- * @function ManufInfo_GetSfwTest
- *
- * @brief get the version test
- *
- * This function returns the test portion of the version
- *
- * @return      test revision
- *
- *****************************************************************************/
-U8 ManufInfo_GetSfwTest( void )
-{
-  // return the value
-  return( PGM_RDBYTE( nSfwVerTest ));
-}
+  /******************************************************************************
+   * @function ManufInfo_GetSfwTest
+   *
+   * @brief get the version test
+   *
+   * This function returns the test portion of the version
+   *
+   * @return      test revision
+   *
+   *****************************************************************************/
+  U8 ManufInfo_GetSfwTest( void )
+  {
+    // return the value
+    return( PGM_RDBYTE( nSfwVerTest ));
+  }
 #endif // MANUFINFO_REV_SFW_TST_ENABLE
 
 /******************************************************************************
@@ -263,58 +265,70 @@ const PC8 ManufInfo_GetPartNum1( void )
 }
 
 #if ( MANUFINFO_PRTNUM2_LEN != 0 )
-/******************************************************************************
- * @function ManufInfo_GetPartNum2
- *
- * @brief gets the 2nd part number
- *
- * This function returns the 2nd part number
- *
- * @return      pointer to the 2nd part number
- *
- *****************************************************************************/
-const PC8 ManufInfo_GetPartNum2( void )
-{
-  // return the pointer to the 2nd part number
-  return(( const PC8 )&szPartNum2 );
-}
+  /******************************************************************************
+   * @function ManufInfo_GetPartNum2
+   *
+   * @brief gets the 2nd part number
+   *
+   * This function returns the 2nd part number
+   *
+   * @return      pointer to the 2nd part number
+   *
+   *****************************************************************************/
+  const PC8 ManufInfo_GetPartNum2( void )
+  {
+    // return the pointer to the 2nd part number
+    return(( const PC8 )&szPartNum2 );
+  }
 #endif // MANUFINFO_PRTNUM2_LEN 
 
 #if ( MANUFINFO_ENABLE_DEBUGCOMMANDS  == 1 )
-/******************************************************************************
- * @function CmdQryVer
- *
- * @brief query version command handler
- *
- * This function outputs the current board title and version
- *
- * @return  Aappropriate statue
- *****************************************************************************/
-static ASCCMDSTS CmdQryVer( U8 nCmdEnum )
-{
-  PC8   pcBuffer;
-  U16   wBufferIndex;
- 
-  // get a pointer to the buffer
-  AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
+  /******************************************************************************
+   * @function CmdQryVer
+   *
+   * @brief query version command handler
+   *
+   * This function outputs the current board title and version
+   *
+   * @return  Aappropriate statue
+   *****************************************************************************/
+  static ASCCMDSTS CmdQryVer( U8 nCmdEnum )
+  {
+    PC8   pcBuffer;
+    U16   wBufferIndex = 0;
+    #if (( MANUFINFO_REV_BLT_VER_ENABLE == 1 ) && ( SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS != 0 ))
+      U32   uBootLoadRevAddress;
+      U32UN tBootLoadRevision;
+    #endif // SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS 
+  
+    #if (( MANUFINFO_REV_BLT_VER_ENABLE == 1 ) && ( SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS != 0 ))
+      // set the address of the boot loader
+      uBootLoadRevAddress = SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS;
+      tBootLoadRevision.uValue = *( PU32 )( uBootLoadRevAddress );
+    #endif
 
-  // output the version=
-  AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szRspVr1 );
-  AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szTitle );
-  wBufferIndex = SPRINTF_P( pcBuffer, ( char const * )szRspVr2, nHdwVerMajor, nHdwVerMinor );
-  #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
-  SPRINTF_P( ( pcBuffer + wBufferIndex ), ( char const * )szRspVr3, nSfwVerMajor, nSfwVerMinor, nSfwVerTest );
-  #else
-  SPRINTF_P( ( pcBuffer + wBufferIndex ), ( char const * )szRspVr3, nSfwVerMajor, nSfwVerMinor );
-  #endif // MANUFINFO_REV_SFW_TST_ENABLE
-  AsciiCommandHandler_OutputBuffer( nCmdEnum );
-  AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szPartNum2 );
-  AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szNewLine );
+    // get a pointer to the buffer
+    AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
 
-  // return the error
-  return( ASCCMD_STS_NONE );
-}
+    // output the version=
+    AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szRspVr1 );
+    AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szTitle );
+    #if (( MANUFINFO_REV_BLT_VER_ENABLE == 1 ) && ( SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS != 0 ))
+      wBufferIndex = SPRINTF_P( pcBuffer + wBufferIndex, ( PCC8 )szRspBtl, tBootLoadRevision.anValue[ LE_U32_LSB_IDX ], tBootLoadRevision.anValue[ LE_U32_MS1_IDX ] );
+    #endif // SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS 
+    wBufferIndex += SPRINTF_P( pcBuffer + wBufferIndex, ( PCC8 )szRspVr2, nHdwVerMajor, nHdwVerMinor );
+    #if ( MANUFINFO_REV_SFW_TST_ENABLE == 1 )
+      SPRINTF_P( ( pcBuffer + wBufferIndex ), ( PCC8 )szRspVr3, nSfwVerMajor, nSfwVerMinor, nSfwVerTest );
+    #else
+      SPRINTF_P( ( pcBuffer + wBufferIndex ), ( PCC8 )szRspVr3, nSfwVerMajor, nSfwVerMinor );
+    #endif // MANUFINFO_REV_SFW_TST_ENABLE
+    AsciiCommandHandler_OutputBuffer( nCmdEnum );
+    AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szPartNum2 );
+    AsciiCommandHandler_OutputString( nCmdEnum, ( PC8 )szNewLine );
 
+    // return the error
+    return( ASCCMD_STS_NONE );
+  }
 #endif // MANUFINFO_ENABLE_DEBUGCOMMANDS
 
 /**@} EOF ManufInfo.c */

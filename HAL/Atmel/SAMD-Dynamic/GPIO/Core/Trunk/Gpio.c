@@ -47,7 +47,7 @@
 #define ENUM_GET_PORT( enum )                   (( enum >> 8 ) & 0x0FF )
 #define ENUM_GET_PIN( enum )                    (( enum >> 1 ) & 0x01F )
 #define ENUM_GET_INVERT( enum )                 ( enum & 0x01 )
-#define	ENUM_GET_REG( enum )										(( enum >> 8 & 0xFF )
+#define	ENUM_GET_REG( enum )										(( enum >> 8 ) & 0xFF )
 #define	ENUM_GET_IRQ( enum )										( enum & 0xFF )
 
 // enumerations ---------------------------------------------------------------
@@ -80,7 +80,6 @@ static		PVGPIOIRQCALLBACK	apvCallbacks[ EIC_EXTINT_NUM ];
  *****************************************************************************/
 U32 Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bHiDriveEnb, GPIOFUNCMUX eFunc, BOOL bInvert )
 {
-  U8                nIdx, nRegOfs, nPinOfs;
   PortGroup*        ptPort;
   PORT_PINCFG_Type  tPinCfg;
   PORT_PMUX_Type    tPinMux;
@@ -133,6 +132,13 @@ U32 Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bHiDriveEnb, G
     // set the mux
     tPinMux.bit.PMUXE = eFunc;
   }
+
+  // if this pin is inverted, toggle the output
+  if ( bInvert )
+  {
+    // toggle the default state
+    ptPort->OUTTGL.reg = uMask;
+  }
     
   // write it back out
   ptPort->PMUX[ nPin >> 1] = tPinMux;
@@ -142,7 +148,7 @@ U32 Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bHiDriveEnb, G
 }
 
 /******************************************************************************
- * @function Gpio_Configure
+ * @function Gpio_ConfigureIrq
  *
  * @brief configure a GPIO pin
  *
@@ -155,17 +161,19 @@ U32 Gpio_Configure( GPIOPORT ePort, U8 nPin, GPIOMODE eMode, BOOL bHiDriveEnb, G
  * @param[in]   bFilterEnable	enable the filter mode
  * @param[in]		bWakeup				wakeup enable
  * @param[in]		bInitOn				intially on
+ * @param[in]   bEvent        event flag
  * @param[in]   pvCallback		IRQ callback function
  *
  * @return      GPIO enum   GPIO enumeration for reference
  *
  *****************************************************************************/
-GPIOENUM Gpio_ConfigureIRQ( GPIOPORT ePort, U8 nPin, GPIOIRQSENSE eSense, BOOL bPullupEnable, BOOL bFilterEnable, BOOL bWakeup, BOOL bInitOn, PVGPIOIRQCALLBACK pvCallback )
+GPIOENUM Gpio_ConfigureIRQ( GPIOPORT ePort, U8 nPin, GPIOIRQSENSE eSense, BOOL bPullupEnable, BOOL bFilterEnable, BOOL bWakeup, BOOL bInitOn, BOOL bEvent, PVGPIOIRQCALLBACK pvCallback )
 {
-  U8                nIdx, nRegOfs, nPinOfs;
+  U8                nRegOfs, nPinOfs;
   PortGroup*        ptPort;
   PORT_PINCFG_Type  tPinCfg;
   PORT_PMUX_Type    tPinMux;
+  EIC_CONFIG_Type   tEicCfg;
   U32               uMask;
   
   // get the port/pin mask
@@ -179,10 +187,10 @@ GPIOENUM Gpio_ConfigureIRQ( GPIOPORT ePort, U8 nPin, GPIOIRQSENSE eSense, BOOL b
   ptPort->PINCFG[ nPin ] = tPinCfg;
   
 	// get the current value
-	tPinMux = ptPort->PMUX[ ptIrq->nPin >> 1 ];
+	tPinMux = ptPort->PMUX[ nPin >> 1 ];
 	
 	// now determine which nibble we are processing
-	if ( ptIrq->nPin & 0x01 )
+	if ( nPin & 0x01 )
 	{
 		// set the mux
 		tPinMux.bit.PMUXO = 0;
@@ -194,57 +202,43 @@ GPIOENUM Gpio_ConfigureIRQ( GPIOPORT ePort, U8 nPin, GPIOIRQSENSE eSense, BOOL b
 	}
 	
 	// write it back out
-	ptPort->PMUX[ ptIrq->nPin >> 1] = tPinMux;
+	ptPort->PMUX[ nPin >> 1] = tPinMux;
 	
 	// set the direction bit
-	if ( bPullupEnble )
+	if ( bPullupEnable )
 	{
 		// set the pull up
 		ptPort->DIRSET.reg = uMask;
 	}
       
-	// test for the odd Port A
-	if (( ptIrq->ePort == GPIO_PORT_A ) && ( ptIrq->nPin >= 24 ))
-	{
-		// adjust for pins 24-31
-		if (( ptIrq->nPin >= 24 ) && ( ptIrq->nPin <=27 ))
-		{
-		// set the pin offset
-			nPinOfs = (( ptIrq->nPin + 4 ) % 8 );
-		}
-		else
-		{
-		// set the pin offset
-			nPinOfs = (( ptIrq->nPin - 4 ) % 8 );
-		}
-	}
-	else
-	{
-		// set the pin offset
-		nPinOfs = ptIrq->nPin % 8;
-	}
-
 	// get the register offset
-	nRegOfs = ( ptIrq->nPin & 0x0F ) / 8;
-	nPinOfs = ptIrq->nPin % 8;
+	nRegOfs = ( nPin & 0x0F ) / 8;
+	nPinOfs = nPin % 8;
 	 
 	// get the new value
 	tEicCfg = EIC->CONFIG[ nRegOfs ];
 	
 	// set the sense and filter
-	tEicCfg.reg |= ( BITS( bSense, ( EIC_CONFIG_SENSE1_Pos * nPinOfs )));
-	tEicCfg.reg |= ( BITS( bFilterEnb, ( EIC_CONFIG_FILTEN0_Pos + ( nPinOfs * EIC_CONFIG_SENSE1_Pos ))));
+	tEicCfg.reg |= ( BITS( eSense, ( EIC_CONFIG_SENSE1_Pos * nPinOfs )));
+	tEicCfg.reg |= ( BITS( bFilterEnable, ( EIC_CONFIG_FILTEN0_Pos + ( nPinOfs * EIC_CONFIG_SENSE1_Pos ))));
 	
 	// write it back
 	EIC->CONFIG[ nRegOfs ] = tEicCfg;
 	
 	// now set the wakeup
-	nPinOfs = ptIrq->nPin % EIC_EXTINT_NUM;
-	EIC->WAKEUP.reg |= ( bWakeupEnb ) ? BIT( nPinOfs ) : 0;
+	nPinOfs = nPin % EIC_EXTINT_NUM;
+	EIC->WAKEUP.reg |= ( bWakeup ) ? BIT( nPinOfs ) : 0;
 	
 	// save the callback
 	apvCallbacks[ nPinOfs ] = pvCallback;
-	
+
+  // test for event
+  if ( TRUE == bEvent )
+  {
+    // enavle the event
+    EIC->EVCTRL.reg |= BIT( nPinOfs );
+  }
+
 		// if initial on
 	if ( bInitOn )
 	{
@@ -252,8 +246,15 @@ GPIOENUM Gpio_ConfigureIRQ( GPIOPORT ePort, U8 nPin, GPIOIRQSENSE eSense, BOOL b
 		EIC->INTENSET.reg |= BIT( nPinOfs );
 	}
 
+  // enable the EIC interrupt
+  NVIC_EnableIRQ( EIC_IRQn );
+
+  // enable the controller
+  EIC->CTRL.reg = EIC_CTRL_ENABLE;
+  while( EIC->STATUS.bit.SYNCBUSY == TRUE );
+
   // now return the GPIO enumration
-  return( ENUM_IRQ_GEN( nRegOfx, nPinOfs ));
+  return( ENUM_IRQ_GEN( nRegOfs, nPinOfs ));
 }
 
 /******************************************************************************
@@ -401,13 +402,12 @@ GPIOERR Gpio_Toggle( GPIOENUM uGpioSel )
 GPIOERR Gpio_IrqControl( GPIOENUM uGpioSel, BOOL bState )
 {
   GPIOERR eError = GPIO_ERR_NONE;
-	U8			nPinOfs, nRegOfs;
+	U8			nPinOfs;
 
   // test valid pin
   if ( ENUM_TEST_IRQ_SIG( uGpioSel ))
   {
 		//  get the register/pinoffset
-		nRegOfs = ENUM_GET_REG( uGpioSel );
 		nPinOfs = ENUM_GET_IRQ( uGpioSel );
 		
 		if ( bState )

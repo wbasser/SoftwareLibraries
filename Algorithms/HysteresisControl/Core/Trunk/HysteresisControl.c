@@ -35,19 +35,10 @@
 // enumerations ---------------------------------------------------------------
 
 // structures -----------------------------------------------------------------
-/// define the control structure
-typedef struct _LCLCTL
-{
-  U16     wExecTime;
-  U16     wExecRate;
-  S16     iSetPoint;
-} LCLCTL, *PLCLCTL;
-#define LCLCTL_SIZE             sizeof( LCLCTL )
 
 // global parameter declarations ----------------------------------------------
 
 // local parameter declarations -----------------------------------------------
-static  LCLCTL  atLclCtl[ HYST_CONTROL_ENUM_MAX ];
 
 // local function prototypes --------------------------------------------------
 
@@ -63,96 +54,36 @@ static  LCLCTL  atLclCtl[ HYST_CONTROL_ENUM_MAX ];
  *****************************************************************************/
 void HysteresisControl_Initialize( void )
 {
-  PHYSTCONTROLDEF ptDef;
-  HYSTCONTROLENUM eCtrlEnum;
-  PLCLCTL         ptCtl;
-
-  // for each control
-  for ( eCtrlEnum = 0; eCtrlEnum < HYST_CONTROL_ENUM_MAX; eCtrlEnum++ )
-  {
-    // get the pointers to the def/control structure
-    ptDef = ( PHYSTCONTROLDEF )&atHystControlDefs[ eCtrlEnum ];
-    ptCtl = &atLclCtl[ eCtrlEnum ];
-    ptCtl->wExecRate = PGM_RDDWRD( ptDef->uExecutionRate ) / HYSTERESISCONTROL_EXEC_RATE;
-  }
 }
 
 /******************************************************************************
- * @function HysteresisControl_ProcessControl
+ * @function HysteresisControl_Process
  *
  * @brief process the control task
  *
- * This function will perform the process of each hysteresis control
+ * This function will perform the process
  *
- * @param[in]   xArg      task argument
+ * @param[in]   ptHystCtl     pointer to the definition structure
+ * @param[in]   xSetPoint     setpoint value
+ * @param[in]   xProcVar      process variable value
  *
- * @return      TRUE      flush the event
+ * @return      state of the output variable
  *
  *****************************************************************************/
-BOOL HysteresisControl_ProcessControl( TASKARG xArg )
+BOOL HysteresisControl_Process( HYSTCONTROLDEF ptHystDef, HYSTARG xSetPoint, HYSTARG xProcVar );
 {
-  PHYSTCONTROLDEF ptDef;
-  HYSTCONTROLENUM eCtrlEnum;
-  PLCLCTL         ptCtl;
-  S16             iSensorValue;
-  BOOL            bRelayState = OFF;
+  BOOL  bOutputState = OFF;
   
-  // for each control
-  for ( eCtrlEnum = 0; eCtrlEnum < HYST_CONTROL_ENUM_MAX; eCtrlEnum++ )
+  // check for on/off
+  if (( xProcVar <= ( xSetPoint - PGM_RDWORD( ptHystDef->xPosHysteresis ))) ||
+      ( xProcVar >= ( xSetPoint - PGM_RDWORD( ptHystDef-xiNegHysteresis ))))
   {
-    // get the pointers to the def/control structure
-    ptDef = ( PHYSTCONTROLDEF )&atHystControlDefs[ eCtrlEnum ];
-    ptCtl = &atLclCtl[ eCtrlEnum ];
-    
-    // increment the count/test for done
-    if ( ++ptCtl->wExecTime >= ptCtl->wExecRate )
-    {
-      // reset the count
-      ptCtl->wExecTime = 0;
-      
-      // now get the process variable
-      SensorManager_GetValue( PGM_RDBYTE( ptDef->eSensorEnum ), &iSensorValue );
-      
-      // check for on/off
-      if ( iSensorValue <= ( ptCtl->iSetPoint - PGM_RDWORD( ptDef->iPosHysteresis )))
-      {
-        // turn on relay
-        bRelayState = ON;
-      }
-      else if ( iSensorValue >= ( ptCtl->iSetPoint - PGM_RDWORD( ptDef->iNegHysteresis )))
-      {
-        // turn on relay
-        bRelayState = ON;
-      }
-
-      // set the relay state
-      RelayManager_SetState( PGM_RDBYTE( ptDef->eRelayEnum ), bRelayState );
-    }
+    // turn on output
+    bOutputState = ON;
   }
 
-  // return TRUE - flush event
-  return( TRUE );
-}
-
-/******************************************************************************
- * @function HysteresisControl_PutSetpont
- *
- * @brief put the new setpoint
- *
- * This function will set the new setpoint for a hysteresis control channel
- *
- * @param[in]   eHystCtlEnum      hysteresis control enumeration
- * @Param[in]   iSetpoint         new control setpoint
- *
- *****************************************************************************/
-void HysteresisControl_PutSetpoint( HYSTCONTROLENUM eHystCtlEnum, S16 iSetpoint )
-{
-  // update the setpoint
-  if ( eHystCtlEnum < HYST_CONTROL_ENUM_MAX )
-  {
-    // update the setpoint
-    atLclCtl[ eHystCtlEnum ].iSetPoint = iSetpoint;
-  }
+  // return the output state
+  return( bOutputState );
 }
 
 /**@} EOF HysteresisControl.c */

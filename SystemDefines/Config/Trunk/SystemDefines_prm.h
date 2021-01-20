@@ -27,8 +27,9 @@
 
 // Macros and Defines ---------------------------------------------------------
 /// define the operating system types
-#define SYSTEMDEFINE_OS_TASKMANAGER               ( 0 )
-#define SYSTEMDEFINE_OS_FREERTOS                  ( 1 )
+#define SYSTEMDEFINE_OS_NONE                      ( 0 )
+#define SYSTEMDEFINE_OS_TASKMANAGER               ( 1 )
+#define SYSTEMDEFINE_OS_FREERTOS                  ( 2 )
 #define SYSTEMDEFINE_OS_TASKSCHEDULER             ( 3 )
 #define SYSTEMDEFINE_OS_MINIMAL                   ( 4 )
 
@@ -40,6 +41,9 @@
 
 /// define the system password for log reset
 #define SYSTEMDEFINE_LOGENTRIES_RESET             ( 0xDEAFFEED )
+
+/// define the system bootloader revision address
+#define SYSTEMDEFINE_BOOTLOADER_REV_ADDRESS       ( 0 )
 
 /**@} EOF SystemDefines.h */
 

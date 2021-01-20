@@ -70,7 +70,7 @@ void Event_Initialize( void )
   for ( eEvent = 0; eEvent < EVENT_ENUM_MAX; eEvent++ )
   {
     // get a pointer to the definition
-    ptDef = ( PEVENTDEF )&atEventDefs[ eEvent ];
+    ptDef = ( PEVENTDEF )&g_atEventDefs[ eEvent ];
 
     // set up the channel
     tChan.reg = EVSYS_CHANNEL_CHANNEL( ptDef->eChannel );

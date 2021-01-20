@@ -30,26 +30,45 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
-#include "HysteresisControl/HysteresisControl_cfg.h"
+#include "HysteresisControl/HysteresisControl_def.h"
 
 // library includes -----------------------------------------------------------
-#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the number of events/execution rate
-#define HYSTERESISCONTROL_NUM_EVENTS            ( 4 )
-#define HYSTERESISCONTROL_EXEC_RATE             ( TASK_TIME_SECS( 1 ))
+/// set the argument size
+#if ( HYSTCONTROL_ARG_TYPE == HYSTCONTROL_ARGTYPE_FLOAT )
+	typedef FLOAT HYTSARG;
+#elif ( HYSTCONTROL_ARG_TYPE == HYSTCONTROL_ARGTYPE_INTEGER )
+  #if ( HYSTCONTROL_INTARG_SIZE_BYTES == 1 )
+    typedef S8    HYSTARG;
+  #elif ( HYSTCONTROL_INTARG_SIZE_BYTES == 2 )
+    typedef S16   HYSTARG;
+  #elif ( HYSTCONTROL_INTARG_SIZE_BYTES == 4 )
+    typedef S32   HYSTARG;
+  #else
+    #error illegal Hysteresis integer argument length
+  #endif
+#else
+  #error Illegal Hysteresis arugment type
+#endif // HYSTCONTROL_ARG_TYPE
+
 
 // enumerations ---------------------------------------------------------------
 
 // structures -----------------------------------------------------------------
+/// define the definition structure
+typedef struct _HYSTCONTROLDEF
+{
+  HYSTARG     xPosHysteresis;
+  HYSTARG     xNegHysteresis;
+} HYSTCONTROLDEF, *PHYSTCONTROLDEF;
+#define HYSTCONTROLDEF_SIZE           sizeof( HYSTCONTROLDEF )
 
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
 extern  void  HysteresisControl_Initialize( void );
-extern  BOOL  HysteresisControl_ProcessControl( TASKARG xArg );
-extern  void  HysteresisControl_PutSetpoint( HYSTCONTROLENUM eHystCtlEnum, S16 iSetpoint );
+extern  BOOL  HysteresisControl_Process( HYSTCONTROLDEF ptHysDef, HYSTARG xSetPoint, HYSTARG xProcVar );
 
 /**@} EOF HysteresisControl.h */
 

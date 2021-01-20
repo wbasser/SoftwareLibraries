@@ -373,4 +373,5 @@ static void BcdToHex( U8 nBcdMsb, U8 nBcdLsb, PU8 pnHexValue )
   *( pnHexValue ) = ( nBcdMsb * 10 ) + nBcdLsb;
 }
 
+
 /**@} EOF RtcDs1340.c */

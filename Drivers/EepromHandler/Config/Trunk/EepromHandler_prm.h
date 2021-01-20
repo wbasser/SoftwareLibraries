@@ -39,13 +39,13 @@
 #define	EEPROMHANDLER_DEV_ADDR                      ( 0x50 )
 
 /// define the size of the device
-#define	EEPROMHANDLER_DEV_SIZE                      ( 8192 )
+#define	EEPROMHANDLER_DEV_SIZE                      ( 1024 )
 
 /// define the size of the block in page write
-#define EEPROMHANDLER_BLK_SIZE                      ( 16 )
+#define EEPROMHANDLER_BLK_SIZE                      ( 8 )
 
 /// define the size of the address
-#define EEPROMHANDLER_ADR_SIZE                      ( 2 )
+#define EEPROMHANDLER_ADR_SIZE                      ( 1 )
 
 /// define the device enum
 #define EEPROMHANDLER_DEVICE                        ( 0 )
@@ -60,13 +60,13 @@
 #define EEPROMHANDLER_LOGBLOCK_BASE_ADDR            ( 128 )
 
 /// define the enumeration for the I2C
-#define EEPROMHANDLER_I2C_ENUM                      ( I2C_DEV_ENUM_ILLEGAL )
+#define EEPROMHANDLER_I2C_ENUM                      ( I2C_DEV_ENUM_LCLBUS )
 
 /// define the operation for busy polling( 0 - write, 1 - read )
-#define EEPROMHANDLER_I2C_POLL_MODE                 ( 1 )
+#define EEPROMHANDLER_I2C_POLL_MODE                 ( 0 )
 
 /// define the macro to enable debug commands
-#define EEPROMHANDLER_ENABLE_DEBUGCOMMANDS          ( 0 )
+#define EEPROMHANDLER_ENABLE_DEBUGCOMMANDS          ( 1 )
 
 #if ( EEPROMHANDLER_ENABLE_DEBUGCOMMANDS == 1 )
 /// define the system mode to allow debug commands in
@@ -83,9 +83,6 @@
 /// define the background write task enum
 #define EEPROM_HANDLER_BACKGROUND_TASK_ENUM         ( TASK_SCHD_ILLEGAL )
 #endif
-
-/// define the function to get system time
-#define EEPROMHANDLER_GET_SYSTEMTIME                ( SystemTick_GetTimeMsec )
 
 /// define the page write time
 #define EEPROMHANDLER_PAGE_WRITE_MSECS              ( 10 )

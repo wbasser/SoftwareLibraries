@@ -42,7 +42,7 @@ extern  BOOL  TaskManager_PostPriorityEventIrq( TASKSCHDENUMS eTask, TASKARG xAr
 extern	BOOL  TaskManager_FlushEvents( TASKSCHDENUMS eTask );
 extern	BOOL  TaskManager_StartTimer( TASKSCHDENUMS eTask, U32 uTime );
 extern	BOOL  TaskManager_StopTimer( TASKSCHDENUMS eTask );
-extern  BOOL  TaskManager_CheckTasksPending( void );
+extern  BOOL  TaskManager_CheckTasksPending( TASKSCHDENUMS eTask );
 #if ( TASK_TICK_ENABLE == 1 )
 extern  BOOL  TaskManager_TickEnableDisable( TASKTICKENUMS eTask, BOOL bState );
 #endif  // TASK_TICK_ENABLE

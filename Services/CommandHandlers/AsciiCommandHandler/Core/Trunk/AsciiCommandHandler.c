@@ -107,7 +107,7 @@ void AsciiCommandHandler_Initialize( void )
   for ( eIdx = 0; eIdx < ASCCMD_ENUM_MAX; eIdx++ )
   {
     // get a pointer to the control/definition structures
-    ptDef = ( PASCCMDDEF )&atAscCmdDefs[ eIdx ];
+    ptDef = ( PASCCMDDEF )&g_atAscCmdDefs[ eIdx ];
 
     // clear the indices/number of arguments/pointer to the command
     atLclCtl[ eIdx ].nBufIdx = 0;
@@ -152,7 +152,7 @@ ASCCMDSTS AsciiCommandHandler_ProcessChar( ASCCMDENUM eProtEnum, C8 cRcvChar, U8
   {
       // get a pointer to the control/definition structures
     ptCtl = &atLclCtl[ eProtEnum ];
-    ptDef = ( PASCCMDDEF )&atAscCmdDefs[ eProtEnum ];
+    ptDef = ( PASCCMDDEF )&g_atAscCmdDefs[ eProtEnum ];
     
     // get the write character function/buffer pointer/echo flag
     pvCurWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( ptDef->pvWriteFunc );
@@ -260,7 +260,7 @@ ASCCMDSTS AsciiCommandHandler_ProcessChar( ASCCMDENUM eProtEnum, C8 cRcvChar, U8
         eStatus = ASCCMD_STS_MSGPROCESSED;
 
         // display the prompt
-        OutputPrompt( PGM_RDBYTE( ptCtl->cCurPrompt ));
+        OutputPrompt( ptCtl->cCurPrompt );
 
         // clear the length
         ptCtl->nBufIdx = 0;
@@ -285,7 +285,7 @@ ASCCMDSTS AsciiCommandHandler_ProcessChar( ASCCMDENUM eProtEnum, C8 cRcvChar, U8
       ptCtl->nBufIdx = 0;
 
       // output a new line
-        OutputString(( const PC8 )g_szAsciiNewLin );
+      OutputString(( const PC8 )g_szAsciiNewLin );
     }
     else
     {
@@ -407,7 +407,7 @@ ASCCMDSTS AsciiCommandHandler_GetArg( ASCCMDENUM  eProtEnum, U8 nArgIdx, PC8* pp
     if ( nArgIdx < atLclCtl[ eProtEnum ].nNumArgs )
     {
       // get the pointer to the argument array
-      ppcArgs = ( PC8* )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].ppcArgs );
+      ppcArgs = ( PC8* )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].ppcArgs );
       *ppcArg = *( ppcArgs + nArgIdx );
     }
     else
@@ -451,7 +451,7 @@ ASCCMDSTS AsciiCommandHandler_GetValue( ASCCMDENUM eProtEnum, U8 nArgIdx, PU32 p
     if ( nArgIdx < atLclCtl[ eProtEnum ].nNumArgs )
     {
       // get the pointer to the argument array
-      puVals = ( PU32 )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].puVals );
+      puVals = ( PU32 )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].puVals );
       *puValue = *( puVals + nArgIdx );
     }
     else
@@ -494,7 +494,7 @@ ASCCMDSTS AsciiCommandHandler_GetBuffer( ASCCMDENUM eProtEnum, PC8* ppcBuffer )
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
     // return the pointer
-    *( ppcBuffer ) = ( PC8 )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pcBuffer );
+    *( ppcBuffer ) = ( PC8 )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pcBuffer );
   }
   else
   {
@@ -529,10 +529,10 @@ ASCCMDSTS AsciiCommandHandler_OutputBuffer( ASCCMDENUM eProtEnum )
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
     // get the buffer
-    pcBuffer = ( PC8 )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pcBuffer );
+    pcBuffer = ( PC8 )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pcBuffer );
 
     // get the write routine/output the string
-    pvWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pvWriteFunc );
+    pvWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pvWriteFunc );
     pvWriteFunc( pcBuffer, strlen( pcBuffer ));
   }
   else
@@ -562,35 +562,31 @@ ASCCMDSTS AsciiCommandHandler_OutputString( ASCCMDENUM eProtEnum, PC8 pcString )
 {
   ASCCMDSTS       eStatus = ASCCMD_STS_NONE;
   PVASCWRITEFUNC  pvWriteFunc;
+  PC8             pcBuffer;
+  U8              nStrLen;
+      
   
   // check for valid protocol
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
     // get the write routine/output the string
-    pvWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pvWriteFunc );
+    pvWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pvWriteFunc );
 
-    #ifdef __ATMEL_AVR__
-    PC8 pcBuffer;
-    U8  nStrLen;
-      
-    // get the length
-    nStrLen = STRLEN_P( pcString );
+      // get the length
+      nStrLen = STRLEN_P( pcString );
 
-    // allocate space
-    if (( pcBuffer = ( PC8 )malloc( nStrLen )) != NULL )
-    {
-      // copy to the local buffer
-      STRCPY_P( pcBuffer, pcString );
+      // allocate space
+      if (( pcBuffer = ( PC8 )malloc( nStrLen )) != NULL )
+      {
+        // copy to the local buffer
+        STRCPY_P( pcBuffer, pcString );
       
-      // now output it
-      pvWriteFunc( pcBuffer, strlen( pcBuffer ));
+        // now output it
+        pvWriteFunc( pcBuffer, strlen( pcBuffer ));
       
-      // free the buffer
-      free( pcBuffer );
-    }
-    #else
-    pvWriteFunc( pcString, strlen( pcString ));
-    #endif  // __ATMEL_AVR__
+        // free the buffer
+        free( pcBuffer );
+      }
   }
   else
   {
@@ -630,8 +626,8 @@ ASCCMDSTS AsciiCommandHandler_DisplayBlock( ASCCMDENUM eProtEnum, U16 wBaseAddr,
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
     // get the write routine/pointer to the buffer
-    pvWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pvWriteFunc );
-    pcBuffer = ( PC8 )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pcBuffer );
+    pvWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pvWriteFunc );
+    pcBuffer = ( PC8 )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pcBuffer );
 
     // for each byte in the block
     for ( wBlockIndex = 0; wBlockIndex < wLength; wBlockIndex += NUM_ELEMS_LINE )
@@ -729,7 +725,7 @@ ASCCMDSTS AsciiCommandHandler_SetPromptCharacter( ASCCMDENUM eProtEnum, C8 cProm
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
     // set the prompt
-    atLclCtl[ eProtEnum ].cCurPrompt =  ( cPrompt > 0 ) ? cPrompt : PGM_RDBYTE( atAscCmdDefs[ eProtEnum ].cPromptChar );
+    atLclCtl[ eProtEnum ].cCurPrompt =  ( cPrompt > 0 ) ? cPrompt : PGM_RDBYTE( g_atAscCmdDefs[ eProtEnum ].cPromptChar );
   }
   else
   {
@@ -761,7 +757,7 @@ ASCCMDSTS AsciiCommandHandler_OutputPrompt( ASCCMDENUM eProtEnum )
   if ( eProtEnum < ASCCMD_ENUM_MAX )
   {
     // get the write function
-    pvCurWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( atAscCmdDefs[ eProtEnum ].pvWriteFunc );
+    pvCurWriteFunc = ( PVASCWRITEFUNC )PGM_RDWORD( g_atAscCmdDefs[ eProtEnum ].pvWriteFunc );
 
     // get the prompt character
     OutputPrompt( PGM_RDBYTE( atLclCtl[ eProtEnum ].cCurPrompt ));
@@ -810,7 +806,6 @@ static void OutputPrompt( C8 cPrompt )
  *****************************************************************************/
 static void OutputString( const PC8 pszString )
 {
-  #ifdef __ATMEL_AVR__
   U8  nStrLen;
   PC8 pcBuffer;
   
@@ -829,10 +824,6 @@ static void OutputString( const PC8 pszString )
     // free the buffer
     free( pcBuffer );
   }
-  #else
-  // output it
-  pvCurWriteFunc(( PC8 )pszString, strlen( pszString ));
-  #endif  // __ATMEL_AVR__
 }
 
 /******************************************************************************

@@ -111,7 +111,7 @@ QUEUESTATUS QueueManager_PutHead( QUEUEENUM eQueue, PU8 pnEntry )
   {
     // get a pointer to the control/definition structures
     ptCtl = &atQueueCtls[ eQueue ];
-    ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
+    ptDef = ( PQUEUEDEF )&g_atQueueDefs[ eQueue ];
     
     // get the number of events
     xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
@@ -219,7 +219,7 @@ QUEUESTATUS QueueManager_PutTail( QUEUEENUM eQueue, PU8 pnEntry )
   {
     // get a pointer to the control/definition structures
     ptCtl = &atQueueCtls[ eQueue ];
-    ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
+    ptDef = ( PQUEUEDEF )&g_atQueueDefs[ eQueue ];
     
     // get the number of events
     xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
@@ -322,7 +322,7 @@ QUEUESTATUS QueueManager_Get( QUEUEENUM eQueue, PU8 pnEntry )
   {
     // get a pointer to the control/definition structures
     ptCtl = &atQueueCtls[ eQueue ];
-    ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
+    ptDef = ( PQUEUEDEF )&g_atQueueDefs[ eQueue ];
     
     // get the number of events
     xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
@@ -422,7 +422,7 @@ QUEUESTATUS QueueManager_Peek( QUEUEENUM eQueue, PU8 pnEntry )
   {
     // get a pointer to the control/definition structures
     ptCtl = &atQueueCtls[ eQueue ];
-    ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
+    ptDef = ( PQUEUEDEF )&g_atQueueDefs[ eQueue ];
     
     // is there anything in the queue
     if ( ptCtl->xCount != 0 )
@@ -485,7 +485,7 @@ QUEUESTATUS QueueManager_Pop( QUEUEENUM eQueue )
   {
     // get a pointer to the control/definition structures
     ptCtl = &atQueueCtls[ eQueue ];
-    ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
+    ptDef = ( PQUEUEDEF )&g_atQueueDefs[ eQueue ];
     
     // get the number of events
     xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );
@@ -645,7 +645,7 @@ QUEUESTATUS QueueManager_GetStatus( QUEUEENUM eQueue )
   {
     // get a pointer to the control/definition structures
     ptCtl = &atQueueCtls[ eQueue ];
-    ptDef = ( PQUEUEDEF )&atQueueDefs[ eQueue ];
+    ptDef = ( PQUEUEDEF )&g_atQueueDefs[ eQueue ];
     
     // get the number of entries
     xNumEntries = PGM_RDBYTE( ptDef->xNumEntries );

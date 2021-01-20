@@ -39,10 +39,12 @@
 
 // local parameter declarations -----------------------------------------------
 static  U32   uSystemClockFreq;
+static  U32   uExt32OscFreq;
 
 // local function prototypes --------------------------------------------------
 static  void  ConfigureXosc( PCLOCKOSCDEF ptDef );
 static  void  ConfigureOsc32k( PCLOCKOSCDEF ptDef );
+static  void  ConfigureExt32k( PCLOCKOSCDEF ptDef );
 static  void  ConfigureOsc8Mhz( PCLOCKOSCDEF ptDef );
 static  void  ConfigureOscDfll( PCLOCKOSCDEF ptDef );
 static  void  ConfigureGenerator( PCLOCKGENDEF ptGen );
@@ -65,7 +67,11 @@ void Clock_Initialize( void )
   PCLOCKGENDEF  ptGenDef;
   U8            nIdx;
   BOOL          bRunFlag;
+  BOOL          bOsc8KEnabled;
   
+  // clear the OSC8K enabled fag
+  bOsc8KEnabled = FALSE;
+
   // now configure the flash wait states/clock divides
   NVMCTRL->CTRLB.bit.RWS = g_tClockMainDef.nFlashWaitStates;
   
@@ -101,12 +107,14 @@ void Clock_Initialize( void )
           break;
           
         case CLOCK_OSC_EXT32K :
+          ConfigureExt32k( ptClkDef );
           break;
           
         case CLOCK_OSC_INTLP32K :
           break;
           
         case CLOCK_OSC_INT8MZ :
+          bOsc8KEnabled = TRUE;
           ConfigureOsc8Mhz( ptClkDef );
           break;
           
@@ -126,6 +134,13 @@ void Clock_Initialize( void )
       // exit
       bRunFlag = FALSE;
     }
+  }
+
+  // check if 8K has been configured, if not, clear
+  if ( bOsc8KEnabled == FALSE )
+  {
+    // disable it
+    SYSCTRL->OSC8M.reg = 0;
   }
   
   // process the clock generators
@@ -211,7 +226,7 @@ U32 Clock_GetFreq( )
  *
  * @param[in]   eMuxId      multiplexer ID
  * 
- *  @return     the frequency of the clock
+*  @return     the frequency of the clock
  *
  *****************************************************************************/
 U32 Clock_GetMultiplexerFreq( CLOCKMUXID eMuxId )
@@ -285,6 +300,9 @@ static void ConfigureXosc( PCLOCKOSCDEF ptDef )
   
   // store it
   SYSCTRL->XOSC.reg = tOsc.reg;
+
+  // now configure the output generator
+  ConfigureGenerator( &ptDef->tOutGenDef );
 }
 
 /******************************************************************************
@@ -328,6 +346,47 @@ static void ConfigureOsc32k( PCLOCKOSCDEF ptDef )
   
   // store the settings
   SYSCTRL->OSC32K.reg = tOsc.reg;
+
+  // now configure the output generator
+  ConfigureGenerator( &ptDef->tOutGenDef );
+}
+
+/******************************************************************************
+ * @function ConfigureExt32k
+ *
+ * @brief configure the esternal 32K oscillator
+ *
+ * This function will configure the external 32K oscillator
+ *
+ * @param[in]   ptDef     pointer to a clock definition structure
+ *
+ *****************************************************************************/
+static void ConfigureExt32k( PCLOCKOSCDEF ptDef )
+{
+  // set the frequency
+  uExt32OscFreq = ptDef->uExtFreq;
+
+  // create a pointer
+  SYSCTRL_XOSC32K_Type tExt32;
+  
+  // set the calibration bits
+  tExt32.reg = 0;
+  tExt32.bit.XTALEN = ON;
+  tExt32.bit.EN1K = ptDef->tFlags.bEnable1KOut;
+  tExt32.bit.EN32K = ptDef->tFlags.bEnable32KOut;
+  tExt32.bit.STARTUP = ptDef->nStartupTime;
+  tExt32.bit.ONDEMAND = ptDef->tFlags.bOnDemand;
+  tExt32.bit.RUNSTDBY = ptDef->tFlags.bRunInStandby;
+  tExt32.bit.WRTLOCK = ptDef->tFlags.bLockBypass;
+
+  // enable it
+  tExt32.bit.ENABLE = TRUE;
+  
+  // store the settings
+  SYSCTRL->XOSC32K.reg = tExt32.reg;
+
+  // now configure the output generator
+  ConfigureGenerator( &ptDef->tOutGenDef );
 }
 
 /******************************************************************************
@@ -379,13 +438,13 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
   SYSCTRL_DFLLVAL_Type  tVal;
   SYSCTRL_DFLLMUL_Type  tMult;
   U32                   uCoarse, uFine;
-//  CLOCKMUXDEF           tClockMux;
+  CLOCKMUXDEF           tClockMux;
 
   // enable the multiplexer for the reference 
-//  tClockMux.bWriteLock = OFF;
-//  tClockMux.eClockGenId = CLOCK_GENID_1;
-//  tClockMux.eMuxId = CLOCK_MUXID_DFLL48M_REF;
-//  ConfigureMultiplexer( &tClockMux );
+  tClockMux.bWriteLock = OFF;
+  tClockMux.eClockGenId = CLOCK_GENID_1;
+  tClockMux.eMuxId = CLOCK_MUXID_DFLL48M_REF;
+  ConfigureMultiplexer( &tClockMux );
 
   // workaround for errate 9905
   SYSCTRL->DFLLCTRL.bit.ONDEMAND = OFF;
@@ -393,20 +452,23 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
 
   // fill the control structure
   tCtrl.reg = 0;
-//  #ifdef __SAM_D21_SUBFAMILY
-//  tCtrl.bit.WAITLOCK = OFF;
-//  tCtrl.bit.BPLCKC = OFF;
-//  tCtrl.bit.USBCRM = ptDef->tFlags.bEnableUsbRecovery;
-//  #endif
-//  tCtrl.bit.QLDIS = ON;
-//  tCtrl.bit.CCDIS = ( ptDef->tFlags.bEnableChillCycle ) ? FALSE : TRUE;
-//  tCtrl.bit.ONDEMAND = OFF;
-//  tCtrl.bit.RUNSTDBY = OFF;
-//  tCtrl.bit.LLAW = ptDef->tFlags.bKeepLockWakeup;
-//  tCtrl.bit.STABLE = OFF;
-//  tCtrl.bit.MODE = ptDef->tFlags.bClosedLoopMode;
-//  tCtrl.bit.ENABLE = OFF;
-    tCtrl.reg = SYSCTRL_DFLLCTRL_ENABLE | SYSCTRL_DFLLCTRL_USBCRM | SYSCTRL_DFLLCTRL_BPLCKC | SYSCTRL_DFLLCTRL_CCDIS | SYSCTRL_DFLLCTRL_STABLE;
+  #ifdef __SAM_D21_SUBFAMILY
+    tCtrl.bit.WAITLOCK = OFF;
+    tCtrl.bit.BPLCKC = OFF;
+    tCtrl.bit.USBCRM = ptDef->tFlags.bEnableUsbRecovery;
+  #endif
+  tCtrl.bit.QLDIS = ON;
+  tCtrl.bit.CCDIS = ( ptDef->tFlags.bEnableChillCycle ) ? FALSE : TRUE;
+  tCtrl.bit.ONDEMAND = OFF;
+  tCtrl.bit.RUNSTDBY = OFF;
+  tCtrl.bit.LLAW = ptDef->tFlags.bKeepLockWakeup;
+  tCtrl.bit.STABLE = OFF;
+  tCtrl.bit.MODE = ptDef->tFlags.bClosedLoopMode;
+  tCtrl.bit.ENABLE = OFF;
+  
+  // write it/wait for sync
+  SYSCTRL->DFLLCTRL.reg = tCtrl.reg;
+  while( !SYSCTRL->PCLKSR.bit.DFLLRDY );
 
   // clear the multipler/value registers
   tMult.reg = 0;
@@ -415,14 +477,26 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
   // determine the mode for coarse/fine/step/mul
   if ( ptDef->tFlags.bClosedLoopMode )
   {
+    // check to see if calibration overwrite is enabled 
+    if ( ptDef->tFlags.bOverwriteCal )
+    {
+      uCoarse = ptDef->nDfllCoarse;
+      uFine = ptDef->wDfllFine;
+    }
+    else
+    {
+      uCoarse =  *(( PU32 )( FUSES_DFLL48M_COARSE_CAL_ADDR )) >> FUSES_DFLL48M_COARSE_CAL_Pos;
+      uFine = *(( PU32 )( FUSES_DFLL48M_FINE_CAL_ADDR )) & FUSES_DFLL48M_FINE_CAL_Msk;
+    }
+
     // fill the coarse/fine/write it
-    uCoarse =  *(( PU32 )( FUSES_DFLL48M_COARSE_CAL_ADDR )) >> FUSES_DFLL48M_COARSE_CAL_Pos;
-    uFine = *(( PU32 )( FUSES_DFLL48M_FINE_CAL_ADDR )) & FUSES_DFLL48M_FINE_CAL_Msk;
     tVal.reg = SYSCTRL_DFLLVAL_COARSE( uCoarse );
     tVal.reg |= SYSCTRL_DFLLVAL_FINE( uFine );
 
     // set the coarse/fine step/multipler
-    tMult.reg = SYSCTRL_DFLLMUL_MUL( 48000 );
+    tMult.reg = SYSCTRL_DFLLMUL_MUL( 1500 );
+    tMult.reg |= SYSCTRL_DFLLMUL_CSTEP( uCoarse >> 1 );
+    tMult.reg |= SYSCTRL_DFLLMUL_FSTEP( uFine >> 1 );
   }
   else
   {
@@ -433,9 +507,9 @@ static void ConfigureOscDfll( PCLOCKOSCDEF ptDef )
   SYSCTRL->DFLLVAL.reg = tVal.reg;
   SYSCTRL->DFLLMUL.reg = tMult.reg;
 
-  // write it/wait for sync
-  SYSCTRL->DFLLCTRL.reg = tCtrl.reg;
-  while( !SYSCTRL->PCLKSR.bit.DFLLRDY );
+  // enable it
+  SYSCTRL->DFLLCTRL.bit.ENABLE = ON;
+  while( !SYSCTRL->PCLKSR.bit.DFLLLCKF );
 
   // now configure the output generator
   ConfigureGenerator( &ptDef->tOutGenDef );
@@ -555,6 +629,7 @@ static U32 GetSystemClockSource( CLOCKSRC eSrc )
       break;
       
     case CLOCK_SRC_XOSC32K :
+      uFreqHz = uExt32OscFreq;
       break;
         
     case CLOCK_SRC_OSC8M :

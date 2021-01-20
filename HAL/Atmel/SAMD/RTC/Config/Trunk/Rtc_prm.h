@@ -31,8 +31,6 @@
 #include "TYpes/Types.h"
 
 // Macros and Defines ---------------------------------------------------------
-/// define the operating system selection
-#define RTC_OS_SELECT           ( TIME_OS_MICRODOS )
 
 /// define the log RTC set enable macro
 #define RTC_ENABLE_TIMESET_LOG  ( 0 )

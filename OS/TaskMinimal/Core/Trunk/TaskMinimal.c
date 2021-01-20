@@ -86,14 +86,14 @@ void TaskMinimal_Initialize( void )
  * This function will create a task
  *
  * @param[in]   pvHandler       pointer ot the handler
- * @param[in]   nExecRateMsecs  execution reate in msecs
+ * @param[in]   wExecRateMsecs  execution reate in msecs
  * @param[in]   nNumEvents      number of events
  * @param[in]   bInitialOn      is the task evnable
  *
  * @return      task handle or NULL on error
  *
  *****************************************************************************/
-PTASKMINIMALHANDLE TaskMinimal_Create( PVCALLBACK pvHandler, U16 nExecRateMsecs, U8 nNumEvents, BOOL bInitialOn )
+PTASKMINIMALHANDLE TaskMinimal_Create( PVCALLBACK pvHandler, U16 wExecRateMsecs, U8 nNumEvents, BOOL bInitialOn )
 {
   PTASKCTL  ptNewTask, ptCurTask, ptLstTask;
   
@@ -106,13 +106,13 @@ PTASKMINIMALHANDLE TaskMinimal_Create( PVCALLBACK pvHandler, U16 nExecRateMsecs,
       // now initialize the control structure
       ptNewTask->ptSignature      = ptNewTask;
       ptNewTask->ptNextTask       = NULL;
-      ptNewTask->wExecRate        = nExecRateMsecs;
+      ptNewTask->wExecRate        = wExecRateMsecs;
       ptNewTask->wDelayCount      = 0;
       ptNewTask->nNrmRdIdx        = 0;
       ptNewTask->nNrmWrIdx        = 0;
       ptNewTask->nNrmCount        = 0;
       ptNewTask->nNrmEvents       = nNumEvents;
-      ptNewTask->bDelayInProgress = ( nExecRateMsecs != 0 );
+      ptNewTask->bDelayInProgress = ( wExecRateMsecs != 0 );
       ptNewTask->bEnabled         = bInitialOn;
       ptNewTask->pvHandler        = pvHandler;
       ptNewTask->bTimeElapsed     = FALSE;
@@ -224,6 +224,47 @@ TASKMINIMALERR TaskMinimal_EnableDisable( PTASKMINIMALHANDLE pvHandle, BOOL bSta
   {
     // set the state
     ptSelTask->bEnabled = bState;
+  }
+  else
+  {
+    // set the error
+    eError = TASKMINIMAL_ERR_ILLTASKHANDLE;
+  }
+  
+  // return the error
+  return( eError );
+}
+
+/******************************************************************************
+ * @function TaskMinimal_SetExecutionRate
+ *
+ * @brief change the execution rate
+ *
+ * This function will change the execution rate
+ *
+ * @param[in]   pvHandle  task handler
+ * @param[in]   wExecRateMsecs    execution rate in milliseconds
+ *
+ * @return      appropriate error
+ *
+ *****************************************************************************/
+TASKMINIMALERR TaskMinimal_SetExecutionRate( PTASKMINIMALHANDLE pvHandle, U16 wExecRateMsecs )
+{
+  TASKMINIMALERR  eError = TASKMINIMAL_ERR_NONE;
+  PTASKCTL        ptSelTask;
+  
+  // map the pointer
+  ptSelTask = MAP_HANDLE_TO_POINTER( pvHandle );
+  
+  // first validate that the task is valid
+  if ( ptSelTask == ptSelTask->ptSignature )
+  {
+    // add the event/change time
+    Interrupt_Disable( );
+    ptSelTask->wExecRate        = wExecRateMsecs;
+    ptSelTask->wDelayCount      = 0;
+    ptSelTask->bDelayInProgress = ( wExecRateMsecs != 0 );
+    Interrupt_Enable( );
   }
   else
   {

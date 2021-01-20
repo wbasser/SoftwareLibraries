@@ -28,9 +28,14 @@
 // library includes -----------------------------------------------------------
 #include "Interrupt/Interrupt.h"
 #include "SystemTick/SystemTick.h"
+#if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
+  #include "TaskManager/TaskManager.h"
+#endif
 
 // local parameter declarations -----------------------------------------------
-static  U32 uMaxExecTimeMsec;
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+  static  U32 uMaxExecTimeMsec;
+#endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 
 // local function prototypes --------------------------------------------------
 #if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
@@ -68,24 +73,28 @@ static  const CODE C8 szRspSys[ ]   = { "RSYS, %8lu\n\r" };
  *****************************************************************************/
 int main( void )
 {
-#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL ) && ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_TASKSCHEDULER )
   U8              nIdx;
   PVMICROINITFUNC pvInitFunc;
   PVMICROIDLEFUNC pvIdleFunc;
-  U32             uStartTime, uStopTime, uDiffTime;
+  #if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
+    U32             uStartTime, uStopTime, uDiffTime;
+  #endif
 #endif // SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL
 
   // disable interrupts
   Interrupt_Disable( );
   
   // call the local initialization
-  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
+  #if (( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL ) || ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKSCHEDULER ))
     Micro_LocalInitialize( );
   #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
 
-#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
-  // clear the execution time
-  uMaxExecTimeMsec = 0;
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL ) && ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_TASKSCHEDULER )
+  #if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
+    // clear the execution time
+    uMaxExecTimeMsec = 0;
+  #endif
   
   // initialize IRQ disabled functions
   nIdx = 0;
@@ -99,12 +108,12 @@ int main( void )
   // enable interrupts
   Interrupt_Enable( );
   
-  // call the local initialization
-  #if ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL )
-    Micro_LocalIrqInitialize( );
+    // call the local initialization
+  #if (( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL ) || ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKSCHEDULER ))
+      Micro_LocalIrqInitialize( );
   #endif // SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_MINIMAL
-  
-#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL ) && ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_TASKSCHEDULER )
   // initialize IRQ enabled functions
   nIdx = 0;
   while (( pvInitFunc = ( PVMICROINITFUNC )PGM_RDWORD( g_apvInitIrqEnbFunctions[ nIdx++ ])) != NULL )
@@ -118,9 +127,11 @@ int main( void )
   FOREVER
   {
     // local the local idle
-#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL ) && ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_TASKSCHEDULER )
+  #if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
     // get the current time
     uStartTime = SystemTick_GetTimeMsec();
+  #endif
         
     // reset index
     nIdx = 0;
@@ -132,6 +143,7 @@ int main( void )
       pvIdleFunc( );
     }
 
+  #if ( MICRO_ENABLE_SYSTIMECMDS  == 1 )
     // get the stop time
     uStopTime = SystemTick_GetTimeMsec();
     
@@ -150,9 +162,10 @@ int main( void )
     {
       uMaxExecTimeMsec = uDiffTime;
     }
+  #endif
     
     // check for pending tasks
-    if ( !Micro_CheckTasksPending( ))
+    if ( !Micro_CheckTasksPending( /*TASK_SCHD_ENUM_MAX*/ ))
     {
       // go to sleep
       Micro_EnterSleepMode( );
@@ -166,7 +179,7 @@ int main( void )
   return( -1 );
 }
 
-#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
+#if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL ) && ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_TASKSCHEDULER )
 /******************************************************************************
  * @function Micro_Shutdown
  *
@@ -210,7 +223,7 @@ static ASCCMDSTS CmdQrySys( U8 nCmdEnum )
   // get a pointer to the buffer
   AsciiCommandHandler_GetBuffer( nCmdEnum, &pcBuffer );
 
-  // output the version=
+  // output the version
   SPRINTF_P( ( pcBuffer ), ( char const * )szRspSys, uMaxExecTimeMsec );
 
   // return the error

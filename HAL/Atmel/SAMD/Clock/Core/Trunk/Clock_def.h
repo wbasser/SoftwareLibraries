@@ -45,6 +45,19 @@
     .uExtFreq = extfreq, \
     .nStartupTime = startup, \
     .btFlags.AutoAmpGain = autogain \
+    .tOutGenDef = \
+    { \
+      .nId = id, \
+      .eClockSrc = CLOCK_SRC_OSC32K, \
+      .tFlags = \
+      { \
+        .bOutputEnabled = outenab, \
+        .bOutOffEnabled = outoffenb, \
+        .bImprovedDutyCycle = impdtycyc, \
+      }, \
+      .eDivideSelect = divselect, \
+      .wDivisor = divisor, \
+    }, \
   }
   
 /// define the helper macro to create an internal 32Khz oscillator
@@ -74,7 +87,7 @@
   }
   
 /// define the helper macro to create an external 32Khz oscillator
-#define CLOCKOSCDEF32KEXT( ondemand, standby, out1kenb, out32kenb, exttype, extfreq, startup, autoamp ) \
+#define CLOCKOSCDEF32KEXT( ondemand, standby, out1kenb, out32kenb, exttype, extfreq, startup, autoamp, outid, outenab, outoffenb, impdtycyc, divselect, divisor ) \
   { \
     .eClockOsc = CLOCK_OSC_EXT32K, \
     .tFlags.bOnDemand = ondemand, \
@@ -84,7 +97,20 @@
     .eExtType = exttype, \
     .uExtFreq = extfreq, \
     .nStartupTime = startup, \
-    .tFlags.bAutoAmpGain = autogamp, \
+    .tFlags.bAutoAmpGain = autoamp, \
+    .tOutGenDef = \
+    { \
+      .nId = outid, \
+      .eClockSrc = CLOCK_SRC_XOSC32K, \
+      .tFlags = \
+      { \
+        .bOutputEnabled = outenab, \
+        .bOutOffEnabled = outoffenb, \
+        .bImprovedDutyCycle = impdtycyc, \
+      }, \
+      .eDivideSelect = divselect, \
+      .wDivisor = divisor, \
+    }, \
   }
   
 /// define the helper macro to creeate an internal 8MHZ oscillator
@@ -135,10 +161,13 @@
   }
 
 /// define the helper macro to create an DFLL oscillator open loop mode
-#define CLOCKOSCDEFDFLLCLOSED( ondemand, usbrecover, quicklock, tracklock, lockonwakeup, chillcycle, refid, refsrc, refoutenab, refoutoffenb, refimpdtycyc, refdivselect, refdivisor, outid, outoutenab, outoutoffenb, outimpdtycyc, outdivselect, outdivisor ) \
+#define CLOCKOSCDEFDFLLCLOSED( mult, coarse, fine, ondemand, usbrecover, quicklock, tracklock, lockonwakeup, chillcycle, overwriteenb, outid, outoutenab, outoutoffenb, outimpdtycyc, outdivselect, outdivisor ) \
   { \
     .eClockOsc = CLOCK_OSC_DFLL, \
     .eDfpllLoopMode = CLOCK_DFPLLMODE_CLOSED, \
+    .wDfllMulitplier = mult, \
+    .nDfllCoarse = coarse, \
+    .wDfllFine = fine, \
     .tFlags = \
     { \
       .bClosedLoopMode = ON, \
@@ -148,19 +177,7 @@
       .bTrackAfterFineLock = tracklock, \
       .bKeepLockWakeup = lockonwakeup, \
       .bEnableChillCycle = chillcycle, \
-    }, \
-    .tRefGenDef = \
-    { \
-      .nId = refid, \
-      .eClockSrc = refsrc, \
-      .tFlags = \
-      { \
-        .bOutputEnabled = refoutenab, \
-        .bOutOffEnabled = refoutoffenb, \
-        .bImprovedDutyCycle = refimpdtycyc, \
-      }, \
-      .eDivideSelect = refdivselect, \
-      .wDivisor = refdivisor, \
+      .bOverwriteCal = overwriteenb, \
     }, \
     .tOutGenDef = \
     { \
@@ -494,6 +511,7 @@ typedef struct _CLOCKOSCDEF
     BOOL            bEnableChillCycle   : 1;  ///< enable chill cycle
     BOOL            bEnableUsbRecovery  : 1;  ///< enable USB recovery
     BOOL            bClosedLoopMode     : 1;  ///< closed loop mode
+    BOOL            bOverwriteCal       : 1;  ///< overwrite DFF calibration
   } tFlags;
   U32               uExtFreq;           ///< external/reference frequency
   U32               uOutFreq;           ///< output frequency
@@ -510,7 +528,6 @@ typedef struct _CLOCKOSCDEF
   CLOCKDPLLREF      eDpllRefClk;        ///< DPLL reference clock
   CLOCKDPLLLKTIM    eDpllLockTime;      ///< DPLL lock time
   CLOCKDPLLFILT     eDpllFilter;        ///< DPLL filter type
-  CLOCKGENDEF       tRefGenDef;         ///< refenence clock generator definition
   CLOCKGENDEF       tOutGenDef;         ///< clock output generator definition
 } CLOCKOSCDEF, *PCLOCKOSCDEF;
 #define CLOCKOSCDEF_SIZE     sizeof( CLOCKOSCDEF )

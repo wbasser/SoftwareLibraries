@@ -26,9 +26,7 @@
 #define _SYSTEMCONTROLMANAGER_H
 
 // local includes -------------------------------------------------------------
-#if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
-  #include "SystemControlManager/SystemControlManager_cfg.h"
-#endif // SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS
+#include "SystemControlManager/SystemControlManager_cfg.h"
 
 // library includes -------------------------------------------------------------
 #include "Types/Types.h"
@@ -40,8 +38,8 @@
 
 // global function prototypes --------------------------------------------------
 /// initialization and task process
-extern  void            SystemControlManager_Initialize( void );
-extern  void            SystemControlManager_ProcessEvent( STATEEXECENGARG xEvent );
+extern  void    SystemControlManager_Initialize( void );
+extern  void    SystemControlManager_ProcessEvent( STATEEXECENGARG xEvent );
 
 #if ( SYSTEMCONTROLMANAGER_ENABLE_DEBUGCOMMANDS == 1 )
 extern  const CODE ASCCMDENTRY g_atSysCtrlMngrCmdHandlerTable[ ];

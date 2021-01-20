@@ -36,7 +36,7 @@
 // BINCMD_MSVBUF( name, mstsize, slvsize )
 
 // constant parameter initializations -----------------------------------------
-const CODE  BINCMDDEF   atBinCmdDefs[ BINCMD_ENUM_MAX ] =
+const CODE  BINCMDDEF   g_atBinCmdDefs[ BINCMD_ENUM_MAX ] =
 {
    // add entries to this table using the below macros
   // BINCMD_SLV_DEFSBPP( name, bufsize, chkmode, seqenb, writefunc, cmdtbl )

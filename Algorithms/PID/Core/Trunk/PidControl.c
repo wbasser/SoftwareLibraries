@@ -71,31 +71,31 @@ void PidControl_Initialize( void )
  * @return      new output value
  *
  *****************************************************************************/
-PIDARG PidControl_Process( PPIDCTRL ptPidCtl, PIDARG xSetPoint, PIDARG xProcVar )
+PIDCONTROLARG PidControl_Process( PPIDCTRL ptPidCtl, PIDCONTROLARG xSetPoint, PIDCONTROLARG xProcVar )
 {
-	PIDARG	xError;
-	PIDARG	xOutput;
+	PIDCONTROLARG	xError;
+	PIDCONTROLARG	xOutput;
 
 	// compute the error
 	xError = xSetPoint - xProcVar;
 
 	// compute the integral/check for limits
 	ptPidCtl->xTotalError += xError;
-	ptPidCtl->xTotalError = ( ptPidCtl->xTotalError > ptPidCtl->xLd ) ? ptPidCtl->xLd : ptPidCtl->xTotalError;
-	ptPidCtl->xTotalError = ( -ptPidCtl->xTotalError < -ptPidCtl->xLd ) ? -ptPidCtl->xLd : ptPidCtl->xTotalError;
+	ptPidCtl->xTotalError = ( ptPidCtl->xTotalError > ptPidCtl->tDefs.xLd ) ? ptPidCtl->tDefs.xLd : ptPidCtl->xTotalError;
+	ptPidCtl->xTotalError = ( -ptPidCtl->xTotalError < -ptPidCtl->tDefs.xLd ) ? -ptPidCtl->tDefs.xLd : ptPidCtl->xTotalError;
 
  // compute derivative
   ptPidCtl->xLastError = ptPidCtl->xCurError;
   ptPidCtl->xCurError = xError;
   
 	// compute output
-	xOutput = ptPidCtl->xKp * xError;
-	xOutput += ptPidCtl->xKi * ptPidCtl->xTotalError;
-	xOutput += ptPidCtl->xKd * ( xError - ptPidCtl->xLastError );
+	xOutput = ptPidCtl->tDefs.xKp * xError;
+	xOutput += ptPidCtl->tDefs.xKi * ptPidCtl->xTotalError;
+	xOutput += ptPidCtl->tDefs.xKd * ( xError - ptPidCtl->xLastError );
   
   // clamp the output to min, max
-  xOutput = MAX( ptPidCtl->xMinOutput, xOutput );
-  xOutput = MIN( xOutput, ptPidCtl->xMaxOutput );
+  xOutput = MAX( ptPidCtl->tDefs.xMinOutput, xOutput );
+  xOutput = MIN( xOutput, ptPidCtl->tDefs.xMaxOutput );
 
 	// return the new output value
 	return( xOutput );

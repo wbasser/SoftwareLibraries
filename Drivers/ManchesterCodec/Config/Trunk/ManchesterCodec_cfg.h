@@ -1,9 +1,11 @@
 /******************************************************************************
  * @file ManchesterCodec_cfg.h
  *
- * @brief 
+ * @brief Manchester Codec configuration declarations
  *
- * This file 
+ * This file provides the declarations for the configuration of the
+ * Manchester Codec
+ *
  *
  * @copyright Copyright (c) 2012 CyberIntegration
  * This document contains proprietary data and information of CyberIntegration
@@ -29,7 +31,6 @@
 
 // local includes -------------------------------------------------------------
 #include "ManchesterCodec/ManchesterCodec_def.h"
-#include "ManchesterCodec/ManchesterCodec_prm.h"
 
 // library includes -----------------------------------------------------------
 #include "Timers/Timers.h"
@@ -43,10 +44,15 @@
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
-extern  void  ManchesterCodec_TransmitCallback( TIMERCBEVENT eEvent, TIMERCMPCAP eChan,  U16 wValue );
-extern  void  ManchesterCodec_ReceiveCallback( TIMERCBEVENT eEvent, TIMERCMPCAP eChan,  U16 wValue );
-extern  void  ManchesterCodec_RecvTimerControl( BOOL bState );
+extern  void  ManchesterCodec_LocalInitialize( U32 uHalfBitTime );
 extern  U32   ManchesterCodec_GetClockFreq( void );
+extern  void  ManchesterCodec_TransmitCallback( U8 nEvent, U8 nChan,  U16 wValue );
+extern  void  ManchesterCodec_ReceiveCallback( U8 nEvent, U8 nChan,  U16 wValue );
+extern  void  ManchesterCodec_RecvTimerControl( BOOL bState );
+extern  void  ManchesterCodec_FlushRecvEvents( void );
+extern  void  ManchesterCodec_OutputControl( BOOL bCurBit );
+extern  void  ManchesterCodec_PostXmitEvent( U32 uEvent );
+extern  void  ManchesterCodec_PostRecvEvent( U32 uEvent );
 
 /**@} EOF ManchesterCodec_cfg.h */
 

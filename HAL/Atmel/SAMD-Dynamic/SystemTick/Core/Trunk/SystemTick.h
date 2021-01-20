@@ -38,6 +38,7 @@ typedef void ( *PVSYSTEMTICKFUNC )( void );
 
 // global function prototypes --------------------------------------------------
 extern  void  SystemTick_Initialize( U32 uTickRateHz, PVSYSTEMTICKFUNC pvCallback );
+extern  void  SystemTick_Close( void );
 #if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 extern  U32   SystemTick_GetTickRateUsec( void );
 extern  U64   SystemTick_GetTimeUsec( void );

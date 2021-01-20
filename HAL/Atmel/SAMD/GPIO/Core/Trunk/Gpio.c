@@ -103,7 +103,7 @@ void Gpio_Initialize( void )
       case GPIO_MODE_INPUT_PULLUP :
         // clear the direction bit
         ptPort->DIRCLR.reg = uMask;
-        ptPort->OUTSET.reg = ( ptDef->eMode == GPIO_MODE_INPUT_PULLDN ) ? uMask : 0;
+        ptPort->OUTSET.reg = ( ptDef->eMode == GPIO_MODE_INPUT_PULLUP ) ? uMask : 0;
         break;
         
       case GPIO_MODE_OUTPUT_INPDSB :
@@ -174,11 +174,32 @@ void Gpio_Initialize( void )
     
     // get the port
     ptPort = &PORT->Group[ ptIrq->ePort ];
-    
+    uMask = BIT( ptIrq->nPin );
+
     // set the cmux enable
     tPinCfg.reg = 0;
     tPinCfg.bit.PMUXEN = TRUE;
     tPinCfg.bit.INEN = TRUE;
+
+    // determine the pull up down
+    switch( ptIrq->ePupdn )
+    {
+      case GPIO_IRQPUPDN_PULLDN :
+        // set the pull up enable in the config
+        tPinCfg.bit.PULLEN = TRUE;
+        break;
+
+      case GPIO_IRQPUPDN_PULLUP :
+        // set the pull up enable in the config
+        tPinCfg.bit.PULLEN = TRUE;
+        ptPort->OUTSET.reg = uMask;
+        break;
+
+      default :
+        break;
+    }
+
+    // write the pin config
     ptPort->PINCFG[ ptIrq->nPin ] = tPinCfg;
     
     // get the current value
@@ -196,30 +217,6 @@ void Gpio_Initialize( void )
       tPinMux.bit.PMUXE = 0;
     }
     
-    // write it back out
-    ptPort->PMUX[ ptIrq->nPin >> 1] = tPinMux;
-    
-    // test for the odd Port A
-    if (( ptIrq->ePort == GPIO_PORT_A ) && ( ptIrq->nPin >= 24 ))
-    {
-      // adjust for pins 24-31
-      if (( ptIrq->nPin >= 24 ) && ( ptIrq->nPin <=27 ))
-      {
-      // set the pin offset
-        nPinOfs = (( ptIrq->nPin + 4 ) % 8 );
-      }
-      else
-      {
-      // set the pin offset
-        nPinOfs = (( ptIrq->nPin - 4 ) % 8 );
-      }
-    }
-    else
-    {
-      // set the pin offset
-      nPinOfs = ptIrq->nPin % 8;
-    }
-
     // get the register offset
     nRegOfs = ( ptIrq->nPin & 0x0F ) / 8;
     nPinOfs = ptIrq->nPin % 8;
@@ -542,31 +539,13 @@ GPIOERR Gpio_Ioctl( GPIOPINENUM eGpioSel, GPIOACT eGpioAct, PVOID pvData )
         
       case GPIO_ACT_ENBDSBIRQ :
         // get the state
-        bAction = ( BOOL )PARAMU8( pvData );
+        bAction = ( BOOL )PARAMBOOL( pvData );
 
         // get the pin definition
         ptIrq = ( PGPIOIRQDEF )&g_atGpioIrqDefs[ eGpioSel ];
 
-        // test for the odd Port A
-        if (( ptIrq->ePort == GPIO_PORT_A ) && ( ptIrq->nPin >= 24 ))
-        {
-          // adjust for pins 24-31
-          if (( ptIrq->nPin >= 24 ) && ( ptIrq->nPin <=27 ))
-          {
-          // set the pin offset
-            nPinOfs = (( ptIrq->nPin + 4 ) % 8 );
-          }
-          else
-          {
-          // set the pin offset
-            nPinOfs = (( ptIrq->nPin - 4 ) % 8 );
-          }
-        }
-        else
-        {
-          // set the pin offset
-          nPinOfs = ptIrq->nPin % 8;
-        }
+        // get the register offset
+        nPinOfs = ptIrq->nPin % EIC_EXTINT_NUM;
 
         // test fpr actopm
         if ( bAction )
@@ -655,9 +634,10 @@ void Gpio_Refresh( void )
  *****************************************************************************/
 void EIC_Handler( void )
 {
-  U32         uStatus, uMask;
+  U32         uStatus, uMask, uPort, uBitMask;
   U8          nIdx;
   PGPIOIRQDEF ptIrq;
+  BOOL        bState;
   
   // get the current IRQ status
   uStatus = EIC->INTFLAG.reg;
@@ -681,8 +661,16 @@ void EIC_Handler( void )
       // if callback is not null
       if ( ptIrq->pvCallback != NULL )
       {
+        // compute the mask
+        uBitMask = BIT( ptIrq->nPin );
+    
+        // get the value
+        uPort = PORT->Group[ ptIrq->ePort ].IN.reg;
+        uPort &= uBitMask;
+        bState = ( uPort ) ? TRUE : FALSE;
+        
         // process the callback
-        ptIrq->pvCallback( nIdx, ptIrq->nEvent );
+        ptIrq->pvCallback( nIdx, ptIrq->nEvent, bState );
       }
 
       // clear the status bit

@@ -44,7 +44,7 @@
 #define CMD_SEND_STOP       ( 3 )
 
 /// define the macro to map the control pointer
-#define MAP_HANDLE_TO_POINTER( handle )   (( SercomI2cm* )handle )
+#define MAP_HANDLE_TO_POINTER( handle )   (( PLCLCTL )handle )
 
 // enumerations ---------------------------------------------------------------
 /// enuemrate the bus direction
@@ -73,18 +73,19 @@ typedef struct _LCLCTLS
   BOOL        bRunning;     ///< running state
   BUSDIR      eBusDir;      ///< bus direction
   SercomI2cm* ptI2c;        ///< pointer to the SERCOM
+  CLOCKMUXID  eClockId;     ///< clock ID
 } LCLCTL, *PLCLCTL;
 #define LCLCTL_SIZE           sizeof( LCLCTL )
 
 // local parameter declarations -----------------------------------------------
 
 // local function prototypes --------------------------------------------------
-static  SercomI2cm*   GetSercomChannel( I2CCHAN eChan );
+static  void          GetSercomChannel( I2CCHAN eChan, PLCLCTL ptLclCtl );
 static  void          ProcessInterrupts( PLCLCTL ptLclCtl );
 static  PRCWRACTION   ProcessMasterWrite( PLCLCTL ptLclCtl );
 static  BOOL          ProcessMasterRead( PLCLCTL ptLclCtl );
 static  void          ProcessComplete( I2CERR eError, PLCLCTL ptLclCtl );
-static  U32           ComputeBaudRate( U32 uBaud );
+static  U32           ComputeBaudRate( U32 uBaud, CLOCKMUXID eClockId );
 
 /******************************************************************************
  * @function I2c_Initialize
@@ -104,11 +105,11 @@ PVI2CHANDLE I2c_Configure( PI2CDEF ptI2cDef )
   if (( ptLclCtl = malloc( LCLCTL_SIZE )) != NULL )
   {
     // configure the GPIO pins
-    Gpio_Configure( ptI2cDef->eDevPort, ptI2cDef->nSdaPin, GPIO_MODE_INPUT, OFF, ptI2cDef->eDevMux, OFF );
-    Gpio_Configure( ptI2cDef->eDevPort, ptI2cDef->nSclPin, GPIO_MODE_INPUT, OFF, ptI2cDef->eDevMux, OFF );
+    Gpio_Configure( ptI2cDef->eDevPort, ptI2cDef->nSdaPin, GPIO_MODE_INPUT,         OFF, ptI2cDef->eDevMux, OFF );
+    Gpio_Configure( ptI2cDef->eDevPort, ptI2cDef->nSclPin, GPIO_MODE_OUTPUT_INPDSB, OFF, ptI2cDef->eDevMux, OFF );
 
     // get pointer to the definition structure
-    ptLclCtl->ptI2c = GetSercomChannel( ptI2cDef->eChan );
+    GetSercomChannel( ptI2cDef->eChan, ptLclCtl );
 
     // disable the control and wait for done
     ptLclCtl->ptI2c->CTRLA.bit.SWRST = 1;
@@ -118,7 +119,7 @@ PVI2CHANDLE I2c_Configure( PI2CDEF ptI2cDef )
   
     // now set the baudrate
     uTemp = ( ptI2cDef->bFastSpeed ) ? BAUD_RATE_FAST : BAUD_RATE_SLOW;
-    ptLclCtl->ptI2c->BAUD.reg = ComputeBaudRate( uTemp );
+    ptLclCtl->ptI2c->BAUD.reg = ComputeBaudRate( uTemp, ptLclCtl->eClockId );
   
     // now set up control B
     ptLclCtl->ptI2c->CTRLB.reg = SERCOM_I2CM_CTRLB_SMEN;
@@ -630,16 +631,17 @@ static void ProcessComplete( I2CERR eError, PLCLCTL ptLclCtl )
  * This function computes the value for the baud rate register
  *
  * @param[in]   uBaud     desired baud rate
+ * @param[in]   eClockId  clock mux ID
  *
  * @return      computer baud rate
  *
  *****************************************************************************/
-static U32 ComputeBaudRate( U32 uBaud )
+static U32 ComputeBaudRate( U32 uBaud, CLOCKMUXID eClockId )
 {
   U32   uPeripheralClock, uBaudRate;
   
   // get the system clock value
-  uPeripheralClock = Clock_GetFreq( );
+  uPeripheralClock = Clock_GetPeriphClock( eClockId );
   
   // calculate the baud rate
   uBaudRate = (( uPeripheralClock / uBaud ) / 2 ) - 5;
@@ -657,73 +659,67 @@ static U32 ComputeBaudRate( U32 uBaud )
  * for a given channel
  *
  * @param[in]   eChan			SERCOM channel
- *
- * @return      pointer to a SercomI2c or NULL if illegal channel
+ * @param[in]   ptLclCtl  pointer to the local control structure
  *
  *****************************************************************************/
-static SercomI2cm* GetSercomChannel( I2CCHAN eChan )
+static void GetSercomChannel( I2CCHAN eChan, PLCLCTL ptLclCtl )
 {
-  Sercom*     ptSercom = NULL;
-  CLOCKMUXID  eClockId;
   U32         uPeriphId;
   
   switch( eChan )
   {
     case I2C_CHAN_0 :
-      ptSercom = SERCOM0;
-      eClockId = CLOCK_MUXID_SERCOM_0;
+      ptLclCtl->ptI2c = &SERCOM0->I2CM;
+      ptLclCtl->eClockId = CLOCK_MUXID_SERCOM_0;
       uPeriphId = PM_APBCMASK_SERCOM0;
       break;
       
     case I2C_CHAN_1 :
-      ptSercom = SERCOM1;
-      eClockId = CLOCK_MUXID_SERCOM_1;
+      ptLclCtl->ptI2c = &SERCOM1->I2CM;
+      ptLclCtl->eClockId = CLOCK_MUXID_SERCOM_1;
       uPeriphId = PM_APBCMASK_SERCOM1;
       break;
     
     #ifdef SERCOM2
     case I2C_CHAN_2:
-      ptSercom = SERCOM2;
-      eClockId = CLOCK_MUXID_SERCOM_2;
+      ptLclCtl->ptI2c = &SERCOM2->I2CM;
+      ptLclCtl->eClockId = CLOCK_MUXID_SERCOM_2;
       uPeriphId = PM_APBCMASK_SERCOM2;
       break;
     #endif // SERCOM2
     
     #ifdef SERCOM3
     case I2C_CHAN_3 :
-      ptSercom = SERCOM3;
-      eClockId = CLOCK_MUXID_SERCOM_3;
+      ptLclCtl->ptI2c = &SERCOM3->I2CM;
+      ptLclCtl->eClockId = CLOCK_MUXID_SERCOM_3;
       uPeriphId = PM_APBCMASK_SERCOM3;
       break;
     #endif // SERCOM3
     
     #ifdef SERCOM4
     case I2C_CHAN_4 :
-      ptSercom = SERCOM4;
-      eClockId = CLOCK_MUXID_SERCOM_4;
+      ptLclCtl->ptI2c = &SERCOM4->I2CM;
+      ptLclCtl->eClockId = CLOCK_MUXID_SERCOM_4;
       uPeriphId = PM_APBCMASK_SERCOM4;
       break;
     #endif // SERCOM4
     
     #ifdef SERCOM5
     case I2C_CHAN_5 :
-      ptSercom = SERCOM5;
-      eClockId = CLOCK_MUXID_SERCOM_5;
+      ptLclCtl->ptI2c = &SERCOM5->I2CM;
+      ptLclCtl->eClockId = CLOCK_MUXID_SERCOM_5;
       uPeriphId = PM_APBCMASK_SERCOM5;
       break;
     #endif // SERCOM5
     
     default :
-      ptSercom = NULL;
+      ptLclCtl->ptI2c = NULL;
       break;
   }
   
   // now enable the clock and power mask
-  Clock_PeriphEnable( eClockId, CLOCK_GENID_0 );
+  Clock_PeriphEnable( ptLclCtl->eClockId, CLOCK_GENID_0 );
   PowerManager_DisableEnablePeriphC( uPeriphId, ON );
-
-  // return the pointer to the channlel
-  return( &ptSercom->I2CM );
 }
 
 /**@} EOF I2c.c */

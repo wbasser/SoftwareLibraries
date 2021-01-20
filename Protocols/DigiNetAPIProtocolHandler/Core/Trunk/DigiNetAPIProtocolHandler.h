@@ -58,48 +58,6 @@ typedef enum _DIGIFRAMETYPEENUM
   DIGIFRAME_TYPE_ENUM_MAX
 } DIGIFRAMETYPEENUM;
 
-/// enumerate the commands
-typedef enum _DIGICMS
-{
-  DIGI_CMD_AC = 0,          ///< apply changes
-  DIGI_CMD_FR,              ///< force reset
-  DIGI_CMD_RE,              ///< reset to defaults
-  DIGI_CMD_WR,              ///< write the new value to NV storage
-  DIGI_CMD_PH,              ///< read the phone number
-  DIGI_CMD_SN,              ///< read the ICCID of the sim
-  DIGI_CMD_IM,              ///< read the IMIE
-  DIGI_CMD_MN,              ///< reads the network operator
-  DIGI_CMD_MV,              ///< reads the modem firmware version
-  DIGI_CMD_DB,              ///< reads the cellular strength
-  DIGI_CMD_AN,              ///< reads the access point name
-  DIGI_CMD_OA,              ///< reads the operating APN
-  DIGI_CMD_AM,              ///< reads/sets the airplane mode
-  DIGI_CMD_DV,              ///< reads/sets the antenna diversity mode
-  DIGI_CMD_IP,              ///< reads/sets the IP protocol
-  DIGI_CMD_TL,              ///< sets the SSl/TLS version
-  DIGI_CMD_TM,              ///< reads/sets the connection timeout
-  DIGI_CMD_TS,              ///< reads/sets the IP serverconnection timeout
-  DIGI_CMD_DO,              ///< reads/sets the device options
-  DIGI_CMD_EQ,              ///< reads/sets the domain name for the remote manager server
-  DIGI_CMD_SH,              ///< reads the upper digits of the IMEI
-  DIGI_CMD_SL,              ///< reads the lower digits of the IMEI
-  DIGI_CMD_DL,              ///< reads/sets the destination address
-  DIGI_CMD_PN,              ///< reads/sets the destination phone number
-  DIGI_CMD_N1,              ///< reads the primary DNS server address
-  DIGI_CMD_N2,              ///< reads the secondary DNS server address
-  DIGI_CMD_DE,              ///< reads/sets the destination port number
-  DIGI_CMD_TD,              ///< reads/sets the text delimiter
-  DIGI_CMD_MY,              ///< reads the devices IP address
-  DIGI_CMD_LA,              ///< looksup the the IP address of the FQDN
-  DIGI_CMD_OD,              ///< reads the operation destination IP address
-  DIGI_CMD_CO,              ///< reads/sets the source port 
-  DIGI_CMD_VR,              ///< reads the firmware version
-  DIGI_CMD_HV,              ///< reads the hardware version
-  DIGI_CMD_AI,              ///< reads the association indication
-  DIGI_CMD_HS,              ///< reads the hardware series
-  DIGI_CMD_CK,              ///< reads the current configuration checksum
-} DIGICMD;
-
 /// enumerate the association indications
 typedef enum _DIGIASSOC
 {

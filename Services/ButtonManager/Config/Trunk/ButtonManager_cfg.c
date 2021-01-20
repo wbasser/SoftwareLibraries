@@ -120,4 +120,25 @@ BOOL ButtonManager_ProcessTask( TASKARG xArg )
 }
 #endif  // SYSTEMDEFINE_OS_SELECTION
 
+/******************************************************************************
+ * @function ButtonManager_GetKeyStatus
+ *
+ * @brief button manager get key status
+ *
+ * This function calls the appropriate user defined function to return the
+ * status of a given key enumeration
+ *
+ * @param[in]   nKeyEnum      key enumeration
+ *  
+ * @return      returns TRUE for key pressed, FALSE otherwise
+ *
+ *****************************************************************************/
+BOOL ButtonManager_GetKeyStatus( U8 nKeyEnum )
+{
+  BOOL bButtonStatus = FALSE;
+  
+  // return the button status
+  return( bButtonStatus );
+}
+
 /**@} EOF ButtonManager_cfg.c */

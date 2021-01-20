@@ -28,9 +28,9 @@
 // system includes ------------------------------------------------------------
 
 // local includes -------------------------------------------------------------
+#include "LTECellModem/LTECellModem_cfg.h"
 
 // library includes -----------------------------------------------------------
-#include "TaskManager/TaskManager.h"
 
 // Macros and Defines ---------------------------------------------------------
 /// define the number of events for the control task
@@ -47,10 +47,12 @@
 /// enumerate the errors
 typedef enum  _LTEERR
 {
-  LTE_ERR_NONE = 0,
-  LTE_ERR_TIMEOUT = -1,
-  LTE_ERR_ERROR = -2,
-  LTE_ERR_ILLGPIOENUM = -3,
+  LTE_ERR_NONE          = 0,
+  LTE_ERR_TIMEOUT       = -1,
+  LTE_ERR_ERROR         = -2,
+  LTE_ERR_ILLGPIOENUM   = -3,
+  LTE_ERR_BUSY          = -4,
+  LTE_ERR_ILLREQUEST    = -5,
 } LTEERR;
 
 /// enumerate the LTE GPIO's
@@ -87,25 +89,93 @@ typedef enum _LTEGPIOMODE
   LTE_GPIO_MODE_RING_INDIC,
   LTE_GPIO_MODE_LAST_GAP_ENB,
   LTE_GPIO_PAD_DISABLED = 255
-} LTEGPIOMODE, *PLTEGPIOMODE;
+} LTEGPIOMODE;
+
+/// enumerate the request
+typedef enum _LTEREQUEST
+{
+  LTE_REQUEST_CREG = 0,
+  LTE_REQUEST_CGSN,
+  LTE_REQUEST_CIMI,
+  LTE_REQUEST_CCID,
+  LTE_REQUEST_CSQ,
+  LTE_REQUEST_MNO,
+  LTE_REQUEST_APN,
+  LTE_REQUEST_MAX
+} LTEREQUEST;
+
+/// enumerate the network operators
+typedef enum _LTEMNO
+{
+  LTE_MNO_DEFAULT = 0,
+  LTE_MNO_SIMICCD,
+  LTE_MNO_ATT,
+  LTE_MNO_VERIZON,
+  LTE_MNO_TELSTRA,
+  LTE_MNO_TMO,
+  LTE_MNO_CT,
+  LTE_MNO_MAX,
+  LTE_MNO_ILLEGAL = 255
+} LTEMNO;
+
+/// enumerate the Network type
+typedef enum _LTEPDP
+{
+  LTE_PDP_IP = 0,
+  LTE_PDP_NONIP,
+  LTE_PDP_IPV4V6,
+  LTE_PDP_IPV6,
+  LTE_PDP_MAX,
+  LTE_PDP_ILLEGAL
+} LTEPDP;
+
+/// enumerate the socket protocol
+typedef enum _LTESKTPROT
+{
+  LTE_SKTPROT_TCP = 6,
+  LTE_SKTPROT_UDP = 17
+} LTESKTPROT;
+
+/// enumerate the MQTT clean type
+typedef enum _LTEMQTTCLEAN
+{
+  LTE_MQTTCLEAN_KEEPMSGS = 0,
+  LTE_MQTTCLEAN_DELETALL,
+  LTE_MQTTCLEAN_MAX
+} LTEMQTTCLEAN;
 
 // structures -----------------------------------------------------------------
 /// define the callback
-typedef void  ( *PVLTECALLBACK )( LTEERR, PVOID );
+typedef void  ( *PVLTECALLBACK )( LTEERR, PU8 );
 
 // global parameter declarations -----------------------------------------------
 
 // global function prototypes --------------------------------------------------
 extern  void    LTECellModem_Intialize( void );
-extern  void    LTECellModem_PutChar( U8 nChar );
-extern  void    LTECellModem_Write( PC8 pcData, U16 wLength );
-extern  BOOL    LTECellModem_ProcessChar( TASKARG xArg );
-extern  BOOL    LTECellModem_ProcessCtrl( TASKARG xArg );
-extern  void    LTECellModem_EchoControl( BOOL bState, PVLTECALLBACK pvCallback );
+extern  void    LTECellModem_CharProcess( U8 nChar );
+extern  void    LTECellModem_CtrlProcess( LTELCLEVENT eEvent );
+extern  LTEERR  LTECellModem_EchoControl( BOOL bState, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SendRequest( LTEREQUEST eRequest, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SetOperator( LTEMNO eMno, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SetAPN( PC8 pszOperator, LTEPDP ePdp, PVLTECALLBACK pvCallback );
 extern  LTEERR  LTECellModem_SetGpio( LTEGPIO eGpioEnum, LTEGPIOMODE eGpioMode, PVLTECALLBACK pvCallback );
-extern  LTEERR  LTECellModem_GetGpio( LTEGPIO eGpioEnum, PLTEGPIOMODE peGpioMode, PVLTECALLBACK pvCallback );
-extern  void    LTECellModem_SetAutoTimeZone( BOOL bState, PVLTECALLBACK pvCallback );
-
+//extern  LTEERR  LTECellModem_GetGpio( LTEGPIO eGpioEnum, PLTEGPIOMODE peGpioMode, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SetAutoTimeZone( BOOL bState, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SocketOpen( LTESKTPROT eProtocol, U16 wLocalPort, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SocketClose( S8 cSocket, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SocketConnect( S8 cSocket, PCC8 pszAddress, U16 wPort, PVLTECALLBACK pvCallback ); 
+extern  LTEERR  LTECellModem_SocketListen( S8 cSocket, U16 wPort, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SocketRead( S8 cSocket, PU8 pnBuffer, U16 wLength, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_SocketWrite( S8 cSocket, PU8 pnBUffer, U16 wLength, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_MqttCOnfigureClientID( U16 wClientId, PVLTECALLBACK pvCallback ); 
+extern  LTEERR  LTECellModem_MqttConfigureLclPort( U16 wLocalPort, PVLTECALLBACK pvCallback ); 
+extern  LTEERR  LTECellModem_MqttConfigureServerName( PC8 pszServerName, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_MqttConfigureIpAddr( PC8 pszIpAddr, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_MqttConfigureUserCred( PC8 pszName, PC8 pszPassword, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_MqttConfigureTimeout( U32 uTimeout, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_MqttConfigureSecure( BOOL bState, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_MqttConfigureClean( LTEMQTTCLEAN eLteClean, PVLTECALLBACK pvCallback );
+extern  LTEERR  LTECellModem_Mqtt
 /**@} EOF LTECellModem.h */
 
 #endif  // _LTECELLMODEM_H

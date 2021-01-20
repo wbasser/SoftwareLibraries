@@ -49,11 +49,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
+
+// system definitions
+#include "SystemDefines/SystemDefines_prm.h"
 
 // Macros and Defines ---------------------------------------------------------
 // define the AVR8 flag
@@ -152,6 +156,9 @@
 #define	LO16(a)	(a&0xFF)
 #define	HI16(a)	((a>>8)&0xFF)
 
+// define the macro for creating a word
+#define MAKEU16(m,l)  ((m<<8)|l)
+
 // define the bit shift macros
 #define BIT(a)    (1<<a)
 #define BITS(a,v) (a<<v)
@@ -213,6 +220,10 @@
 #define STRLEN_P  strlen_P
 #define FPRINTF_P fprintf_P
 
+// define the macro to determine the number of elements of an array of structure
+#define NUMELEMENTS( array ) \
+  ( sizeof( array ) / sizeof( array[0] ))
+
 /// define the macro to write protected I/O registers
 #define WRITE_PROTECTED_REGISTER( puAddr, nValue ) \
   __asm__ __volatile__( \
@@ -237,17 +248,18 @@
 #define PARAMU8( a )    (*((PU8)a ))
 #define PARAMBOOL( a )  (*((BOOL*)a ))
 
+/// define the macro to swap bytes 
+#define SWAP_BYTES_16( value )  ((U16)(((value & 0xFF) << 8) | ((value & 0xFF00 ) >> 8 )))
+
+/// define the macro for creating large numbers
+#ifndef _UL_
+#define _UL_(a)   (a ## ul)
+#endif
+
+/// define a round function
+#define ROUND( a )      ((a)>=0 ? (long)((a)+0.5) : (long)((a)-0.5))
+
 // enumerations ---------------------------------------------------------------
-typedef enum _TIMEOSTYPE
-{
-  TIME_OS_ANDROID = 0,
-  TIME_OS_MICRODOS,
-  TIME_OS_IOS,
-  TIME_OS_UNIX,
-  TIME_OS_IBMPCBIOS,
-  TIME_OS_NTP,
-  TIME_OS_MAX
-} TIMEOSTYPE;
 
 // structures -----------------------------------------------------------------
 // define the special types
@@ -305,20 +317,23 @@ typedef S64 PROGMEM		      FS64;
 typedef U64 PROGMEM 		    FU64;
 typedef PC8 PROGMEM         PFC8;
 typedef PU8 PROGMEM         PFU8;
+typedef const char*         PCC8;
 
 // define the value	union
 typedef	union
 {
-    U16	wValue;
-    U8	anValue[ 2 ];
+  U16	wValue;
+  S16 iValue;
+  U8	anValue[ 2 ];
 } U16UN, *PU16UN;
 
 typedef	union
 {
-    FLOAT	fValue;
-    U32		uValue;
-    U16		awValue[ 2 ];
-    U8		anValue[ 4 ];
+  FLOAT	fValue;
+  U32		uValue;
+  S32   lValue;
+  U16		awValue[ 2 ];
+  U8		anValue[ 4 ];
 } U32UN, *PU32UN;
 
 typedef	union

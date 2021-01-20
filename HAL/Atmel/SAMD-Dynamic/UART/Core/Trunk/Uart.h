@@ -121,7 +121,7 @@ typedef enum _UARTMODE
 typedef enum _UARTSAMPLE
 {
   UART_SAMP_16XARITH = 0, ///< 16X oversampling, arithmatic baud rate
-  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+  #if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   UART_SAMP_16XFRAC,      ///< 16X oversampling, fractional baud rate
   UART_SAMP_8XARITH,      ///< 8X oversampling, arithmatic baud rate
   UART_SAMP_8XFRAC,       ///< 8X oversampling, fracitonal baud rate
@@ -194,12 +194,16 @@ typedef struct _UARTDEF
   UARTRXDPAD        eRxdPad;      ///< RXD pad
   UARTTXDPAD        eTxdPad;      ///< TAD pad
   U32               uBaudRate;    ///< baud rate
+#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   UARTSAMP          eSamp;        ///< sampling
+#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
   UARTPARITY        eParity;      ///< parity
   UARTWRDLEN        eWrdLen;      ///< word length
   UARTSTOPBIT       eStopBit;     ///< number of stop bits
   BOOL              bRunStandby;  ///< run in standby
+#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
   U16               wRxBufSize;   ///< RX buffer size
+#endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
   U16               wTxBufSize;   ///< RX buffer size
   PVUARTINTCALLBACK pvCallback;   ///< callback
   USARTEVENTFLAGS   tEventFlags;  ///< event flags
@@ -215,7 +219,7 @@ typedef struct _UARTDEF
 // global function prototypes --------------------------------------------------
 extern  PTUARTHANDLE  Uart_Configure( PUARTDEF ptDef );
 extern  UARTERR       Uart_Write( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesWritten );
-#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDDEFINE_OS_TASKMINIMAL )
+#if (SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 extern  UARTERR       Uart_Read( PTUARTHANDLE ptUart, PU8 pnData, U16 wLength, PU16 pwBytesRead );
 #endif // SYSTEMDEFINE_OS_SELECTON != SYSTEMDEFINE_OS_TASKMINIMAL
 

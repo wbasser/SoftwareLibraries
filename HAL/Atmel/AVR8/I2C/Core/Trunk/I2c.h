@@ -35,7 +35,7 @@
 /// enumerate the single instantiation
 typedef enum _I2CDEVENUM
 {
-  I2C_LCLBUS_DEV_ENUM = 0
+  I2C_DEV_ENUM_LCLBUS = 0
 } I2CDEVENUM;
 
 /// enumerate the IOCTL acton

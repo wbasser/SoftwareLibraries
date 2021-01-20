@@ -25,26 +25,14 @@
 
 // local includes -------------------------------------------------------------
 #include "ManchesterCodec/ManchesterCodec.h"
-#include "ManchesterCodec/ManchesterCodec_cfg.h"
+
 // library includes -----------------------------------------------------------
-#include "GPIO/Gpio.h"
 #include "Interrupt/Interrupt.h"
-#include "QueueManager/QueueManager.h"
 #if (( MANCHESTERCODEC_RCVDBG_ENABLE == 1 ) || ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 ))
 #include "DebugManager/DebugManager.h"
 #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 ) || ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 )
 
 // Macros and Defines ---------------------------------------------------------
-/// define the local receive bit time event
-#if ( TASK_TSKARG_SIZE_BYTES == 1 )
-  #define RCV_LCL_EVENT_BITTIME ( 0xBB )
-#elif ( TASK_TSKARG_SIZE_BYTES == 2 )
-  #define RCV_LCL_EVENT_BITTIME ( 0xBBBB )
-#elif ( TASK_TSKARG_SIZE_BYTES == 4 )
-  #define RCV_LCL_EVENT_BITTIME ( 0xBBBBBB )
-#else
-  #define RCV_LCL_EVENT_BITTIME ( 0xBB )
-#endif // TASK_TASKARG_SIZE_BYTES
 
 // enumerations ---------------------------------------------------------------
 /// enumerate the message phase
@@ -109,34 +97,33 @@ typedef enum _SHIFTBIT
 // global parameter declarations ----------------------------------------------
 
 // local parameter declarations -----------------------------------------------
-static  U16           wHalfBitMinTime;      ///< half bit mean time
-static  U16           wHalfBitMaxTime;      ///< half bit max time
-static  U16           wFullBitMinTime;      ///< full bit mean time
-static  U16           wFullBitMaxTime;      ///< full bit max time
-static  XMTPHASE      eXmtPhase;            ///< transmit phase
-static  RCVPHASE      eRcvPhase;            ///< recieve phase
-static  PU8           pnXmtData;            ///< pointer to the transmit data
-static  PU8           pnRcvData;            ///< pointer to the receive data
-static  U8            nXmtLen;              ///< transmit length
-static  U8            nRcvLen;              ///< recieve length
-static  U16           wOnCapTime;           ///< on capture time
-static  U16           wOffCapTime;          ///< off capture time
-static  U8            nXmtMask;             ///< transmit bit mask
-static  U8            nXmtSyncBitCnt;       ///< sync bit count - transmit
-static  U8            nRcvSyncBitCnt;       ///< sync bit count - receive
-static  U8            nXmtStopBitCnt;       ///< stop bit count
-static  U8            nRcvStopBitCnt;       ///< receive stop bit count
-static  U8            nActRcvBits;          ///< actual number of receive bits
-static  U8            nCurData;             ///< current data byte
-static  VU8           nTimeout;             ///< timeout value
-static  U8            nRcvBitCnt;           ///< bit count
-static  BOOL          bPrvBit;              ///< previous bit in decode
-static  BOOL          bCurBit;              ///< current bit to decode
-static  BOOL          bFirstEdge;           ///< first edge flag
-static  VBOOL         bXmtInProgress;       ///< transmit in progress flag
-static  U8            nXmtBitCnt;           ///< transmit bit count
-static  PVOID         pvRcvTask;            ///< receive task enumeration
-static  PVOID         pvXmtTask;            ///< transmit task enumeration
+static  U16                 wHalfBitMinTime;      ///< half bit mean time
+static  U16                 wHalfBitMaxTime;      ///< half bit max time
+static  U16                 wFullBitMinTime;      ///< full bit mean time
+static  U16                 wFullBitMaxTime;      ///< full bit max time
+static  XMTPHASE            eXmtPhase;            ///< transmit phase
+static  RCVPHASE            eRcvPhase;            ///< recieve phase
+static  PU8                 pnXmtData;            ///< pointer to the transmit data
+static  PU8                 pnRcvData;            ///< pointer to the receive data
+static  U8                  nXmtLen;              ///< transmit length
+static  U8                  nRcvLen;              ///< recieve length
+static  U16                 wOnCapTime;           ///< on capture time
+static  U16                 wOffCapTime;          ///< off capture time
+static  U8                  nXmtMask;             ///< transmit bit mask
+static  U8                  nXmtSyncBitCnt;       ///< sync bit count - transmit
+static  U8                  nRcvSyncBitCnt;       ///< sync bit count - receive
+static  U8                  nXmtStopBitCnt;       ///< stop bit count
+static  U8                  nRcvStopBitCnt;       ///< receive stop bit count
+static  U8                  nActRcvBits;          ///< actual number of receive bits
+static  U8                  nCurData;             ///< current data byte
+static  VU8                 nTimeout;             ///< timeout value
+static  U8                  nRcvBitCnt;           ///< bit count
+static  BOOL                bPrvBit;              ///< previous bit in decode
+static  BOOL                bCurBit;              ///< current bit to decode
+static  BOOL                bFirstEdge;           ///< first edge flag
+static  VBOOL               bXmtInProgress;       ///< transmit in progress flag
+static  U8                  nXmtBitCnt;           ///< transmit bit count
+static  MANCHESTERCODECDEF  tDef;           
 
 // local function prototypes --------------------------------------------------
 static  void      ShiftRcvBit( SHIFTBIT eBit );
@@ -144,6 +131,7 @@ static  void      DecodeBit( void );
 static  BITSTATE  DecodeBitTime( U16 wCapTime );
 
 // constant parameter initializations -----------------------------------------
+
 /******************************************************************************
  * @function ManchesterCodec_Initialize
  *
@@ -152,22 +140,47 @@ static  BITSTATE  DecodeBitTime( U16 wCapTime );
  * This function will perform all initialization for the manchester encoder/
  * decoder
  *
+ * @param[in] ptDef       pointer to the definition structure
+ *
  *****************************************************************************/
-void ManchesterCodec_Initialize( void )
+#if ( MANCHESTERCODEC_ENALBE_DYNAMICINIT == OFF )
+  extern  void  ManchesterCodec_Initialize( void )
+#else
+  extern  void  ManchesterCodec_Initialize( PMANCHESTERCODECDEF ptDef );
+#endif // MANCHESTERCODEC_ENALBE_DYNAMICINIT
 {
   U32 uHalfBitMeanTime, uTolerance;
 
+#if ( MANCHESTERCODEC_ENALBE_DYNAMICINIT == ON )
+  // copy the data
+  memcpy( &tDef, ptDef, MANCHESTERCODECDEF_SIZE );
+#else
+  // set the data from the constants
+  tDef.wBaudRate          = MANCHESTERCODEC_BAUD_RATE;
+  tDef.nNumSyncBits       = MANCHESTERCODEC_NUM_SYNC_BITS;
+  tDef.nNumStopBits       = MANCHESTERCODEC_NUM_STOP_BITS;
+  tDef.nBitTolerancePct   = MANCHESTERCODEC_BIT_TOLERANCE_PCT;
+  tDef.bRisingEdgeEnable  = MANCHESTERCODEC_ENABLE_RCVPOLARITY;
+#endif // MANCHESTERCODEC_ENALBE_DYNAMICINIT
+
   // calculate the half bit mean time in CPU clock counts
-  uHalfBitMeanTime = ManchesterCodec_GetClockFreq( ) /  MANCHESTER_HALF_BIT_FREQ ;
-  
+  uHalfBitMeanTime = ManchesterCodec_GetClockFreq( ) /  ( tDef.wBaudRate << 2 );
+
   // calculate the tolerance
-  uTolerance = ( MANCHESTER_BITTOL_PERCENT * uHalfBitMeanTime ) / 100;
+  uTolerance = ( tDef.nBitTolerancePct * uHalfBitMeanTime ) / 100;
+
+  // call the local initialization
+  ManchesterCodec_LocalInitialize( uHalfBitMeanTime );
   
-  // calculate the min/max bit times
+   // calculate the min/max bit times
   wHalfBitMinTime = uHalfBitMeanTime - uTolerance;
   wHalfBitMaxTime = uHalfBitMeanTime + uTolerance;
   wFullBitMinTime = ( uHalfBitMeanTime * 2 ) - uTolerance;
   wFullBitMaxTime = ( uHalfBitMeanTime * 2 ) + uTolerance;
+
+  // set the bit counts
+  nXmtSyncBitCnt = tDef.nNumSyncBits;
+  nXmtStopBitCnt = tDef.nNumStopBits * 2;
 
   // disable transmit in progress
   bXmtInProgress = FALSE;
@@ -185,10 +198,9 @@ void ManchesterCodec_Initialize( void )
  *
  * @param[in]   pnData    pointer to the data to be sent
  * @param[in]   nLength   length of the data
- * @param[in]   pvTask    pointer to a void task argument
  *
  *****************************************************************************/
-void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, PVOID pvTask )
+void ManchesterCodec_Xmit( PU8 pnData, U8 nLength )
 {
   // copy the parameters
   pnXmtData = pnData;
@@ -197,12 +209,7 @@ void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, PVOID pvTask )
   // reset the transmit state/bit
   eXmtPhase = XMT_PHASE_SYNCFH;
   bCurBit = ON;
-  nXmtSyncBitCnt = MANCHESTERCODEC_NUM_SYNC_BITS;
-  nXmtStopBitCnt = MANCHESTERCODEC_NUM_STOP_BITS * 2;
   nXmtBitCnt = 0;
-
-  // save the enumeration
-  pvXmtTaskEnum = pvTask;
 
   #if ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 )
   DebugManager_AddElement( MANCHESTERCODEC_DBGXMT_BASE, 0x0000 );
@@ -224,10 +231,9 @@ void ManchesterCodec_Xmit( PU8 pnData, U8 nLength, PVOID pvTask )
  *
  * @param[in]   pnData        pointer to the storage for the incoming data
  * @param[in]   nLength       expected length of the incoming data
- * @param[in]   pvTask    pointer to a void task argument
  *
  *****************************************************************************/
-void ManchesterCodec_Recv( PU8 pnData, U8 nLength, PVOID pvTask )
+void ManchesterCodec_Recv( PU8 pnData, U8 nLength )
 {
   // copy the parameters
   pnRcvData = pnData;
@@ -244,11 +250,8 @@ void ManchesterCodec_Recv( PU8 pnData, U8 nLength, PVOID pvTask )
   nTimeout = 0;
   nRcvBitCnt = 0;
 
-  // save the enumeration
-  pvRcvTask = pvTask;
-
   // flush the queue/task manager too
-  ManchesterCOdec_FlushRcvEvent( );
+  ManchesterCodec_FlushRecvEvents( );
 
   // turn on the timer to start the process
   ManchesterCodec_RecvTimerControl( ON );
@@ -287,7 +290,7 @@ void ManchesterCodec_ProcessXmtTimer( void )
   if ( bXmtInProgress == TRUE )
   {
     // output the current bit
-    Gpio_Set( MANCHESTERCODEC_XMTBIT_GPIO_ENUM, bCurBit );
+    ManchesterCodec_OutputControl( bCurBit );
 
     #if ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 )
     DebugManager_AddElement( MANCHESTERCODEC_DBGXMT_BASE | 0x08 | bCurBit, ( nXmtBitCnt << 8 ) | eXmtPhase );
@@ -381,7 +384,7 @@ void ManchesterCodec_ProcessXmtTimer( void )
         bXmtInProgress = FALSE;
 
         // post done to the appropriate task
-        ManchesterCodec_PostPriorityEvent( pvXmtTask, MANCHESTERCODEC_XMIT_DONE 
+        ManchesterCodec_PostXmitEvent( MANCHESTERCODEC_XMIT_DONE );
       
         #if ( MANCHESTERCODEC_XMTDBG_ENABLE == 1 )
         DebugManager_AddElement( MANCHESTERCODEC_DBGXMT_BASE, 0xD0EE );
@@ -401,132 +404,114 @@ void ManchesterCodec_ProcessXmtTimer( void )
     if ((( ++nRcvBitCnt & 0x01 ) == 0 ) && ( eRcvPhase != RCV_PHASE_DONE ))
     {
       // post a bit time event to the receive task
-      ManchesterCodec_PostPriorityEvent( g_pvXmitMask, RCV_LCL_EVENT_BITTIME );
+      ManchesterCodec_ProcessReceive( TRUE, 0, 0 );
     }
   }
 }
 
 /******************************************************************************
- * @function ManchesterCodec_ProcessEvent
+ * @function ManchesterCodec_ProcessReceive
  *
- * @brief process the timer
+ * @brief process a receive value
  *
- * This function will setup and transmit the data 
+ * This function will process a receive value
  *
- * @param[in]   xArg      argument 
- *
- * @return    always returns true
+ * @param[in]   bTimeout    timeout detected
+ * @param[in]   wBitTime    bit time
+ * @param[in]   eEdge       edge
  *
  *****************************************************************************/
-BOOL ManchesterCodec_ProcessEvent( TASKARG xArg )
+void ManchesterCodec_ProcessReceive( BOOL bTimeout, U16 wBitTime, MANCHESTERCODECEDGE eEdge )
 {
-  MANCHESTERCCODECDATA tData;
-
-  // check for which argument
-  switch( xArg )
+  // check for a timeout
+  if ( bTimeout )
   {
-    case QUEUEPUT_EVENT( MANCHESTER_INPCAP_QUEUE_ENUM ) :
-      // edge received, clear the timeout
-      nTimeout = 0;
-
-      // get the event from the queue
-      QueueManager_Get( MANCHESTER_INPCAP_QUEUE_ENUM, ( PU8)&tData );  
-  
+    // if we are in the middle of a decode and we have hit a timeout - reset
+    if (( bFirstEdge == FALSE ) && ( eRcvPhase != RCV_PHASE_STOP ) && ( eRcvPhase != RCV_PHASE_DONE ))
+    {
       #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
-      DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE | ( bFirstEdge << 4 ) | tData.eEdge, tData.wValue );
+      DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE | 0x0008, nTimeout );
       #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
 
-      // ensure we are not in a stop bit phase
-      if ( eRcvPhase != RCV_PHASE_STOP )
+      if ( ++nTimeout >= 4 )
       {
-        #if ( MANCHESTERCODEC_INVERT_ENABLE == 1 )
-        // check for falling edge
-        if ( tData.eEdge == MANCHESTERCODEC_EDGE_FALL )
-        #else
-        // check for rising edge
-        if ( tData.eEdge == MANCHESTERCODEC_EDGE_RISE )
-        #endif // ( MANCHESTERCODEC_INVERT_ENABLE == 1 )
-        {
-          // first pulse
-          if ( bFirstEdge )
-          {
-            // clear the first edge
-            bFirstEdge = FALSE;
+        #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+        DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE | 0x0009, 0xD0EE );
+        #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
 
-            // set the previous bit to a 1
-            bPrvBit = ON;
-            wOffCapTime = wHalfBitMinTime;
-            wOnCapTime = wHalfBitMinTime;
-
-            // post an edge event
-            ManchesterCodec_PostPriorityEvent( pvRcvTask, MANCHESTERCODEC_RECV_EDGE );
-          }
-          else
-          {
-            // get the high time/decode
-            wOffCapTime = tData.wValue;
-          }
-        }
-        else if ( bFirstEdge == FALSE )
-        {
-          // get the lo time
-          wOnCapTime = tData.wValue;
-
-          // decode the bit
-          DecodeBit( );
-        }
-      }
-      else
-      {
-        // turn off the receiver/flush any events/post the event
-        ManchesterCodec_RecvTimerControl( OFF );
-        ManchesterCodec_FlushXmtEvents( );
-        ManchesterCodec_PostPriorityEvent( pvRcvTask, MANCHESTERCODEC_RECV_EROR );        
-
-        // reset the state
+        // reset the receiver
         eRcvPhase = RCV_PHASE_DONE;
-        bFirstEdge = TRUE;
-
-        #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
-        DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE, 0xC0DE );
-        #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+        ManchesterCodec_RecvTimerControl( OFF );
+        ManchesterCodec_PostRecvEvent( MANCHESTERCODEC_RECV_DONE );        
       }
-      break;
+    }
 
-    case RCV_LCL_EVENT_BITTIME :
-      // if we are in the middle of a decode and we have hit a timeout - reset
-      if (( bFirstEdge == FALSE ) && ( eRcvPhase != RCV_PHASE_STOP ) && ( eRcvPhase != RCV_PHASE_DONE ))
+    // if we are in stop bit detect, process bit
+    if ( eRcvPhase == RCV_PHASE_STOP )
+    {
+      ShiftRcvBit( SHIFT_BIT_STOP );
+    }
+  }
+  else
+  {
+    // edge received, clear the timeout
+    nTimeout = 0;
+
+    #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+    DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE | ( bFirstEdge << 4 ) | tData.eEdge, tData.wValue );
+    #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+
+    // ensure we are not in a stop bit phase
+    if ( eRcvPhase != RCV_PHASE_STOP )
+    {
+      if ((( ON == tDef.bRisingEdgeEnable ) && ( MANCHESTERCODEC_EDGE_RISE == eEdge )) ||
+          (( OFF == tDef.bRisingEdgeEnable ) && ( MANCHESTERCODEC_EDGE_FALL == eEdge )))
       {
-        #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
-        DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE | 0x0008, nTimeout );
-        #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
-
-        if ( ++nTimeout >= 4 )
+        // first pulse
+        if ( bFirstEdge )
         {
-          #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
-          DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE | 0x0009, 0xD0EE );
-          #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+          // clear the first edge
+          bFirstEdge = FALSE;
 
-          // reset the receiver
-          eRcvPhase = RCV_PHASE_DONE;
-          ManchesterCodec_RecvTimerControl( OFF );
-          ManchesterCodec_PostPriorityEvent( pvRcvTask, MANCHESTERCODEC_RECV_DONE );        
+          // set the previous bit to a 1
+          bPrvBit = ON;
+          wOffCapTime = wHalfBitMinTime;
+          wOnCapTime = wHalfBitMinTime;
+
+          // post an edge event
+          ManchesterCodec_PostRecvEvent( MANCHESTERCODEC_RECV_EDGE );
+        }
+        else
+        {
+          // get the high time/decode
+          wOffCapTime = wBitTime;
         }
       }
-
-      // if we are in stop bit detect, process bit
-      if ( eRcvPhase == RCV_PHASE_STOP )
+      else if ( bFirstEdge == FALSE )
       {
-        ShiftRcvBit( SHIFT_BIT_STOP );
+        // get the lo time
+        wOnCapTime = wBitTime;
+
+        // decode the bit
+        DecodeBit( );
       }
-      break;
+    }
+    else
+    {
+      // turn off the receiver/flush any events/post the event
+      ManchesterCodec_RecvTimerControl( OFF );
+      ManchesterCodec_FlushRecvEvents( );
+      ManchesterCodec_PostRecvEvent( MANCHESTERCODEC_RECV_EROR );        
 
-    default :
-      break;
+      // reset the state
+      eRcvPhase = RCV_PHASE_DONE;
+      bFirstEdge = TRUE;
+
+      #if ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+      DebugManager_AddElement( MANCHESTERCODEC_DBGRCV_BASE, 0xC0DE );
+      #endif // ( MANCHESTERCODEC_RCVDBG_ENABLE == 1 )
+    }
   }
-
-  // flush the event
-  return( TRUE );
 }
 
 /******************************************************************************
@@ -580,7 +565,7 @@ static void DecodeBit( void )
       // turn off the receive/post event
       eRcvPhase = RCV_PHASE_DONE;
       ManchesterCodec_RecvTimerControl( OFF );
-      TaskManager_PostPriorityEvent( eRcvTaskEnum, MANCHESTERCODEC_RECV_EROR );        
+      ManchesterCodec_PostRecvEvent( MANCHESTERCODEC_RECV_EROR );        
       break;
   }
 }
@@ -609,7 +594,7 @@ static void ShiftRcvBit( SHIFTBIT eBit )
   switch( eRcvPhase )
   {
     case RCV_PHASE_SYNC :
-      if ( ++nRcvSyncBitCnt == MANCHESTERCODEC_NUM_SYNC_BITS )
+      if ( ++nRcvSyncBitCnt == tDef.nNumSyncBits )
       {
         // go to the data state/reset the bit count
         eRcvPhase = RCV_PHASE_DATA;
@@ -650,13 +635,12 @@ static void ShiftRcvBit( SHIFTBIT eBit )
       if ( eBit == SHIFT_BIT_STOP )
       {
         // test for done
-        if ( ++nRcvStopBitCnt == ( MANCHESTERCODEC_NUM_STOP_BITS + 2 ))
+        if ( ++nRcvStopBitCnt == ( tDef.nNumStopBits + 2 ))
         {
           // turn off the receiver/post the event
           ManchesterCodec_RecvTimerControl( OFF );
-
-          TaskManager_FlushEvents( MANCHESTER_PROCESS_EVENT_TASK );
-          TaskManager_PostPriorityEvent( eRcvTaskEnum, MANCHESTERCODEC_RECV_DONE );        
+          ManchesterCodec_FlushRecvEvents( );
+          ManchesterCodec_PostRecvEvent( MANCHESTERCODEC_RECV_DONE );        
           
           // reset the state/set first edge flag
           eRcvPhase = RCV_PHASE_DONE;

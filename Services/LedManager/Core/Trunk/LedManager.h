@@ -30,7 +30,7 @@
 
 // library includes -----------------------------------------------------------
 #if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-#include "AsciiCommandHandler/AsciiCommandHandler.h"
+  #include "AsciiCommandHandler/AsciiCommandHandler.h"
 #endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 // Macros and Defines ---------------------------------------------------------
@@ -48,23 +48,22 @@ typedef enum _LEDMANAGERERR
 
 // global parameter declarations -----------------------------------------------
 #if ( LEDMANAGER_ENABLE_DEBUG_COMMANDS == 1 )
-extern  const CODE ASCCMDENTRY g_atLedManagerCmdHandlerTable[ ];
+  extern  const CODE ASCCMDENTRY g_atLedManagerCmdHandlerTable[ ];
 #endif  // LEDMANAGER_ENABLE_DEBUG_COMMANDS
 
 // global function prototypes --------------------------------------------------
 extern 	void          LedManager_Initialize( void );
 extern  LEDMANAGERERR LedManager_Control( LEDMANAGERSELENUM eLedSel, LEDACTION eAction, U16 wOption );
 #if ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
-extern	LEDMANAGERERR LedManager_PlayAnimation( LEDMNGRANIMENUM eAnimation, U16 wOption );
+  extern	LEDMANAGERERR LedManager_PlayAnimation( LEDMNGRANIMENUM eAnimation, U16 wOption );  
 #endif // ( SYSTEMDEFINE_OS_SELECTION != SYSTEMDEFINE_OS_MINIMAL )
 extern  void          LedManager_ProcessAnimation( void );
 #if (( LEDMANAGER_MATRIX_MAX_NUM_ROWS != 0 ) && ( LEDMANAGER_MATRIX_MAX_NUM_COLS != 0 ))
-extern  void          LedManager_ProcessScan( void );
+  extern  void          LedManager_ProcessScan( void );
 #endif  // MATRIX DEFS
 #if ( LEDMANAGER_RGB_LEDS_ENABLED == 1 )
-extern  LEDMANAGERERR LedManager_RgbControl( LEDMANAGERRGBENUM eLedSel, LEDACTION eAction, LEDRGBCOLOR eColor, U16 wOption );
+  extern  LEDMANAGERERR LedManager_RgbControl( LEDMANAGERRGBENUM eLedSel, LEDACTION eAction, LEDRGBCOLOR eColor, U16 wOption );
 #endif  // LEDMANAGER_RGB_LEDS_ENABLED
-
 
 /**@} EOF LedManager.h */
 

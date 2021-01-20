@@ -169,7 +169,7 @@ static void ScanTask( PVOID pvParameters )
   }
 }
 #endif  // MATRIX DEFS
-#elif ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKAMANAGER )
+#elif ( SYSTEMDEFINE_OS_SELECTION == SYSTEMDEFINE_OS_TASKMANAGER )
 /******************************************************************************
  * @function LedManager_AnimationTask
  *

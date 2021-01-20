@@ -9,33 +9,32 @@
  * @copyright Copyright (c) 2012 CyberIntegration
  * This document contains proprietary data and information of CyberIntegration
  * LLC. It is the exclusive property of CyberIntegration, LLC and will not be
- * disclosed in any form to any party without prior written permission of 
+ * disclosed in any form to any party without prior written permission of
  * CyberIntegration, LLC. This document may not be reproduced or further used
  * without the prior written permission of CyberIntegration, LLC.
  *
  * Version History
  * ======
  * $Log: $
- * 
+ *
  *
  * \addtogroup StateExecutionEngine
  * @{
  *****************************************************************************/
- 
+   
 // ensure only one instantiation
 #ifndef _STATEEXECUTIONENGINE_H
 #define _STATEEXECUTIONENGINE_H
 
 // system includes ------------------------------------------------------------
 
-// library includes -----------------------------------------------------------
-#include "Types/Types.h"
+// local includes -------------------------------------------------------------
 #include "StateExecutionEngine/StateExecutionEngine_prm.h"
-#if ( STATEEXECENG_DISABLE_TASKMANAGER == 0 )
-#include "TaskManager/TaskManager.h"
-#endif // STATEEXECENG_DISABLE_TASKMANAGER
+
+// library includes -----------------------------------------------------------
 
 // Macros and Defines ---------------------------------------------------------
+
 /// define the "None" state.
 #define	STATEEXECENG_STATE_NONE		( 0xFF)
 
@@ -49,11 +48,11 @@
 
 /// define the helper macro for the end event table entry
 #define STATEEXECENGEVENT_END( ) \
-{ \
-  .xEvent = 0, \
-  .nNextState = STATEEXECENG_STATE_NONE, \
-  .bExecuteExit = FALSE \
-}
+  { \
+    .xEvent = 0, \
+    .nNextState = STATEEXECENG_STATE_NONE, \
+    .bExecuteExit = FALSE \
+  }
 
 /// define the helper macro for creating state table entries
 #define STATEXECENGETABLE_ENTRY( state, enter, exec, exit, event ) \
@@ -66,33 +65,28 @@
       .pvExitFunc = ( PVSTATEEXECENGEXTFUNC )exit \
     }, \
     .ptEventTable = ( PSTATEEXECENGEVENT )event \
-  } 
+  }
+
+// enumerations ---------------------------------------------------------------
 
 // structures -----------------------------------------------------------------
-#if ( STATEEXECENG_DISABLE_TASKMANAGER == 0 )
-typedef TASKARG   STATEEXECENGARG;
-#else
 #if ( STATEEXECENG_ARG_SIZE_BYTES == 1 )
-typedef U8		    STATEEXECENGARG;
-typedef	PU8		    PSTATEEXECENGARG;
+  typedef U8		    STATEEXECENGARG;
+  typedef	PU8		    PSTATEEXECENGARG;
 #elif ( STATEEXECENG_ARG_SIZE_BYTES == 2 )
-typedef U16		    STATEEXECENGARG;
-typedef PU16	    PSTATEEXECENGARG;
+  typedef U16		    STATEEXECENGARG;
+  typedef PU16	    PSTATEEXECENGARG;
 #elif ( STATEEXECENG_ARG_SIZE_BYTES == 4 )
-typedef U32		    STATEEXECENGARG;
-typedef	PU32	    PSTATEEXECENGARG;
+  typedef U32		    STATEEXECENGARG;
+  typedef	PU32	    PSTATEEXECENGARG;
 #else
-#error You must select a task argument size in StateExecutionEngine_prm.h
+  #error You must select a task argument size in StateExecutionEngine_prm.h
 #endif  // STATEEXECENG_ARG_SIZE_BYTES
-#endif // STATEEXEECENG_DISABLE_TASKMANAGER
 
 /// Function pointer type definitions for entry, exec, and exit functions
 typedef void ( *PVSTATEEXECENGENTFUNC )( void );
 typedef U8   ( *PVSTATEEXECENGEXCFUNC )( STATEEXECENGARG );
 typedef void ( *PVSTATEEXECENGEXTFUNC )( void );
-//typedef void ( *PVSTATEEXECENGENTFUNC )( PVOID, void );
-//typedef U8   ( *PVSTATEEXECENGEXCFUNC )( PVOID, STATEEXECENGARG );
-//typedef void ( *PVSTATEEXECENGEXTFUNC )( PVOID, void );
 
 /// define the event structure
 typedef struct _STATEEXECENGEVENT
@@ -127,7 +121,7 @@ typedef struct _STATEEXECENGCONTROL
   BOOL                      bExecExit;    ///< execute the exit function for this event
   BOOL                      bFlushEvent;  ///< flush event flag
   STATEEXECENGTABLE const*  ptStates;     ///< pointer to the states for this instance
-//  PVOID                     pvArg;        ///< pointer to an user supplied argument
+  //  PVOID                     pvArg;        ///< pointer to an user supplied argument
 } STATEEXECENGCONTROL, *PSTATEEXECENGCONTROL;
 #define STATEEXECENGCONTROL_SIZE  sizeof( STATEEXECENGCONTROL )
 
@@ -137,4 +131,4 @@ extern  void  StateExecutionEngine_Process( PSTATEEXECENGCONTROL ptControl, STAT
 
 /**@} EOF StateExecutionEngine.h */
 
-#endif  // _STATEEXECUTIONENGINE_H
+#endif  // _STATEEXECUTIONENGINE.H
